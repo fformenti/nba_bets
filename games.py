@@ -1,11 +1,11 @@
 from utils import get_nba_season
 from pandas import DataFrame
 import pandas as pd
+from teams_history import get_cities_conference
 
 
 def read_games_file() -> DataFrame:
-    # Read the CSV file directly into a pandas DataFrame
-    file_path = "data/archive/Games.csv"  # Change to your actual filename
+    file_path = "data/archive/Games.csv"
     df = pd.read_csv(file_path, parse_dates=["gameDate"])
 
     # Convert specific columns to appropriate data types
@@ -23,18 +23,18 @@ def read_games_file() -> DataFrame:
     return df
 
 
-def filter_games(games, start_date, gameType) -> DataFrame:
-    games = games.loc[games["gameType"] <= gameType]
+def filter_games(games, start_date, gameTypes) -> DataFrame:
+    games = games.loc[games["gameType"].isin(gameTypes)]
     games = games.loc[games["gameDate"] >= start_date]
     games = games.loc[games["homeScore"] > 0]
 
     return games
 
 
-def add_features_to_games(df):
-    df["season"] = df["gameDate"].apply(get_nba_season)
+def add_features_to_games(games):
+    games["season"] = games["gameDate"].apply(get_nba_season)
 
-    df["winnerTeam"] = df.apply(
+    games["winnerTeam"] = games.apply(
         lambda x: str(x["hometeamName"])
         if x["winner"] == x["hometeamId"]
         else str(x["awayteamName"])
@@ -43,47 +43,37 @@ def add_features_to_games(df):
         axis=1,
     )
 
-    df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
+    games["gameDateOnlyStr"] = games["gameDate"].dt.strftime("%Y-%m-%d")
 
-    df["pts_diff"] = df.apply(
+    games["pts_diff"] = games.apply(
         lambda x: x["homeScore"] - x["awayScore"],
         axis=1,
     )
 
-    df["winner_home_bool"] = df.apply(
+    games["winner_home_bool"] = games.apply(
         lambda x: 1 if x["winner"] == x["hometeamId"] else 0, axis=1
     )
 
-    df["winner_away_bool"] = df.apply(
+    games["winner_away_bool"] = games.apply(
         lambda x: 1 if x["winner"] != x["hometeamId"] else 0, axis=1
     )
 
-    return df
+    cities_conferences = get_cities_conference()
 
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="hometeamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+    games.rename(columns={"Conference": "hometeamConference"}, inplace=True)
 
-def calculate_record(games):
-    games = games.sort_values(["teamId", "gameDate"])
-
-    games["total_wins"] = games.groupby("teamId")["win_bool"].transform(
-        pd.Series.cumsum
-    )
-
-    # games["aux"] = 1
-    # games["record"] = games["total_wins"] / games["games_count"]
-    # games["games_count"] = games.groupby("teamId")["aux"].transform(pd.Series.cumsum)
-
-    games["record"] = (
-        games.groupby("teamId")["win_bool"]
-        .expanding()  # Uses all available prior rows in the group
-        .mean()
-        .reset_index(level=0, drop=True)  # Align with original DataFrame
-    )
-
-    games["record_L5"] = (
-        games.groupby("teamId")["win_bool"]
-        .rolling(window=5, min_periods=1)  # min_periods=1 to avoid NaN for small groups
-        .mean()
-        .reset_index(level=0, drop=True)
-    )
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="awayteamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+    games.rename(columns={"Conference": "awayteamConference"}, inplace=True)
 
     return games

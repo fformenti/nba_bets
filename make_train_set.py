@@ -28,10 +28,10 @@ def make_training_set(games_filtered):
 
 
 def main():
-    gameType = "Regular Season"
+    GAMETYPES = ["Regular Season", "NBA Emirates Cup"]
     start_date = "1980-07-01"
 
     games = read_games_file()
     games: DataFrame = add_features_to_games(games)
-    games_filtered: DataFrame = filter_games(games, start_date, gameType)
+    games_filtered: DataFrame = filter_games(games, start_date, GAMETYPES)
     training_set = make_training_set(games_filtered)
