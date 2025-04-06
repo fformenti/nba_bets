@@ -34,10 +34,10 @@ def filter_games(games, start_date, gameTypes) -> DataFrame:
 def add_features_to_games(games):
     games["season"] = games["gameDate"].apply(get_nba_season)
 
-    games["winnerTeam"] = games.apply(
-        lambda x: str(x["hometeamName"])
+    games["winnerteamCity"] = games.apply(
+        lambda x: str(x["hometeamCity"])
         if x["winner"] == x["hometeamId"]
-        else str(x["awayteamName"])
+        else str(x["awayteamCity"])
         if x["winner"] == x["awayteamId"]
         else "",
         axis=1,
@@ -75,5 +75,13 @@ def add_features_to_games(games):
         right_on="teamCity",
     ).drop(columns=["teamCity"])
     games.rename(columns={"Conference": "awayteamConference"}, inplace=True)
+
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="winnerteamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+    games.rename(columns={"Conference": "winnerteamConference"}, inplace=True)
 
     return games

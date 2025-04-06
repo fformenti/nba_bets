@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 pandas = "*"
+huggingface-hub = "*"
 
 [dev-packages]
 jupyter = "*"
