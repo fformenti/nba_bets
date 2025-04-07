@@ -11,6 +11,8 @@ def make_season_info(games_filtered):
         columns={"min": "season_start", "max": "season_end"}
     )
 
+    season_teams_ids = season_teams_ids.rename(columns={"hometeamId": "teams_ids"})
+
     season_info = season_start_end.merge(season_teams_ids, on="season")
 
     return season_info

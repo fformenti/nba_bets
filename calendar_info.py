@@ -89,4 +89,8 @@ def make_rested_days_table(
         ["teamId", (rested_days["at_road_indicator"] == 0).cumsum()]
     )["at_road_indicator"].transform("cumsum")
 
+    rested_days = rested_days.drop(
+        columns=["gameDate", "home_game", "away_game", "rest"]
+    )
+
     return rested_days

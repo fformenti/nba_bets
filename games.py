@@ -23,8 +23,9 @@ def read_games_file() -> DataFrame:
     return df
 
 
-def filter_games(games, start_date, gameTypes) -> DataFrame:
-    games = games.loc[games["gameType"].isin(gameTypes)]
+def filter_regular_season_games(games, start_date) -> DataFrame:
+    GAMETYPES = ["Regular Season", "NBA Emirates Cup"]
+    games = games.loc[games["gameType"].isin(GAMETYPES)]
     games = games.loc[games["gameDate"] >= start_date]
     games = games.loc[games["homeScore"] > 0]
 

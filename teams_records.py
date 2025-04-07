@@ -1,16 +1,6 @@
 import pandas as pd
 
 
-HOME_AWAY_COLUMNS_JOIN = [
-    "gameId",
-    "teamId",
-    "record",
-    "record_L5",
-    "pts_diff_avg",
-    "pts_diff_avg_L5",
-]
-
-
 def total_losses(window):
     # Exclusive OR (XOR) to invert the boolean values
     return sum([bool(i) ^ 1 for i in window])
@@ -117,84 +107,6 @@ def calculate_away_record(games):
     )
 
     return calculate_record(away_games)
-
-
-def get_records(games, teams_record):
-    record_columns_join = [
-        "gameId",
-        "teamId",
-        "total_wins",
-        "total_losses",
-        "record",
-        "record_L5",
-        "pts_diff_avg",
-        "pts_diff_avg_L5",
-        "games_played",
-    ]
-
-    games = (
-        games.merge(
-            teams_record[record_columns_join],
-            how="left",
-            left_on=["gameId", "hometeamId"],
-            right_on=["gameId", "teamId"],
-            suffixes=("", "_HT"),
-        )
-        .drop(columns=["teamId"])
-        .copy()
-    )
-
-    games = (
-        games.merge(
-            teams_record[record_columns_join],
-            how="left",
-            left_on=["gameId", "awayteamId"],
-            right_on=["gameId", "teamId"],
-            suffixes=("", "_VT"),
-        )
-        .drop(columns=["teamId"])
-        .copy()
-    )
-
-    return games
-
-
-def get_home_records(games, home_games_record):
-    # Calculate home and away records
-    # home_games_record = calculate_home_record(games)
-
-    games = (
-        games.merge(
-            home_games_record[HOME_AWAY_COLUMNS_JOIN],
-            how="left",
-            left_on=["gameId", "hometeamId"],
-            right_on=["gameId", "teamId"],
-            suffixes=("", "_HT_at_home"),
-        )
-        .drop(columns=["teamId"])
-        .copy()
-    )
-
-    return games
-
-
-def get_away_records(games, away_games_record):
-    # Calculate home and away records
-    # away_games_record = calculate_away_record(games)
-
-    games = (
-        games.merge(
-            away_games_record[HOME_AWAY_COLUMNS_JOIN],
-            how="left",
-            left_on=["gameId", "awayteamId"],
-            right_on=["gameId", "teamId"],
-            suffixes=("", "_VT_at_away"),
-        )
-        .drop(columns=["teamId"])
-        .copy()
-    )
-
-    return games
 
 
 def make_east_west_record(games, season_start, season_end):
