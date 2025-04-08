@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def read_games_file() -> DataFrame:
-    file_path = "data/archive/Games.csv"
+    file_path = "data/raw/Games.csv"
     df = pd.read_csv(file_path, parse_dates=["gameDate"])
 
     # Convert specific columns to appropriate data types

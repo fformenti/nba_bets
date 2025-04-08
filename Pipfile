@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 pandas = "*"
 huggingface-hub = "*"
+boto3 = "*"
+python-dotenv = "*"
 
 [dev-packages]
 jupyter = "*"

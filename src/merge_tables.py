@@ -200,4 +200,4 @@ if __name__ == "__main__":
         ]
     ).copy()
 
-    games.to_csv("data/new_tables/games_added_features_part2.csv", index=False)
+    games.to_csv("data/processed/games_features.csv", index=False)
