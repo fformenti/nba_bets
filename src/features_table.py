@@ -1,33 +1,94 @@
 import pandas as pd
 
 from pandas import DataFrame
-from games import read_games_file, add_features_to_games, filter_regular_season_games
-from calendar_info import make_rested_days_table
+from games import read_games_file, filter_regular_season_games
+from rest_beetwen_games import make_rested_days_table
 from teams_records import (
     calculate_record,
     calculate_away_record,
     calculate_home_record,
     make_east_west_record,
 )
+from utils import get_nba_season
+from teams_cities_conferences import get_cities_conference
 
 pd.set_option("display.max_rows", 100)
 pd.set_option("display.max_columns", 100)
 
-TEAMS_HOME_RECORDS_PATH = "data/new_tables/teams_home_record.csv"
-TEAMS_AWAY_RECORDS_PATH = "data/new_tables/teams_away_record.csv"
-TEAMS_RECORDS_PATH = "data/new_tables/teams_records.csv"
-EAST_WEST_RECORDS_PATH = "data/new_tables/east_west_record.csv"
-RESTED_DAYS_PATH = "data/new_tables/rested_days.csv"
-GAMES_ADDED_FEATURES_PART1_PATH = "data/new_tables/games_added_features_part1.csv"
+TEAMS_HOME_RECORDS_PATH = "data/processed/teams_home_record.csv"
+TEAMS_AWAY_RECORDS_PATH = "data/processed/teams_away_record.csv"
+TEAMS_RECORDS_PATH = "data/processed/teams_records.csv"
+EAST_WEST_RECORDS_PATH = "data/processed/east_west_record.csv"
+RESTED_DAYS_PATH = "data/processed/rested_days.csv"
+GAMES_ADDED_FEATURES_PART1_PATH = "data/processed/games_added_features_part1.csv"
 
 
-def create_new_features_tables(games: DataFrame):
+def add_features_to_games(games):
+    games["season"] = games["gameDate"].apply(get_nba_season)
+
+    games["winnerteamCity"] = games.apply(
+        lambda x: str(x["hometeamCity"])
+        if x["winner"] == x["hometeamId"]
+        else str(x["awayteamCity"])
+        if x["winner"] == x["awayteamId"]
+        else "",
+        axis=1,
+    )
+
+    games["gameDateOnlyStr"] = games["gameDate"].dt.strftime("%Y-%m-%d")
+
+    games["pts_diff"] = games.apply(
+        lambda x: x["homeScore"] - x["awayScore"],
+        axis=1,
+    )
+
+    games["winner_home_bool"] = games.apply(
+        lambda x: 1 if x["winner"] == x["hometeamId"] else 0, axis=1
+    )
+
+    games["winner_away_bool"] = games.apply(
+        lambda x: 1 if x["winner"] != x["hometeamId"] else 0, axis=1
+    )
+
+    cities_conferences = get_cities_conference()
+
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="hometeamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+
+    games = games.rename(columns={"Conference": "hometeamConference"}, inplace=False)
+
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="awayteamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+    games = games.rename(columns={"Conference": "awayteamConference"}, inplace=False)
+
+    games = games.merge(
+        cities_conferences,
+        how="left",
+        left_on="winnerteamCity",
+        right_on="teamCity",
+    ).drop(columns=["teamCity"])
+    games = games.rename(columns={"Conference": "winnerteamConference"}, inplace=False)
+
+    return games
+
+
+def create_features_tables(games: DataFrame):
     seasons = games["season"].unique()
     home_games_record_season = []
     away_games_record_season = []
     teams_games_record_season = []
     east_west_record_season = []
     rested_days_season = []
+
+    games = add_features_to_games(games)
     for season in seasons:
         games_season = games.loc[games["season"] == season].copy()
         season_start = games_season["gameDate"].min()
@@ -81,10 +142,9 @@ if __name__ == "__main__":
 
     games = read_games_file()
     games_regular_season: DataFrame = filter_regular_season_games(games, start_date)
-    games_regular_season: DataFrame = add_features_to_games(games_regular_season)
     games_regular_season = games_regular_season.drop(
         columns=["gameType", "gameSubLabel", "gameLabel", "seriesGameNumber"]
     ).copy()
 
     games_regular_season.to_csv(GAMES_ADDED_FEATURES_PART1_PATH, index=False)
-    create_new_features_tables(games_regular_season)
+    create_features_tables(games_regular_season)

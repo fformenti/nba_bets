@@ -1,6 +1,19 @@
 import pandas as pd
 
 
+TEAMS_RECORDS_COLUMNS_JOIN = [
+    "gameId",
+    "teamId",
+    "total_wins",
+    "total_losses",
+    "record",
+    "record_L5",
+    "pts_diff_avg",
+    "pts_diff_avg_L5",
+    "games_played",
+]
+
+
 def total_losses(window):
     # Exclusive OR (XOR) to invert the boolean values
     return sum([bool(i) ^ 1 for i in window])
@@ -52,7 +65,7 @@ def calculate_record(games):
 
     games["games_played"] = games["total_wins"] + games["total_losses"]
 
-    return games
+    return games[TEAMS_RECORDS_COLUMNS_JOIN].copy()
 
 
 def calculate_home_record(games):

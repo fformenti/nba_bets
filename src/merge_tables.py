@@ -1,6 +1,6 @@
 import pandas as pd
 
-from make_new_tables import (
+from features_table import (
     TEAMS_HOME_RECORDS_PATH,
     TEAMS_AWAY_RECORDS_PATH,
     TEAMS_RECORDS_PATH,
@@ -10,33 +10,11 @@ from make_new_tables import (
 )
 
 
-TEAMS_RECORDS_COLUMNS_JOIN = [
-    "gameId",
-    "teamId",
-    "total_wins",
-    "total_losses",
-    "record",
-    "record_L5",
-    "pts_diff_avg",
-    "pts_diff_avg_L5",
-    "games_played",
-]
-
-HOME_AWAY_RECORDS_COLUMNS_JOIN = [
-    "gameId",
-    "teamId",
-    "record",
-    "record_L5",
-    "pts_diff_avg",
-    "pts_diff_avg_L5",
-]
-
-
 # ==== Teams Records ====
-def get_home_team_record(games, teams_record):
+def get_home_team_record(games, teams_records):
     games = (
         games.merge(
-            teams_record[TEAMS_RECORDS_COLUMNS_JOIN],
+            teams_records,
             how="left",
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
@@ -60,10 +38,10 @@ def get_home_team_record(games, teams_record):
     return games
 
 
-def get_away_team_record(games, teams_record):
+def get_away_team_record(games, teams_records):
     games = (
         games.merge(
-            teams_record[TEAMS_RECORDS_COLUMNS_JOIN],
+            teams_records,
             how="left",
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
@@ -90,7 +68,7 @@ def get_away_team_record(games, teams_record):
 def get_home_team_record_at_home(games, home_games_record):
     games = (
         games.merge(
-            home_games_record[HOME_AWAY_RECORDS_COLUMNS_JOIN],
+            home_games_record,
             how="left",
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
@@ -117,11 +95,10 @@ def get_home_team_record_at_home(games, home_games_record):
 def get_away_team_records_on_road(games, away_games_record):
     games = (
         games.merge(
-            away_games_record[HOME_AWAY_RECORDS_COLUMNS_JOIN],
+            away_games_record,
             how="left",
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
-            suffixes=("", "_VT_at_away"),
         )
         .drop(columns=["teamId"])
         .copy()
