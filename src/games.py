@@ -1,9 +1,10 @@
 from pandas import DataFrame
 import pandas as pd
 
+RAW_GAMES_PATH = "../data/raw/Games.csv"
 
-def read_games_file() -> DataFrame:
-    file_path = "data/raw/Games.csv"
+
+def read_games_file(file_path=RAW_GAMES_PATH) -> DataFrame:
     df = pd.read_csv(file_path, parse_dates=["gameDate"])
 
     # Convert specific columns to appropriate data types

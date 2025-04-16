@@ -9,6 +9,8 @@ from features_table import (
     GAMES_ADDED_FEATURES_PART1_PATH,
 )
 
+GAMES_FEATURES_PATH = "../data/processed/games_features.csv"
+
 
 # ==== Teams Records ====
 def get_home_team_record(games, teams_records):
@@ -46,7 +48,7 @@ def get_away_team_record(games, teams_records):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId"])
+        .drop(columns=["teamId", "season", "gameDate"])
         .copy()
     )
 
@@ -73,7 +75,7 @@ def get_home_team_record_at_home(games, home_games_record):
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId"])
+        .drop(columns=["teamId", "season", "gameDate"])
         .copy()
     )
 
@@ -100,7 +102,7 @@ def get_away_team_records_on_road(games, away_games_record):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId"])
+        .drop(columns=["teamId", "season", "gameDate"])
         .copy()
     )
 
@@ -170,10 +172,14 @@ if __name__ == "__main__":
     east_west_record = pd.read_csv(EAST_WEST_RECORDS_PATH)
     rested_days = pd.read_csv(RESTED_DAYS_PATH)
 
+    teams_records = teams_records.drop(columns=["gameDate", "season", "win_bool"])
     games = get_home_team_record(games, teams_records)
     games = get_away_team_record(games, teams_records)
 
+    teams_home_record = teams_home_record.drop(columns=["win_bool"])
     games = get_home_team_record_at_home(games, teams_home_record)
+
+    teams_away_record = teams_away_record.drop(columns=["win_bool"])
     games = get_away_team_records_on_road(games, teams_away_record)
 
     games = games.merge(
@@ -200,4 +206,4 @@ if __name__ == "__main__":
         ]
     ).copy()
 
-    games.to_csv("data/processed/games_features.csv", index=False)
+    games.to_csv(GAMES_FEATURES_PATH, index=False)

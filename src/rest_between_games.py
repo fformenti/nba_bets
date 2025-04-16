@@ -21,7 +21,26 @@ def is_away(home_game, away_game):
         return nan
 
 
-def make_rested_days_table(
+def make_rested_days_table(games):
+    rested_days_season = []
+    seasons = games["season"].unique()
+    for season in seasons:
+        games_season = games.loc[games["season"] == season].copy()
+        season_start = games_season["gameDate"].min()
+        season_end = games_season["gameDate"].max()
+        season_teams_ids = games_season["hometeamId"].unique()
+
+        # Days in Between Games
+        rested_days_season.append(
+            make_rested_days_table_season(
+                games_season, season_start, season_end, season_teams_ids
+            )
+        )
+
+    return pd.concat(rested_days_season, ignore_index=True)
+
+
+def make_rested_days_table_season(
     games_filtered, start_date, end_date, teams_season
 ) -> DataFrame:
     date_range = pd.date_range(start=start_date, end=end_date)
