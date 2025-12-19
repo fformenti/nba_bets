@@ -1,4 +1,8 @@
+"""Point differential feature calculations."""
+
+
 def calculate_home_pts_diff(games):
+    """Calculate point differential for home teams."""
     home_games = games.rename(
         index=str,
         columns={
@@ -9,6 +13,7 @@ def calculate_home_pts_diff(games):
 
 
 def calculate_away_pts_diff(games):
+    """Calculate point differential for away teams."""
     games["pts_diff"] = games["pts_diff"].apply(lambda x: -1 * x)
 
     home_games = games.rename(
@@ -22,6 +27,19 @@ def calculate_away_pts_diff(games):
 
 
 def calculate_pts_diff(games):
+    """
+    Calculate point differential statistics with rolling windows.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Games DataFrame with teamId, gameDate, season, pts_diff columns
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with point differential statistics
+    """
     games = games.sort_values(["teamId", "gameDate", "season"])
 
     games["pts_diff_L1"] = games.groupby(["teamId", "season"])["pts_diff"].shift(1)
@@ -48,7 +66,7 @@ def calculate_pts_diff(games):
 
     games["pts_diff_avg_L26"] = (
         games.groupby(["teamId", "season"])["pts_diff_L1"]
-        .rolling(window=13, min_periods=1)
+        .rolling(window=26, min_periods=1)
         .mean()
         .reset_index(level=[0, 1], drop=True)
     ).fillna(0.0)

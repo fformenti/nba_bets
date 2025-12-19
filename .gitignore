@@ -10,3 +10,9 @@ __pycache__
 
 
 .DS_Store
+
+# ML outputs
+models/*
+!models/.gitkeep
+outputs/*
+!outputs/.gitkeep

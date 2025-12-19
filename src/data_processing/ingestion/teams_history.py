@@ -41,10 +41,9 @@ def create_teams_history_table(
     # Read the input CSV
     df = pd.read_csv(input_file)
 
-    # Filter: league == "NBA", teamCity != "All-star", seasonFounded != 1980
+    # Filter: league == "NBA", teamCity != "All-star"
     df = df[df["league"] == "NBA"]
     df = df[df["teamCity"] != "All-star"]
-    df = df[df["seasonFounded"] != 1980]
 
     # Overwrite seasonActiveTill == 2100 to current_season_year + 1
     # (2025 for 2024/25 season as per user instruction)
@@ -101,7 +100,7 @@ def create_teams_history_table(
 
 if __name__ == "__main__":
     # Define paths
-    project_root = Path(__file__).parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent.parent
     input_file = (
         project_root / "data" / "raw" / "historical" / "TeamsHistoriesConferenceNBA.csv"
     )

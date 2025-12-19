@@ -1,7 +1,22 @@
+"""Winning percentage feature calculations."""
+
 import pandas as pd
 
 
 def calculate_record(games):
+    """
+    Calculate team records (winning percentage) with rolling windows.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Games DataFrame with teamId, gameDate, season, win_bool columns
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with record statistics
+    """
     # Sort by Team and Game Date to perform cumulative calculations correctly
     games = games.sort_values(["teamId", "gameDate", "season"])
     games["win_bool_l1"] = games.groupby(["teamId", "season"])["win_bool"].shift(1)
@@ -73,6 +88,7 @@ def calculate_record(games):
 
 
 def calculate_home_record(home_games):
+    """Calculate home team records."""
     home_games["win_bool"] = home_games.apply(
         lambda x: 1 if x["hometeamId"] == x["winner"] else 0, axis=1
     )
@@ -89,6 +105,7 @@ def calculate_home_record(home_games):
 
 
 def calculate_away_record(away_games):
+    """Calculate away team records."""
     away_games["win_bool"] = away_games.apply(
         lambda x: 1 if x["winner"] != x["hometeamId"] else 0, axis=1
     )
@@ -105,6 +122,7 @@ def calculate_away_record(away_games):
 
 
 def make_east_west_record(games):
+    """Calculate East vs West conference records."""
     east_west_record = games[games["hometeamConference"] != games["awayteamConference"]]
     east_west_record = east_west_record[
         ["gameDate", "gameDateOnlyStr", "season", "winnerteamConference"]

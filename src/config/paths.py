@@ -1,7 +1,13 @@
+"""
+Path constants for data files and directories.
+
+All paths are relative to PROJECT_ROOT for portability.
+"""
+
 from pathlib import Path
 
+# Project root directory
 script_dir = Path(__file__).parent
-
 PROJECT_ROOT = script_dir.parent.parent
 
 # Filenames
@@ -35,10 +41,3 @@ LOCAL_TEAMS_PTS_DIFF_PATH = LOCAL_PROCESSED_FOLDER / "teams_pts_diff.csv"
 LOCAL_EAST_WEST_RECORDS_PATH = LOCAL_PROCESSED_FOLDER / "east_west_record.csv"
 LOCAL_RESTED_DAYS_PATH = LOCAL_PROCESSED_FOLDER / "rested_days.csv"
 LOCAL_GAMES_FEATURES_PATH = LOCAL_PROCESSED_FOLDER / "games_features.csv"
-
-# AWS
-AWS_BUCKET_NAME = "formenti-nba-bets"
-AWS_PROCESSED_FOLDER = "processed"
-# AWS_TEAMS_CITIES_CONFERENCES_S3_KEY = (
-#     f"{AWS_PROCESSED_FOLDER}/{TEAMS_CITIES_CONFERENCES_FILENAME}"
-# )

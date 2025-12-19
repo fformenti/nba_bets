@@ -1,9 +1,12 @@
+"""Rest days between games feature calculations."""
+
 import pandas as pd
 from pandas import DataFrame
 from numpy import nan
 
 
 def is_home(home_game, away_game):
+    """Determine if team is playing at home."""
     if home_game == 1:
         return 1
     elif away_game == 1:
@@ -13,6 +16,7 @@ def is_home(home_game, away_game):
 
 
 def is_away(home_game, away_game):
+    """Determine if team is playing away."""
     if home_game == 1:
         return 0
     elif away_game == 1:
@@ -22,6 +26,19 @@ def is_away(home_game, away_game):
 
 
 def make_rested_days_table(games):
+    """
+    Calculate rest days between games for all teams.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Games DataFrame with gameDate, season, hometeamId, awayteamId columns
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with rested_days, days_at_home, days_on_road columns
+    """
     rested_days_season = []
     seasons = games["season"].unique()
     for season in seasons:
@@ -43,6 +60,25 @@ def make_rested_days_table(games):
 def make_rested_days_table_season(
     games_filtered, start_date, end_date, teams_season
 ) -> DataFrame:
+    """
+    Calculate rest days for a single season.
+
+    Parameters
+    ----------
+    games_filtered : pd.DataFrame
+        Games for a single season
+    start_date : pd.Timestamp
+        Season start date
+    end_date : pd.Timestamp
+        Season end date
+    teams_season : array-like
+        Team IDs for the season
+
+    Returns
+    -------
+    pd.DataFrame
+        Rest days DataFrame
+    """
     date_range = pd.date_range(start=start_date, end=end_date)
     rested_days = pd.MultiIndex.from_product(
         [date_range, teams_season], names=["gameDate", "teamId"]

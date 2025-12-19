@@ -1,17 +1,12 @@
+"""Feature aggregation and merging utilities."""
+
 import pandas as pd
 
-from pathlib import Path
-import sys
 
-# Add project root to path to allow imports
-_script_dir = Path(__file__).parent
-_project_root = _script_dir.parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-from src.local.constants import (  # noqa: E402
+from src.config import (
     LOCAL_REGULAR_SEASON_GAMES_PATH,
     LOCAL_GAMES_FEATURES_PATH,
+    LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH,
     LOCAL_TEAMS_HOME_RECORDS_PATH,
     LOCAL_TEAMS_AWAY_RECORDS_PATH,
     LOCAL_TEAMS_RECORDS_PATH,
@@ -22,9 +17,137 @@ from src.local.constants import (  # noqa: E402
     LOCAL_RESTED_DAYS_PATH,
 )
 
+from src.data_processing.features.winning_percentage import (
+    calculate_away_record,
+    calculate_home_record,
+    calculate_record,
+    make_east_west_record,
+)
+from src.data_processing.features.point_differential import (
+    calculate_away_pts_diff,
+    calculate_home_pts_diff,
+    calculate_pts_diff,
+)
+from src.data_processing.features.rest_days import make_rested_days_table
+from src.data_processing.transformation.add_teams_conferences import add_conference
+
+
+def create_features_tables(games: pd.DataFrame):
+    """
+    Create all feature tables from games DataFrame.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Games DataFrame with conference information
+    """
+    home_records = calculate_home_record(games)
+    away_records = calculate_away_record(games)
+    teams_record = calculate_record(
+        pd.concat([home_records, away_records], ignore_index=True)
+    )
+
+    games["pts_diff"] = games["homeScore"] - games["awayScore"]
+    home_pts_diff = calculate_home_pts_diff(games)
+    away_pts_diff = calculate_away_pts_diff(games)
+    teams_pts_diff = calculate_pts_diff(pd.concat([home_pts_diff, away_pts_diff]))
+
+    east_west_record = make_east_west_record(games)
+    rested_days = make_rested_days_table(games)
+
+    # Save the dataframes to CSV files
+    home_records.to_csv(LOCAL_TEAMS_HOME_RECORDS_PATH, index=False)
+    away_records.to_csv(LOCAL_TEAMS_AWAY_RECORDS_PATH, index=False)
+    teams_record.to_csv(LOCAL_TEAMS_RECORDS_PATH, index=False)
+
+    home_pts_diff.to_csv(LOCAL_TEAMS_HOME_PTS_DIFF_PATH, index=False)
+    away_pts_diff.to_csv(LOCAL_TEAMS_AWAY_PTS_DIFF_PATH, index=False)
+    teams_pts_diff.to_csv(LOCAL_TEAMS_PTS_DIFF_PATH, index=False)
+
+    east_west_record.to_csv(LOCAL_EAST_WEST_RECORDS_PATH, index=False)
+    rested_days.to_csv(LOCAL_RESTED_DAYS_PATH, index=False)
+    return
+
+
+def merge_features(games):
+    """
+    Merge all feature tables into the games DataFrame.
+
+    This function replicates the logic from 03_merge_tables.py
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Base games DataFrame
+
+    Returns
+    -------
+    pd.DataFrame
+        Games DataFrame with all features merged
+    """
+    # Load feature tables
+    teams_home_record = pd.read_csv(LOCAL_TEAMS_HOME_RECORDS_PATH)
+    teams_away_record = pd.read_csv(LOCAL_TEAMS_AWAY_RECORDS_PATH)
+    teams_records = pd.read_csv(LOCAL_TEAMS_RECORDS_PATH)
+
+    home_pts_diff = pd.read_csv(LOCAL_TEAMS_HOME_PTS_DIFF_PATH)
+    away_pts_diff = pd.read_csv(LOCAL_TEAMS_AWAY_PTS_DIFF_PATH)
+    teams_pts_diff = pd.read_csv(LOCAL_TEAMS_PTS_DIFF_PATH)
+
+    east_west_record = pd.read_csv(LOCAL_EAST_WEST_RECORDS_PATH)
+    rested_days = pd.read_csv(LOCAL_RESTED_DAYS_PATH)
+
+    # Join Tables
+    # Records
+    teams_records = teams_records.drop(columns=["gameDate", "season", "win_bool"])
+    games = _get_home_team_record(games, teams_records)
+    games = _get_away_team_record(games, teams_records)
+
+    teams_home_record = teams_home_record.drop(
+        columns=["win_bool", "season", "gameDate"]
+    )
+    games = _get_home_team_record_at_home(games, teams_home_record)
+
+    teams_away_record = teams_away_record.drop(
+        columns=["win_bool", "season", "gameDate"]
+    )
+    games = _get_away_team_records_on_road(games, teams_away_record)
+
+    # East vs West
+    games = games.merge(
+        east_west_record[["gameDateOnlyStr", "east_wins_pct_L1"]],
+        how="left",
+        on=["gameDateOnlyStr"],
+    )
+
+    # Point differential
+    teams_pts_diff.drop(columns=["pts_diff", "season", "gameDate"], inplace=True)
+    games = _add_home_team_point_diff(games, teams_pts_diff)
+    games = _add_away_team_point_diff(games, teams_pts_diff)
+
+    home_pts_diff.drop(columns=["pts_diff", "season", "gameDate"], inplace=True)
+    games = _add_home_team_point_diff_at_home(games, home_pts_diff)
+    away_pts_diff.drop(columns=["pts_diff", "season", "gameDate"], inplace=True)
+    games = _add_away_team_point_diff_on_road(games, away_pts_diff)
+
+    # Rested days
+    games = _get_rested_days_home_team(games, rested_days)
+    games = _get_rested_days_away_team(games, rested_days)
+
+    games = games.drop(
+        columns=[
+            "hometeamName",
+            "awayteamCity",
+            "attendance",
+            "arenaId",
+        ]
+    ).copy()
+
+    return games
+
 
 # ==== Teams Records ====
-def get_home_team_record(games, teams_records):
+def _get_home_team_record(games, teams_records):
     games = (
         games.merge(
             teams_records,
@@ -51,7 +174,7 @@ def get_home_team_record(games, teams_records):
     return games
 
 
-def get_away_team_record(games, teams_records):
+def _get_away_team_record(games, teams_records):
     games = (
         games.merge(
             teams_records,
@@ -59,7 +182,7 @@ def get_away_team_record(games, teams_records):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -78,7 +201,7 @@ def get_away_team_record(games, teams_records):
     return games
 
 
-def get_home_team_record_at_home(games, home_games_record):
+def _get_home_team_record_at_home(games, home_games_record):
     games = (
         games.merge(
             home_games_record,
@@ -86,7 +209,7 @@ def get_home_team_record_at_home(games, home_games_record):
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -105,7 +228,7 @@ def get_home_team_record_at_home(games, home_games_record):
     return games
 
 
-def get_away_team_records_on_road(games, away_games_record):
+def _get_away_team_records_on_road(games, away_games_record):
     games = (
         games.merge(
             away_games_record,
@@ -113,7 +236,7 @@ def get_away_team_records_on_road(games, away_games_record):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -133,7 +256,7 @@ def get_away_team_records_on_road(games, away_games_record):
 
 
 # ==== Point Differential ====
-def add_home_team_point_diff(games, teams_pts_diff):
+def _add_home_team_point_diff(games, teams_pts_diff):
     games = (
         games.merge(
             teams_pts_diff,
@@ -141,7 +264,7 @@ def add_home_team_point_diff(games, teams_pts_diff):
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -157,7 +280,7 @@ def add_home_team_point_diff(games, teams_pts_diff):
     return games
 
 
-def add_home_team_point_diff_at_home(games, home_pts_diff):
+def _add_home_team_point_diff_at_home(games, home_pts_diff):
     games = (
         games.merge(
             home_pts_diff,
@@ -165,7 +288,7 @@ def add_home_team_point_diff_at_home(games, home_pts_diff):
             left_on=["gameId", "hometeamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -174,13 +297,14 @@ def add_home_team_point_diff_at_home(games, home_pts_diff):
             "pts_diff_avg": "pts_diff_avg_HT_at_home",
             "pts_diff_avg_L5": "pts_diff_avg_L5_HT_at_home",
             "pts_diff_avg_L13": "pts_diff_avg_L13_HT_at_home",
+            "pts_diff_avg_L26": "pts_diff_avg_L26_HT_at_home",
         }
     )
 
     return games
 
 
-def add_away_team_point_diff(games, teams_pts_diff):
+def _add_away_team_point_diff(games, teams_pts_diff):
     games = (
         games.merge(
             teams_pts_diff,
@@ -188,7 +312,7 @@ def add_away_team_point_diff(games, teams_pts_diff):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -204,7 +328,7 @@ def add_away_team_point_diff(games, teams_pts_diff):
     return games
 
 
-def add_away_team_point_diff_on_road(games, away_pts_diff):
+def _add_away_team_point_diff_on_road(games, away_pts_diff):
     games = (
         games.merge(
             away_pts_diff,
@@ -212,7 +336,7 @@ def add_away_team_point_diff_on_road(games, away_pts_diff):
             left_on=["gameId", "awayteamId"],
             right_on=["gameId", "teamId"],
         )
-        .drop(columns=["teamId", "season", "gameDate"])
+        .drop(columns=["teamId"])
         .copy()
     )
 
@@ -221,6 +345,7 @@ def add_away_team_point_diff_on_road(games, away_pts_diff):
             "pts_diff_avg": "pts_diff_avg_VT_on_road",
             "pts_diff_avg_L5": "pts_diff_avg_L5_VT_on_road",
             "pts_diff_avg_L13": "pts_diff_avg_L13_VT_on_road",
+            "pts_diff_avg_L26": "pts_diff_avg_L26_VT_on_road",
         }
     )
 
@@ -228,7 +353,7 @@ def add_away_team_point_diff_on_road(games, away_pts_diff):
 
 
 # ==== Rested Days ====
-def get_rested_days_home_team(games, rested_days):
+def _get_rested_days_home_team(games, rested_days):
     rest_home_teams_columns = [
         "gameDateOnlyStr",
         "teamId",
@@ -249,7 +374,7 @@ def get_rested_days_home_team(games, rested_days):
     )
 
 
-def get_rested_days_away_team(games, rested_days):
+def _get_rested_days_away_team(games, rested_days):
     rest_away_teams_columns = [
         "gameDateOnlyStr",
         "teamId",
@@ -271,60 +396,16 @@ def get_rested_days_away_team(games, rested_days):
 
 
 if __name__ == "__main__":
-    # -- Read Tables --------
+    # Read Tables
     games = pd.read_csv(LOCAL_REGULAR_SEASON_GAMES_PATH)
-    teams_home_record = pd.read_csv(LOCAL_TEAMS_HOME_RECORDS_PATH)
-    teams_away_record = pd.read_csv(LOCAL_TEAMS_AWAY_RECORDS_PATH)
-    teams_records = pd.read_csv(LOCAL_TEAMS_RECORDS_PATH)
+    teams_cities_conferences = pd.read_csv(LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH)
+    games = add_conference(games, teams_cities_conferences)
 
-    home_pts_diff = pd.read_csv(LOCAL_TEAMS_HOME_PTS_DIFF_PATH)
-    away_pts_diff = pd.read_csv(LOCAL_TEAMS_AWAY_PTS_DIFF_PATH)
-    teams_pts_diff = pd.read_csv(LOCAL_TEAMS_PTS_DIFF_PATH)
+    # Create feature tables
+    create_features_tables(games)
 
-    east_west_record = pd.read_csv(LOCAL_EAST_WEST_RECORDS_PATH)
-    rested_days = pd.read_csv(LOCAL_RESTED_DAYS_PATH)
-
-    # -- Join Tables --------
-    # Records
-    teams_records = teams_records.drop(columns=["gameDate", "season", "win_bool"])
-    games = get_home_team_record(games, teams_records)
-    games = get_away_team_record(games, teams_records)
-
-    teams_home_record = teams_home_record.drop(columns=["win_bool"])
-    games = get_home_team_record_at_home(games, teams_home_record)
-
-    teams_away_record = teams_away_record.drop(columns=["win_bool"])
-    games = get_away_team_records_on_road(games, teams_away_record)
-
-    # East vs West
-    games = games.merge(
-        east_west_record[["gameDateOnlyStr", "east_wins_pct_L1"]],
-        how="left",
-        on=["gameDateOnlyStr"],
-    )
-
-    # Point differential
-    teams_pts_diff.drop(columns=["pts_diff"], inplace=True)
-    games = add_home_team_point_diff(games, teams_pts_diff)
-    games = add_away_team_point_diff(games, teams_pts_diff)
-
-    home_pts_diff.drop(columns=["pts_diff"], inplace=True)
-    games = add_home_team_point_diff_at_home(games, home_pts_diff)
-    away_pts_diff.drop(columns=["pts_diff"], inplace=True)
-    games = add_away_team_point_diff_on_road(games, away_pts_diff)
-
-    # Rested days
-    games = get_rested_days_home_team(games, rested_days)
-    games = get_rested_days_away_team(games, rested_days)
-
-    games = games.drop(
-        columns=[
-            "hometeamName",
-            "awayteamCity",
-            "attendance",
-            "arenaId",
-        ]
-    ).copy()
+    # Merge features
+    games_with_features = merge_features(games)
 
     # Save Table
-    games.to_csv(LOCAL_GAMES_FEATURES_PATH, index=False)
+    games_with_features.to_csv(LOCAL_GAMES_FEATURES_PATH, index=False)
