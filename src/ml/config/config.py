@@ -20,7 +20,7 @@ class MLConfig:
     test_size: float = 0.2
     val_size: float = 0.2
     random_state: Optional[int] = 42
-    split_method: str = "random"  # 'random', 'temporal', 'stratified'
+    split_method: str = "temporal"  # 'random', 'temporal', 'stratified'
     stratify_column: Optional[str] = None
 
     # Feature engineering
@@ -31,7 +31,7 @@ class MLConfig:
     handle_outliers: bool = True
 
     # Model configuration
-    model_type: str = "regression"  # 'regression' or 'classification'
+    model_type: str = "classification"  # 'regression' or 'classification'
     model_name: str = "model"
     hyperparameter_tuning: bool = False
     param_grid: Optional[Dict[str, Any]] = None

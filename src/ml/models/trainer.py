@@ -1,23 +1,23 @@
 """Model training utilities."""
 
+import logging
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, Any, Literal
+
 from sklearn.base import BaseEstimator
 from sklearn.model_selection import (
     GridSearchCV,
     RandomizedSearchCV,
     cross_validate,
 )
-from sklearn.metrics import (
-    mean_squared_error,
-    mean_absolute_error,
-    r2_score,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
+
+from src.ml.evaluation.metrics import (
+    compute_regression_metrics,
+    compute_classification_metrics,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ModelTrainer:
@@ -70,22 +70,34 @@ class ModelTrainer:
         Returns
         -------
         dict
-            Training metrics
+            Training metrics with keys 'train' and optionally 'val'
+
+        Raises
+        ------
+        ValueError
+            If X_val is provided without y_val or vice versa
         """
+        if (X_val is None) != (y_val is None):
+            raise ValueError("X_val and y_val must both be provided or both be None")
+
+        logger.info(f"Training {self.task_type} model on {len(X_train)} samples")
         self.model.fit(X_train, y_train)
         self.is_fitted = True
 
         # Evaluate on training set
         train_pred = self.model.predict(X_train)
-        train_metrics = self._compute_metrics(y_train, train_pred, prefix="train")
+        train_metrics = self._compute_metrics(
+            y_train, train_pred, X_train, prefix="train"
+        )
 
         results = {"train": train_metrics}
 
         # Evaluate on validation set if provided
         if X_val is not None and y_val is not None:
             val_pred = self.model.predict(X_val)
-            val_metrics = self._compute_metrics(y_val, val_pred, prefix="val")
+            val_metrics = self._compute_metrics(y_val, val_pred, X_val, prefix="val")
             results["val"] = val_metrics
+            logger.info(f"Validation metrics: {val_metrics}")
 
         return results
 
@@ -98,31 +110,33 @@ class ModelTrainer:
         return_train_score: bool = True,
     ) -> Dict[str, Any]:
         """
-               Perform cross-validation.
+        Perform cross-validation.
 
-               Parameters
-               ----------
-               X : pd.DataFrame
-                   Features
-               y : pd.Series
-                   Target
-               cv : int, default=5
-                   Number of folds
-               scoring : str, optional
-                   Scoring metric. If None, uses default for task type.
-               return_train_score : bool, default=True
-                   Whether to return training scores
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Features
+        y : pd.Series
+            Target
+        cv : int, default=5
+            Number of folds
+        scoring : str, optional
+            Scoring metric. If None, uses default for task type.
+        return_train_score : bool, default=True
+            Whether to return training scores
 
-               Returns
+        Returns
         -------
-               dict
-                   Cross-validation results
+        dict
+            Cross-validation results
         """
         if scoring is None:
             if self.task_type == "regression":
                 scoring = "neg_mean_squared_error"
             else:
                 scoring = "accuracy"
+
+        logger.info(f"Performing {cv}-fold cross-validation with scoring={scoring}")
 
         cv_results = cross_validate(
             self.model,
@@ -132,6 +146,11 @@ class ModelTrainer:
             scoring=scoring,
             return_train_score=return_train_score,
             n_jobs=-1,
+        )
+
+        logger.info(
+            f"CV results - Test score: {cv_results['test_score'].mean():.4f} "
+            f"(±{cv_results['test_score'].std():.4f})"
         )
 
         return cv_results
@@ -164,18 +183,31 @@ class ModelTrainer:
         n_iter : int, default=100
             Number of iterations for random search
         scoring : str, optional
-            Scoring metric
+            Scoring metric. If None, uses default for task type.
 
         Returns
         -------
         BaseEstimator
             Best model from tuning
+
+        Raises
+        ------
+        ValueError
+            If method is not 'grid' or 'random'
         """
         if scoring is None:
             if self.task_type == "regression":
                 scoring = "neg_mean_squared_error"
             else:
                 scoring = "accuracy"
+
+        if method not in ["grid", "random"]:
+            raise ValueError(f"method must be 'grid' or 'random', got {method}")
+
+        logger.info(
+            f"Starting {method} search hyperparameter tuning: "
+            f"cv={cv}, scoring={scoring}, n_iter={n_iter if method == 'random' else 'N/A'}"
+        )
 
         if method == "grid":
             search = GridSearchCV(
@@ -185,6 +217,7 @@ class ModelTrainer:
                 scoring=scoring,
                 n_jobs=-1,
                 random_state=self.random_state,
+                return_train_score=True,
             )
         else:
             search = RandomizedSearchCV(
@@ -195,12 +228,18 @@ class ModelTrainer:
                 scoring=scoring,
                 n_jobs=-1,
                 random_state=self.random_state,
+                return_train_score=True,
             )
 
         search.fit(X_train, y_train)
         self.model = search.best_estimator_
         self.search_results_ = search  # Store search object for accessing best_params
         self.is_fitted = True
+
+        logger.info(
+            f"Hyperparameter tuning completed. Best score: {search.best_score_:.4f}, "
+            f"Best params: {search.best_params_}"
+        )
 
         return self.model
 
@@ -226,49 +265,66 @@ class ModelTrainer:
         -------
         dict
             Evaluation metrics
+
+        Raises
+        ------
+        ValueError
+            If model has not been trained
         """
         if not self.is_fitted:
-            raise ValueError("Model must be trained before evaluation")
+            raise ValueError(
+                "Model must be trained before evaluation. Call train() first."
+            )
 
+        logger.info(f"Evaluating model on {len(X)} samples (prefix: {prefix})")
         y_pred = self.model.predict(X)
-        return self._compute_metrics(y, y_pred, prefix=prefix)
+        metrics = self._compute_metrics(y, y_pred, X, prefix=prefix)
+        logger.info(f"Evaluation metrics ({prefix}): {metrics}")
+        return metrics
 
     def _compute_metrics(
         self,
         y_true: pd.Series,
         y_pred: np.ndarray,
+        X: pd.DataFrame,
         prefix: str = "",
     ) -> Dict[str, float]:
-        """Compute metrics based on task type."""
-        metrics = {}
+        """
+        Compute metrics based on task type.
 
+        Parameters
+        ----------
+        y_true : pd.Series
+            True target values
+        y_pred : np.ndarray
+            Predicted values
+        X : pd.DataFrame
+            Features (needed for probability predictions in classification)
+        prefix : str, default=''
+            Prefix for metric names
+
+        Returns
+        -------
+        dict
+            Dictionary of metrics with prefix
+        """
         if self.task_type == "regression":
-            metrics[f"{prefix}_mse"] = mean_squared_error(y_true, y_pred)
-            metrics[f"{prefix}_rmse"] = np.sqrt(metrics[f"{prefix}_mse"])
-            metrics[f"{prefix}_mae"] = mean_absolute_error(y_true, y_pred)
-            metrics[f"{prefix}_r2"] = r2_score(y_true, y_pred)
+            base_metrics = compute_regression_metrics(y_true, y_pred)
         else:
-            metrics[f"{prefix}_accuracy"] = accuracy_score(y_true, y_pred)
-            metrics[f"{prefix}_precision"] = precision_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-            metrics[f"{prefix}_recall"] = recall_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-            metrics[f"{prefix}_f1"] = f1_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-
-            # ROC AUC for binary classification
-            if len(np.unique(y_true)) == 2:
+            # Get predicted probabilities for classification metrics
+            y_pred_proba = None
+            if hasattr(self.model, "predict_proba"):
                 try:
-                    # Note: X is not available here, need to pass it differently
-                    # This is a limitation - ROC AUC calculation needs X
-                    pass
-                except (AttributeError, IndexError):
-                    pass
+                    y_pred_proba = self.model.predict_proba(X)
+                except Exception as e:
+                    logger.warning(f"Could not compute probabilities: {e}")
 
-        return metrics
+            base_metrics = compute_classification_metrics(
+                y_true, y_pred, y_pred_proba=y_pred_proba
+            )
+
+        # Add prefix to metric names
+        return {f"{prefix}_{k}": v for k, v in base_metrics.items()}
 
 
 def train_model(

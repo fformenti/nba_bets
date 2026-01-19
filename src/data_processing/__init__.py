@@ -21,7 +21,6 @@ from .features import (
     calculate_record,
     calculate_home_record,
     calculate_away_record,
-    make_east_west_record,
     calculate_pts_diff,
     calculate_home_pts_diff,
     calculate_away_pts_diff,
@@ -54,6 +53,8 @@ __all__ = [
     "calculate_away_pts_diff",
     "make_rested_days_table",
     # Utils
+    "get_season_date_range",
+    "get_season_date_range",
     "calculate_arena_occupation",
     "get_nba_season_util",
     "filter_games_by_date",

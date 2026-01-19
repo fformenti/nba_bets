@@ -3,6 +3,28 @@
 import pandas as pd
 
 
+def get_season_date_range(games):
+    all_season_date_range = []
+    seasons = games["season"].unique()
+    for season in seasons:
+        games_season = games.loc[games["season"] == season].copy()
+        season_start = games_season["gameDate"].min()
+        season_end = games_season["gameDate"].max()
+
+        date_range = pd.date_range(start=season_start, end=season_end)
+        season_dates = pd.MultiIndex.from_product(
+            [date_range], names=["gameDate"]
+        ).to_frame(index=False)
+        season_dates["season"] = season
+        season_dates["gameDateOnlyStr"] = season_dates["gameDate"].dt.strftime(
+            "%Y-%m-%d"
+        )
+        season_dates.drop(columns=["gameDate"], inplace=True)
+        all_season_date_range.append(season_dates)
+
+    return pd.concat(all_season_date_range)
+
+
 def calculate_arena_occupation(home_games):
     """
     Calculate arena occupation metrics for home games.

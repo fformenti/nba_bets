@@ -14,6 +14,7 @@ from src.config import (
     LOCAL_REGULAR_SEASON_GAMES_PATH,
     LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH,
     LOCAL_GAMES_FEATURES_PATH,
+    PROJECT_ROOT,
 )
 
 from src.data_processing.ingestion import (
@@ -25,6 +26,7 @@ from src.data_processing.ingestion import (
 from src.data_processing.transformation import add_conference
 from src.data_processing.features import create_features_tables, merge_features
 from src.data_processing.utils import filter_games_by_date
+from src.ml.config.loader import load_yaml_config
 
 
 def run_full_pipeline(
@@ -32,7 +34,7 @@ def run_full_pipeline(
     teams_history_path: Path = None,
     output_path: Path = None,
     current_season_year: int = 2024,
-    min_date: str = None,
+    earliest_date: str = None,
 ):
     """
     Run the complete data processing pipeline.
@@ -63,6 +65,15 @@ def run_full_pipeline(
     print("=" * 60)
     print("NBA Data Processing Pipeline")
     print("=" * 60)
+
+    # Step 0: Load configuration
+    config_path = PROJECT_ROOT / "configs" / "my_experiment.yaml"
+    config = load_yaml_config(config_path)
+    filters_config = config.get("filters", {})
+    feature_engineering_config = config.get("feature_engineering", {})
+    earliest_date = filters_config.get("start_date", "1980-08-01")
+    lags = feature_engineering_config.get("lags", [])
+    location_lags = feature_engineering_config.get("location_lags", [])
 
     # Step 1: Create teams history table
     print("\n[Step 1/5] Creating teams history table...")
@@ -101,7 +112,7 @@ def run_full_pipeline(
 
     # Step 4: Create feature tables
     print("\n[Step 4/5] Creating feature tables...")
-    create_features_tables(games_with_conference)
+    create_features_tables(games_with_conference, lags, location_lags)
     print("✓ Created all feature tables")
 
     # Step 5: Merge features
@@ -112,9 +123,9 @@ def run_full_pipeline(
     final_features = merge_features(games_with_conference)
 
     # Step 6: Filter by date if provided
-    if min_date is not None:
-        print(f"\n[Step 6/6] Filtering games by minimum date ({min_date})...")
-        final_features = filter_games_by_date(final_features, min_date)
+    if earliest_date is not None:
+        print(f"\n[Step 6/6] Filtering games by earliest date ({earliest_date})...")
+        final_features = filter_games_by_date(final_features, earliest_date)
         print(f"✓ Filtered to {len(final_features)} games")
 
     final_features.to_csv(output_path, index=False)
@@ -129,5 +140,5 @@ def run_full_pipeline(
 
 
 if __name__ == "__main__":
-    start_date = "1980-08-01"
-    run_full_pipeline(min_date=start_date)
+    earliest_date = "1980-08-01"
+    run_full_pipeline(earliest_date=earliest_date)

@@ -4,8 +4,10 @@ from .winning_percentage import (
     calculate_record,
     calculate_home_record,
     calculate_away_record,
-    make_east_west_record,
 )
+
+from .east_vs_west import make_east_west_record
+
 from .point_differential import (
     calculate_pts_diff,
     calculate_home_pts_diff,
