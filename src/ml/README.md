@@ -104,13 +104,13 @@ metrics = trainer.evaluate(X_test, y_test)
 ### Regression
 
 ```bash
-python -m src.ml.scripts.train_regression
+uv run python -m src.ml.scripts.train_regression
 ```
 
 ### Classification
 
 ```bash
-python -m src.ml.scripts.train_classification
+uv run python -m src.ml.scripts.train_classifier --config configs/my_experiment.yaml
 ```
 
 ## Model Registry
@@ -130,17 +130,12 @@ model, metadata = registry.load("nba_regression")
 
 ## Configuration
 
-Use `MLConfig` for experiment configuration:
+Use the Pydantic `ExperimentConfig` schema to validate YAML configs:
 
 ```python
-from src.ml.config import MLConfig
+from pathlib import Path
+from src.ml.config import load_experiment_config
 
-config = MLConfig(
-    data_path="data/processed/games_features.csv",
-    target_column="homeScore",
-    test_size=0.2,
-    val_size=0.2,
-    model_type="regression",
-)
-config.save("configs/experiment_1.json")
+config = load_experiment_config(Path("configs/my_experiment.yaml"))
+print(config.model_dump())
 ```

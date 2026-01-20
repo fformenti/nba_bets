@@ -5,6 +5,8 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any
 
+from src.ml.config.schema import ExperimentConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +49,24 @@ def load_yaml_config(config_path: Path) -> Dict[str, Any]:
 
     logger.info(f"Loaded configuration from {config_path}")
     return config
+
+
+def load_experiment_config(config_path: Path) -> ExperimentConfig:
+    """
+    Load configuration from a YAML file into a validated ExperimentConfig.
+
+    Parameters
+    ----------
+    config_path : Path
+        Path to YAML configuration file
+
+    Returns
+    -------
+    ExperimentConfig
+        Validated experiment configuration
+    """
+    raw_config = load_yaml_config(config_path)
+    return ExperimentConfig.model_validate(raw_config)
 
 
 def get_nested_config(

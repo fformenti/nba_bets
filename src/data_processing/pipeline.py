@@ -26,7 +26,7 @@ from src.data_processing.ingestion import (
 from src.data_processing.transformation import add_conference
 from src.data_processing.features import create_features_tables, merge_features
 from src.data_processing.utils import filter_games_by_date
-from src.ml.config.loader import load_yaml_config
+from src.ml.config.loader import load_experiment_config
 
 
 def run_full_pipeline(
@@ -68,12 +68,12 @@ def run_full_pipeline(
 
     # Step 0: Load configuration
     config_path = PROJECT_ROOT / "configs" / "my_experiment.yaml"
-    config = load_yaml_config(config_path)
-    filters_config = config.get("filters", {})
-    feature_engineering_config = config.get("feature_engineering", {})
-    earliest_date = filters_config.get("start_date", "1980-08-01")
-    lags = feature_engineering_config.get("lags", [])
-    location_lags = feature_engineering_config.get("location_lags", [])
+    config = load_experiment_config(config_path)
+    filters_config = config.filters
+    feature_engineering_config = config.feature_engineering
+    earliest_date = filters_config.start_date
+    lags = feature_engineering_config.lags
+    location_lags = feature_engineering_config.location_lags
 
     # Step 1: Create teams history table
     print("\n[Step 1/5] Creating teams history table...")

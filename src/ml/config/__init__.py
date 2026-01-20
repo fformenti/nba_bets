@@ -1,13 +1,17 @@
 """Configuration management for ML experiments."""
 
-from .config import MLConfig, load_config, save_config
-from .loader import load_yaml_config, get_nested_config, validate_config
+from .loader import (
+    load_yaml_config,
+    load_experiment_config,
+    get_nested_config,
+    validate_config,
+)
+from .schema import ExperimentConfig
 
 __all__ = [
-    "MLConfig",
-    "load_config",
-    "save_config",
+    "ExperimentConfig",
     "load_yaml_config",
+    "load_experiment_config",
     "get_nested_config",
     "validate_config",
 ]
