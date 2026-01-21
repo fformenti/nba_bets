@@ -19,21 +19,21 @@ from src.config import (
     LOCAL_RESTED_DAYS_PATH,
 )
 
-from src.data_processing.features.winning_percentage import (
+from src.etl.features.winning_percentage import (
     calculate_away_record,
     calculate_home_record,
     calculate_record,
 )
 
-from src.data_processing.features.east_vs_west import make_east_west_record
+from src.etl.features.east_vs_west import make_east_west_record
 
-from src.data_processing.features.point_differential import (
+from src.etl.features.point_differential import (
     calculate_away_pts_diff,
     calculate_home_pts_diff,
     calculate_pts_diff,
 )
-from src.data_processing.features.rest_days import make_rested_days_table
-from src.data_processing.transformation.add_teams_conferences import add_conference
+from src.etl.features.rest_days import make_rested_days_table
+from src.etl.transformation.add_teams_conferences import add_conference
 
 
 def create_features_tables(games: pd.DataFrame, lags=[], location_lags=[]):

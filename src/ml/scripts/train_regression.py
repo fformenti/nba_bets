@@ -20,8 +20,8 @@ if str(project_root) not in sys.path:
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
 
-from src.ml.data.loaders import load_features
-from src.ml.data.splitters import train_val_test_split
+from src.ml.datasets.loaders import load_features
+from src.ml.datasets.splitters import train_val_test_split
 from src.ml.features.preprocessing import create_preprocessing_pipeline
 from src.ml.models.trainer import ModelTrainer
 from src.ml.models.registry import ModelRegistry
@@ -168,20 +168,24 @@ def main():
 
     print("Visualizations saved to outputs/")
 
-    # ===== Save Model =====
-    print("\nSaving model...")
-    registry_path = PROJECT_ROOT / "models"
-    registry = ModelRegistry(registry_path)
+    # ===== Save Model (optional local registry) =====
+    SAVE_LOCAL_MODEL = False
+    if SAVE_LOCAL_MODEL:
+        print("\nSaving model...")
+        registry_path = PROJECT_ROOT / "models"
+        registry = ModelRegistry(registry_path)
 
-    model_path = registry.save(
-        model=pipeline,
-        model_name="nba_regression",
-        task_type="regression",
-        metrics=test_metrics,
-        feature_names=list(X.columns),
-    )
+        model_path = registry.save(
+            model=pipeline,
+            model_name="nba_regression",
+            task_type="regression",
+            metrics=test_metrics,
+            feature_names=list(X.columns),
+        )
 
-    print(f"Model saved to: {model_path}")
+        print(f"Model saved to: {model_path}")
+    else:
+        print("\nSkipping local model save; MLflow should log the model instead.")
 
     print("\nTraining complete!")
 

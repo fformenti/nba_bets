@@ -17,7 +17,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.config import LOCAL_GAMES_FEATURES_PATH
-from src.data_processing.specialized.games_class import Game
+from src.etl.specialized.games_class import Game
 
 
 def fix_float_to_int(df):

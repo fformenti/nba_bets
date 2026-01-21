@@ -13,8 +13,8 @@ This document outlines the improvements made to address project structure issues
 - **Solution**: Replaced `MLConfig` with a Pydantic `ExperimentConfig` schema that validates YAML configs.
 
 ### 2. Project Structure
-- **Problem**: `data_processing/` and `ml/` at same level in `src/` is confusing
-- **Recommendation**: Consider renaming `data_processing/` to `data/` for clarity, but this requires updating imports across the codebase
+- **Problem**: Two separate “data” concepts (`data_processing/` for ETL and `ml/data/` for datasets) caused naming collisions and confusion
+- **Solution**: Standardized naming with `src/etl/` for ingestion/transforms/features and `src/ml/datasets/` for ML dataset loading/splitting
 
 ### 3. Missing Experiment Tracking
 - **Problem**: No experiment tracking system in place
@@ -63,13 +63,9 @@ with MLflowTracker(experiment_name="nba_bets_classification") as tracker:
 The `MLConfig` class in `src/ml/config/config.py` was unused and JSON-only. It has been replaced with a Pydantic schema (`ExperimentConfig`) that validates the YAML configs used in practice.
 
 ### 2. Project Structure Reorganization
-Consider renaming `data_processing/` to `data/`:
-- More standard naming convention
-- Clearer separation: `data/` for data processing, `ml/` for ML code
-- Would require updating imports in:
-  - `src/data_processing/pipeline.py`
-  - `src/data_processing/features/aggregator.py`
-  - Various notebooks
+Applied a clearer separation of responsibilities:
+- `src/etl/` for ingestion, transformation, and feature engineering
+- `src/ml/datasets/` for dataset loading and splitting utilities
 
 ### 3. Config Management
 Current setup uses YAML configs from `configs/` folder and now validates them via Pydantic. Next steps:
@@ -123,7 +119,7 @@ model = mlflow.sklearn.load_model(f"runs:/{best_run.run_id}/model")
 
 1. ✅ MLflow integration complete
 2. ✅ MLConfig replaced with Pydantic schema
-3. ⚠️ Consider renaming `data_processing/` to `data/`
+3. ✅ Standardize structure with `src/etl/` and `src/ml/datasets/`
 4. ⚠️ Test MLflow tracking with a training run
 5. ⚠️ Set up MLflow server if needed for team collaboration
 

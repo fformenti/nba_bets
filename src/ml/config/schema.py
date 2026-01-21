@@ -79,6 +79,7 @@ class PathsConfig(BaseModel):
 
     model_registry: str = "models"
     outputs: str = "outputs"
+    save_local_models: bool = True
 
 
 class ExperimentConfig(BaseModel):

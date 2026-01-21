@@ -1,5 +1,5 @@
 """
-Data processing module for NBA betting project.
+ETL module for NBA betting project.
 
 This module provides utilities for:
 - Data ingestion (loading and parsing raw data)
@@ -21,6 +21,7 @@ from .features import (
     calculate_record,
     calculate_home_record,
     calculate_away_record,
+    make_east_west_record,
     calculate_pts_diff,
     calculate_home_pts_diff,
     calculate_away_pts_diff,
@@ -29,6 +30,7 @@ from .features import (
 from .utils import (
     calculate_arena_occupation,
     get_nba_season as get_nba_season_util,
+    get_season_date_range,
     filter_games_by_date,
 )
 from .pipeline import run_full_pipeline
@@ -53,7 +55,6 @@ __all__ = [
     "calculate_away_pts_diff",
     "make_rested_days_table",
     # Utils
-    "get_season_date_range",
     "get_season_date_range",
     "calculate_arena_occupation",
     "get_nba_season_util",

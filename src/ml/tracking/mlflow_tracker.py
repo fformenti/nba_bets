@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import mlflow
 import mlflow.sklearn
+from mlflow.models import infer_signature
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,7 @@ class MLflowTracker:
         model: Any,
         artifact_path: str = "model",
         registered_model_name: Optional[str] = None,
+        input_example: Optional[Any] = None,
     ):
         """
         Log a model to MLflow.
@@ -154,18 +156,39 @@ class MLflowTracker:
         model : Any
             Model to log (scikit-learn model or pipeline)
         artifact_path : str, default='model'
-            Path within the run's artifact directory
+            Artifact name within the run's artifact directory
         registered_model_name : str, optional
             If provided, register the model with this name in the model registry
+        input_example : Any, optional
+            Example inputs used to infer model signature and log input example
         """
         if not self._log_model_enabled:
             return
 
+        extra_pip_requirements = None
+        try:
+            import pip  # type: ignore
+
+            extra_pip_requirements = [f"pip=={pip.__version__}"]
+        except Exception:
+            extra_pip_requirements = None
+
+        signature = None
+        if input_example is not None:
+            try:
+                model_output = model.predict(input_example)
+                signature = infer_signature(input_example, model_output)
+            except Exception as e:
+                logger.warning(f"Could not infer MLflow signature: {e}")
+
         try:
             mlflow.sklearn.log_model(
                 sk_model=model,
-                artifact_path=artifact_path,
+                name=artifact_path,
                 registered_model_name=registered_model_name,
+                extra_pip_requirements=extra_pip_requirements,
+                signature=signature,
+                input_example=input_example,
             )
             logger.info(f"Logged model to MLflow at {artifact_path}")
         except Exception as e:

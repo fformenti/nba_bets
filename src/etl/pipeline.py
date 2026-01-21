@@ -17,15 +17,15 @@ from src.config import (
     PROJECT_ROOT,
 )
 
-from src.data_processing.ingestion import (
+from src.etl.ingestion import (
     create_teams_history_table,
     parse_raw_games,
     filter_regular_season_games,
     get_nba_season,
 )
-from src.data_processing.transformation import add_conference
-from src.data_processing.features import create_features_tables, merge_features
-from src.data_processing.utils import filter_games_by_date
+from src.etl.transformation import add_conference
+from src.etl.features import create_features_tables, merge_features
+from src.etl.utils import filter_games_by_date
 from src.ml.config.loader import load_experiment_config
 
 

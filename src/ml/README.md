@@ -6,7 +6,7 @@ This module provides a comprehensive, production-ready structure for training an
 
 ```
 src/ml/
-├── data/           # Data loading and partitioning
+├── datasets/       # Data loading and partitioning
 ├── features/        # Feature engineering pipelines
 ├── models/          # Model training and persistence
 ├── evaluation/      # Metrics and visualization
@@ -19,8 +19,8 @@ src/ml/
 ### Regression Example
 
 ```python
-from src.ml.data.loaders import load_features
-from src.ml.data.splitters import train_val_test_split
+from src.ml.datasets.loaders import load_features
+from src.ml.datasets.splitters import train_val_test_split
 from src.ml.models.trainer import ModelTrainer
 from sklearn.ensemble import RandomForestRegressor
 
@@ -43,8 +43,8 @@ metrics = trainer.evaluate(X_test, y_test)
 ### Classification Example
 
 ```python
-from src.ml.data.loaders import load_features
-from src.ml.data.splitters import train_val_test_split
+from src.ml.datasets.loaders import load_features
+from src.ml.datasets.splitters import train_val_test_split
 from src.ml.models.trainer import ModelTrainer
 from sklearn.ensemble import RandomForestClassifier
 

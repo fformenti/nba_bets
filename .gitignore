@@ -16,3 +16,7 @@ models/*
 !models/.gitkeep
 outputs/*
 !outputs/.gitkeep
+
+# MLflow
+mlruns/*
+mlflow.db

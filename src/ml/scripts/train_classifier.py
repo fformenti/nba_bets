@@ -24,8 +24,12 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from src.utils.logging_config import setup_logging, get_logger
-from src.ml.data.loaders import load_dataframe, validate_dataframe
-from src.ml.data.splitters import temporal_split, train_val_test_split, stratified_split
+from src.ml.datasets.loaders import load_dataframe, validate_dataframe
+from src.ml.datasets.splitters import (
+    temporal_split,
+    train_val_test_split,
+    stratified_split,
+)
 from src.ml.features.engineering import (
     create_conference_delta,
     get_home_conference_vs_away_conference_record,
@@ -876,26 +880,30 @@ def main(
                 # Log visualizations to MLflow
                 tracker.log_artifacts(str(output_dir), artifact_path="visualizations")
 
-            # Save model
-            logger.info(f"Saving best model ({best_model_name})...")
-            registry_path = Path(paths_config.model_registry)
-            registry = ModelRegistry(registry_path)
+            # Save model locally (optional)
+            if paths_config.save_local_models:
+                logger.info(f"Saving best model ({best_model_name}) locally...")
+                registry_path = Path(paths_config.model_registry)
+                registry = ModelRegistry(registry_path)
 
-            model_path = registry.save(
-                model=best_pipeline,
-                model_name=f"nba_classification_{best_model_name}",
-                task_type="classification",
-                metrics=best_model_data["test_metrics"],
-                feature_names=list(X_train.columns),
-            )
+                model_path = registry.save(
+                    model=best_pipeline,
+                    model_name=f"nba_classification_{best_model_name}",
+                    task_type="classification",
+                    metrics=best_model_data["test_metrics"],
+                    feature_names=list(X_train.columns),
+                )
 
-            logger.info(f"Best model saved to: {model_path}")
+                logger.info(f"Best model saved to: {model_path}")
+            else:
+                logger.info("Skipping local model save; MLflow handles model logging.")
 
             # Log best model to MLflow
             tracker.log_model(
                 best_pipeline,
                 artifact_path="model",
                 registered_model_name=f"nba_classification_{best_model_name}",
+                input_example=X_train.head(5),
             )
 
         logger.info("Training complete!")

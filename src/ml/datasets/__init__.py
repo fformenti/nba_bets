@@ -1,4 +1,4 @@
-"""Data loading and splitting utilities."""
+"""Dataset loading and splitting utilities."""
 
 from .loaders import load_features, load_dataframe
 from .splitters import (

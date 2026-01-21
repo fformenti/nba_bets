@@ -1,4 +1,4 @@
-from src.data_processing.utils.common import get_season_date_range
+from src.etl.utils.common import get_season_date_range
 
 
 def make_east_west_record(games, location=None):

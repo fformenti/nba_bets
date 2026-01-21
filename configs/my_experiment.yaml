@@ -100,3 +100,4 @@ evaluation:
 paths:
   model_registry: "models"
   outputs: "outputs"
+  save_local_models: false
