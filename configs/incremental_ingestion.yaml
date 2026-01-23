@@ -1,0 +1,15 @@
+raw_incremental_dir: data/raw/incremental
+archive_dir: data/raw/incremental/archive
+raw_games_path: data/raw/historical/games/Games.csv
+processed_games_path: data/processed/regular_season/games.csv
+teams_history_path: data/raw/historical/TeamsHistoriesConferenceNBA.csv
+feature_config_path: configs/my_experiment.yaml
+current_season_year: 2024
+update_features: true
+max_files: null
+use_llm: false
+llm_provider: openai
+llm_model: gpt-4o-mini
+llm_timeout_seconds: 30
+dedupe_key: gameId
+

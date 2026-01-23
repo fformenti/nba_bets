@@ -17,9 +17,17 @@ LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_FILENAME = "teams_history_expanded.csv"
 LOCAL_RAW_GAMES_PATH = (
     PROJECT_ROOT / "data" / "raw" / "historical" / "games" / "Games.csv"
 )
+LOCAL_RAW_INCREMENTAL_DIR = PROJECT_ROOT / "data" / "raw" / "incremental"
+LOCAL_RAW_INCREMENTAL_ARCHIVE_DIR = LOCAL_RAW_INCREMENTAL_DIR / "archive"
+LOCAL_LEAGUE_SCHEDULE_PATH = (
+    PROJECT_ROOT / "data" / "raw" / "historical" / "LeagueSchedule24_25.csv"
+)
 
 # Ingested data paths
 LOCAL_INGESTED_GAMES_PATH = PROJECT_ROOT / "data" / "ingested" / "historical" / "games"
+LOCAL_INGESTED_INCREMENTAL_GAMES_PATH = (
+    PROJECT_ROOT / "data" / "ingested" / "incremental" / "games"
+)
 
 # Processed data paths
 LOCAL_PROCESSED_FOLDER = PROJECT_ROOT / "data" / "processed"
