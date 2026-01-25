@@ -7,6 +7,13 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.ml.config import ExperimentConfig
+from src.ml.features import (
+    create_conference_delta,
+    create_delta_features,
+    get_home_conference_vs_away_conference_record,
+)
+
 
 GLOBAL_FEATURE_COLUMNS = [
     "east_record_adjusted",
@@ -103,144 +110,144 @@ def _apply_rest_adjustments(
     return merged
 
 
-# def build_features_for_upcoming(
-#     upcoming: pd.DataFrame,
-#     historical: pd.DataFrame,
-#     config: ExperimentConfig,
-#     conference_filter: str = "different",
-#     add_conference_delta: bool = False,
-# ) -> FeatureBuildResult:
-#     """
-#     Build model-ready features for upcoming games using historical feature snapshots.
-#     """
-#     if upcoming.empty:
-#         return FeatureBuildResult(features=pd.DataFrame(), metadata=pd.DataFrame())
+def build_features_for_upcoming(
+    upcoming: pd.DataFrame,
+    historical: pd.DataFrame,
+    config: ExperimentConfig,
+    conference_filter: str = "different",
+    add_conference_delta: bool = False,
+) -> FeatureBuildResult:
+    """
+    Build model-ready features for upcoming games using historical feature snapshots.
+    """
+    if upcoming.empty:
+        return FeatureBuildResult(features=pd.DataFrame(), metadata=pd.DataFrame())
 
-#     df = upcoming.copy()
-#     df["gameDate"] = pd.to_datetime(df["gameDate"], errors="coerce")
-#     df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
-#     df["hometeamId"] = pd.to_numeric(df["hometeamId"], errors="coerce").astype("int64")
-#     df["awayteamId"] = pd.to_numeric(df["awayteamId"], errors="coerce").astype("int64")
+    df = upcoming.copy()
+    df["gameDate"] = pd.to_datetime(df["gameDate"], errors="coerce")
+    df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
+    df["hometeamId"] = pd.to_numeric(df["hometeamId"], errors="coerce").astype("int64")
+    df["awayteamId"] = pd.to_numeric(df["awayteamId"], errors="coerce").astype("int64")
 
-#     historical = historical.copy()
-#     historical["gameDate"] = pd.to_datetime(historical["gameDate"], errors="coerce")
-#     if "hometeamId" in historical.columns:
-#         historical["hometeamId"] = pd.to_numeric(
-#             historical["hometeamId"], errors="coerce"
-#         ).astype("int64")
-#     if "awayteamId" in historical.columns:
-#         historical["awayteamId"] = pd.to_numeric(
-#             historical["awayteamId"], errors="coerce"
-#         ).astype("int64")
+    historical = historical.copy()
+    historical["gameDate"] = pd.to_datetime(historical["gameDate"], errors="coerce")
+    if "hometeamId" in historical.columns:
+        historical["hometeamId"] = pd.to_numeric(
+            historical["hometeamId"], errors="coerce"
+        ).astype("int64")
+    if "awayteamId" in historical.columns:
+        historical["awayteamId"] = pd.to_numeric(
+            historical["awayteamId"], errors="coerce"
+        ).astype("int64")
 
-#     history_columns = historical.columns.tolist()
-#     home_cols = _select_feature_columns(history_columns, HOME_SUFFIXES)
-#     away_cols = _select_feature_columns(history_columns, AWAY_SUFFIXES)
+    history_columns = historical.columns.tolist()
+    home_cols = _select_feature_columns(history_columns, HOME_SUFFIXES)
+    away_cols = _select_feature_columns(history_columns, AWAY_SUFFIXES)
 
-#     home_cols += [
-#         col
-#         for col in ["rested_days_HT", "days_at_home", "hometeamConference"]
-#         if col in history_columns
-#     ]
-#     away_cols += [
-#         col
-#         for col in ["rested_days_VT", "days_on_road", "awayteamConference"]
-#         if col in history_columns
-#     ]
-#     global_cols = [col for col in GLOBAL_FEATURE_COLUMNS if col in history_columns]
+    home_cols += [
+        col
+        for col in ["rested_days_HT", "days_at_home", "hometeamConference"]
+        if col in history_columns
+    ]
+    away_cols += [
+        col
+        for col in ["rested_days_VT", "days_on_road", "awayteamConference"]
+        if col in history_columns
+    ]
+    global_cols = [col for col in GLOBAL_FEATURE_COLUMNS if col in history_columns]
 
-#     home_history = historical[["gameDate", "hometeamId"] + home_cols].sort_values(
-#         "gameDate"
-#     )
-#     df = pd.merge_asof(
-#         df.sort_values("gameDate"),
-#         home_history,
-#         on="gameDate",
-#         by="hometeamId",
-#         direction="backward",
-#         allow_exact_matches=False,
-#     )
+    home_history = historical[["gameDate", "hometeamId"] + home_cols].sort_values(
+        "gameDate"
+    )
+    df = pd.merge_asof(
+        df.sort_values("gameDate"),
+        home_history,
+        on="gameDate",
+        by="hometeamId",
+        direction="backward",
+        allow_exact_matches=False,
+    )
 
-#     away_history = historical[["gameDate", "awayteamId"] + away_cols].sort_values(
-#         "gameDate"
-#     )
-#     df = pd.merge_asof(
-#         df.sort_values("gameDate"),
-#         away_history,
-#         on="gameDate",
-#         by="awayteamId",
-#         direction="backward",
-#         allow_exact_matches=False,
-#     )
+    away_history = historical[["gameDate", "awayteamId"] + away_cols].sort_values(
+        "gameDate"
+    )
+    df = pd.merge_asof(
+        df.sort_values("gameDate"),
+        away_history,
+        on="gameDate",
+        by="awayteamId",
+        direction="backward",
+        allow_exact_matches=False,
+    )
 
-#     global_history = (
-#         historical[["gameDate"] + global_cols]
-#         .drop_duplicates(subset=["gameDate"])
-#         .sort_values("gameDate")
-#     )
-#     df = pd.merge_asof(
-#         df.sort_values("gameDate"),
-#         global_history,
-#         on="gameDate",
-#         direction="backward",
-#         allow_exact_matches=False,
-#     )
+    global_history = (
+        historical[["gameDate"] + global_cols]
+        .drop_duplicates(subset=["gameDate"])
+        .sort_values("gameDate")
+    )
+    df = pd.merge_asof(
+        df.sort_values("gameDate"),
+        global_history,
+        on="gameDate",
+        direction="backward",
+        allow_exact_matches=False,
+    )
 
-#     last_games = _prepare_rest_context(historical)
-#     df = _apply_rest_adjustments(df, last_games, location="home")
-#     df = _apply_rest_adjustments(df, last_games, location="away")
+    last_games = _prepare_rest_context(historical)
+    df = _apply_rest_adjustments(df, last_games, location="home")
+    df = _apply_rest_adjustments(df, last_games, location="away")
 
-#     if conference_filter == "different":
-#         df = df[df["hometeamConference"] != df["awayteamConference"]].copy()
-#     elif conference_filter == "same":
-#         df = df[df["hometeamConference"] == df["awayteamConference"]].copy()
+    if conference_filter == "different":
+        df = df[df["hometeamConference"] != df["awayteamConference"]].copy()
+    elif conference_filter == "same":
+        df = df[df["hometeamConference"] == df["awayteamConference"]].copy()
 
-#     delta_df = create_delta_features(
-#         df.copy(),
-#         lags=config.feature_engineering.lags,
-#         location_lags=config.feature_engineering.location_lags,
-#     )
-#     delta_cols = [
-#         col
-#         for col in delta_df.columns
-#         if col.endswith("_delta") or col.endswith("_delta_at_location")
-#     ]
-#     for col in delta_cols:
-#         df[col] = delta_df[col]
+    delta_df = create_delta_features(
+        df.copy(),
+        lags=config.feature_engineering.lags,
+        location_lags=config.feature_engineering.location_lags,
+    )
+    delta_cols = [
+        col
+        for col in delta_df.columns
+        if col.endswith("_delta") or col.endswith("_delta_at_location")
+    ]
+    for col in delta_cols:
+        df[col] = delta_df[col]
 
-#     if conference_filter == "different":
-#         conf_df = get_home_conference_vs_away_conference_record(df.copy())
-#         for col in [
-#             "home_conference_vs_away_conference_record",
-#             "games_played_at_home_conference",
-#         ]:
-#             if col in conf_df.columns:
-#                 df[col] = conf_df[col]
-#     if add_conference_delta:
-#         conf_delta = create_conference_delta(df.copy())
-#         if "conference_diff_home_advantage_pct" in conf_delta.columns:
-#             df["conference_diff_home_advantage_pct"] = conf_delta[
-#                 "conference_diff_home_advantage_pct"
-#             ]
-#             df["conference_diff_east_pct"] = conf_delta[
-#                 "conference_diff_home_advantage_pct"
-#             ]
+    if conference_filter == "different":
+        conf_df = get_home_conference_vs_away_conference_record(df.copy())
+        for col in [
+            "home_conference_vs_away_conference_record",
+            "games_played_at_home_conference",
+        ]:
+            if col in conf_df.columns:
+                df[col] = conf_df[col]
+    if add_conference_delta:
+        conf_delta = create_conference_delta(df.copy())
+        if "conference_diff_home_advantage_pct" in conf_delta.columns:
+            df["conference_diff_home_advantage_pct"] = conf_delta[
+                "conference_diff_home_advantage_pct"
+            ]
+            df["conference_diff_east_pct"] = conf_delta[
+                "conference_diff_home_advantage_pct"
+            ]
 
-#     metadata_cols = [
-#         col
-#         for col in [
-#             "gameId",
-#             "gameDate",
-#             "hometeamId",
-#             "hometeamName",
-#             "hometeamCity",
-#             "awayteamId",
-#             "awayteamName",
-#             "awayteamCity",
-#             "arenaName",
-#             "arenaCity",
-#         ]
-#         if col in df.columns
-#     ]
-#     metadata = df[metadata_cols].copy()
-#     return FeatureBuildResult(features=df, metadata=metadata)
+    metadata_cols = [
+        col
+        for col in [
+            "gameId",
+            "gameDate",
+            "hometeamId",
+            "hometeamName",
+            "hometeamCity",
+            "awayteamId",
+            "awayteamName",
+            "awayteamCity",
+            "arenaName",
+            "arenaCity",
+        ]
+        if col in df.columns
+    ]
+    metadata = df[metadata_cols].copy()
+    return FeatureBuildResult(features=df, metadata=metadata)

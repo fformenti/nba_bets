@@ -8,7 +8,7 @@ feature_config_path: "configs/my_experiment.yaml"
 #   - Registered model: "models:/nba_classification_random_forest/Production"
 #   - Specific version: "models:/nba_classification_random_forest/1"
 #   - Run ID: "runs:/<run_id>/model"
-model_uri: "models:/nba_classification_random_forest/Production"
+model_uri: "models:/nba_classification_random_forest/1"
 
 tracking_uri: null
 experiment_name: "nba_bets_predictions"

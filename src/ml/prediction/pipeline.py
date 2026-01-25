@@ -83,7 +83,7 @@ def _predict(
     return preds, proba
 
 
-def build_features_for_upcoming():
+def append_upcoming_to_historical():
     config, config_path = None, None
     if config is None:
         if config_path is None:

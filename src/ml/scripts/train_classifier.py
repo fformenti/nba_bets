@@ -535,7 +535,6 @@ def main(
 
         X = df.drop(columns=[col for col in exclude_cols if col in df.columns])
         logger.info(f"Features sent to model: {X.columns}")
-
         logger.info(f"Splitting data using {split_method} method")
 
         if split_method == "temporal":
