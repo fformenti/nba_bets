@@ -98,7 +98,7 @@ def run_full_pipeline(
     if raw_games_path is None:
         raw_games_path = LOCAL_RAW_GAMES_PATH
 
-    raw_games = pd.read_csv(raw_games_path, parse_dates=["gameDate"])
+    raw_games = pd.read_csv(raw_games_path, parse_dates=["gameDate"], low_memory=False)
     parsed_games = parse_raw_games(raw_games)
     parsed_games["season"] = parsed_games["gameDate"].apply(get_nba_season)
     regular_season_games = filter_regular_season_games(parsed_games)
