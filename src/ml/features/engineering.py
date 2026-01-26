@@ -155,6 +155,8 @@ def get_home_conference_vs_away_conference_record(df: pd.DataFrame) -> pd.DataFr
 
     df = df.drop(
         columns=[
+            "east_record_adjusted",
+            "west_record_adjusted",
             "east_record_at_east",
             "west_record_at_west",
             "games_played_at_east",
