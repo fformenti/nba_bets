@@ -31,12 +31,18 @@ def get_nba_season(game_date):
 
 def parse_raw_games(df: DataFrame) -> DataFrame:
     """Parse raw games DataFrame with proper data types and cleaning."""
+    # Ensure gameDate is datetime if it isn't already
+    if not pd.api.types.is_datetime64_any_dtype(df["gameDate"]):
+        df["gameDate"] = pd.to_datetime(df["gameDate"], errors="coerce")
+
     # Convert specific columns to appropriate data types
-    df["gameId"] = df["gameId"].astype("int64")
-    df["hometeamId"] = df["hometeamId"].astype("int64")
-    df["awayteamId"] = df["awayteamId"].astype("int64")
-    df["winner"] = df["winner"].astype("int64")
-    df["arenaId"] = df["arenaId"].astype("int64")
+    # Use pd.to_numeric with errors='coerce' to handle empty strings/NaN before converting to int
+    df["gameId"] = pd.to_numeric(df["gameId"], errors="coerce").astype("int64")
+    df["hometeamId"] = pd.to_numeric(df["hometeamId"], errors="coerce").astype("int64")
+    df["awayteamId"] = pd.to_numeric(df["awayteamId"], errors="coerce").astype("int64")
+    df["winner"] = pd.to_numeric(df["winner"], errors="coerce").astype("int64")
+    # arenaId may have NaN values, so use nullable integer type
+    df["arenaId"] = pd.to_numeric(df["arenaId"], errors="coerce").astype("Int64")
     df["seriesGameNumber"] = df["seriesGameNumber"].astype("float64")
 
     # Handle empty strings in numeric columns (convert to NaN)
@@ -44,12 +50,15 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Filter out invalid rows
-    df = df.loc[df["gameDate"].notna()]
-    df = df.loc[df["homeScore"].notna()]
-    df = df.loc[df["awayScore"].notna()]
-    df = df.loc[df["homeScore"] > 0]
-    df = df.loc[df["awayScore"] > 0]
+    # Filter out invalid rows (combine conditions and use .copy() to preserve dtypes)
+    mask = (
+        df["gameDate"].notna()
+        & df["homeScore"].notna()
+        & df["awayScore"].notna()
+        & (df["homeScore"] > 0)
+        & (df["awayScore"] > 0)
+    )
+    df = df.loc[mask].copy()
 
     # Add formatted date string
     df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
