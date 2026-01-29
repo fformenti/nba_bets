@@ -49,7 +49,7 @@ from src.ml.evaluation.visualization import (
 from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.tracking import MLflowTracker
-from src.config import PROJECT_ROOT, LOCAL_GAMES_FEATURES_PATH
+from src.config import PROJECT_ROOT, GAMES_FEATURES_PATH
 
 logger = get_logger(__name__)
 
@@ -418,9 +418,7 @@ def main(
 
         # Data loading
         data_path = (
-            Path(data_config.path)
-            if data_config.path
-            else Path(LOCAL_GAMES_FEATURES_PATH)
+            Path(data_config.path) if data_config.path else Path(GAMES_FEATURES_PATH)
         )
         target_column = data_config.target_column
         date_column = data_config.date_column

@@ -9,11 +9,10 @@ import pandas as pd
 
 from src.config import (
     PROJECT_ROOT,
-    LOCAL_GAMES_FEATURES_PATH,
+    GAMES_FEATURES_PATH,
 )
 from src.etl.features import create_features_tables, merge_features
-from src.etl.ingestion import create_teams_history_table, filter_regular_season_games
-from src.etl.ingestion.raw_games import parse_raw_games, get_nba_season
+from src.etl.ingestion import build_regular_season_games, load_teams_history_table
 from src.etl.transformation import add_conference
 from src.ml.config.loader import load_experiment_config
 from src.utils.logging_config import setup_logging, get_logger
@@ -123,9 +122,7 @@ def run_incremental_pipeline(
 
     archive_files(files, archive_dir)
 
-    parsed_games = parse_raw_games(combined)
-    parsed_games["season"] = parsed_games["gameDate"].apply(get_nba_season)
-    regular_season_games = filter_regular_season_games(parsed_games)
+    regular_season_games = build_regular_season_games(combined)
     regular_season_games.to_csv(processed_games_path, index=False)
     logger.info("Saved regular season games to %s", processed_games_path)
 
@@ -136,11 +133,7 @@ def run_incremental_pipeline(
     lags = feature_config.feature_engineering.lags
     location_lags = feature_config.feature_engineering.location_lags
 
-    teams_history = create_teams_history_table(
-        input_file=str(PROJECT_ROOT / config.teams_history_path),
-        output_file=None,
-        current_season_year=config.current_season_year,
-    )
+    teams_history = load_teams_history_table()
     games_with_conference = add_conference(regular_season_games, teams_history)
     create_features_tables(
         games_with_conference,
@@ -148,8 +141,8 @@ def run_incremental_pipeline(
         location_lags=location_lags,
     )
     final_features = merge_features(games_with_conference)
-    final_features.to_csv(LOCAL_GAMES_FEATURES_PATH, index=False)
-    logger.info("Saved merged features to %s", LOCAL_GAMES_FEATURES_PATH)
+    final_features.to_csv(GAMES_FEATURES_PATH, index=False)
+    logger.info("Saved merged features to %s", GAMES_FEATURES_PATH)
 
     return final_features
 

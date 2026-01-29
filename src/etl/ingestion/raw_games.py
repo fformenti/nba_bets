@@ -2,31 +2,13 @@
 
 from pandas import DataFrame
 import pandas as pd
-from pathlib import Path
-import sys
 
-# Add project root to path to allow imports
-_script_dir = Path(__file__).parent
-_project_root = _script_dir.parent.parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-from src.config import LOCAL_RAW_GAMES_PATH, LOCAL_REGULAR_SEASON_GAMES_PATH
-
-
-def get_nba_season(game_date):
-    """Determine the NBA season for a given date.
-    NBA season spans October-June, labeled as YYYY/YY where October is in the first year.
-    Example: Feb 25, 2025 → season "2024/25" (because season started Oct 2024)"""
-    year = game_date.year
-    month = game_date.month
-
-    # If month is October or later, season is current_year/next_year
-    if month >= 9:
-        return f"{year}/{(year + 1) % 100:02d}"
-    # Otherwise season is previous_year/current_year
-    else:
-        return f"{year - 1}/{year % 100:02d}"
+from src.config import (
+    RAW_GAMES_PATH,
+    REGULAR_SEASON_GAMES_PATH,
+    NON_POSITIVE_SCORE_PATH,
+)
+from src.etl.utils.common import get_nba_season, add_neutral_court_game_flag
 
 
 def parse_raw_games(df: DataFrame) -> DataFrame:
@@ -58,25 +40,43 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
         & (df["homeScore"] > 0)
         & (df["awayScore"] > 0)
     )
+
+    mask_non_positive_scores = (df["homeScore"] <= 0) | (df["awayScore"] <= 0)
+
     df = df.loc[mask].copy()
+    df_non_positive_score = df.loc[mask_non_positive_scores].copy()
 
     # Add formatted date string
     df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
-    return df
+    return df, df_non_positive_score
 
 
 def filter_regular_season_games(games) -> DataFrame:
     """Filter games to only include regular season games."""
-    GAMETYPES = ["Regular Season", "NBA Emirates Cup"]
-    games = games.loc[games["gameType"].isin(GAMETYPES)]
-    games = games.drop(columns=["gameSubLabel", "gameLabel", "seriesGameNumber"]).copy()
+
+    # Changes were made to the raw games season 2025/26 has a different patttern from previous years
+    not_gametype_regular_season = ["Playoffs", "Preseason", "Play-in Tournament"]
+    games = games.loc[~games["gameType"].isin(not_gametype_regular_season)]
+    gamelabel_preseason = ["Preseason"]
+    games = games.loc[~games["gameType"].isin(gamelabel_preseason)]
+    games = games.drop(columns=["gameSubLabel", "seriesGameNumber"]).copy()
 
     return games
 
 
-if __name__ == "__main__":
-    raw_games = pd.read_csv(LOCAL_RAW_GAMES_PATH, parse_dates=["gameDate"])
-    parsed_games = parse_raw_games(raw_games)
+def build_regular_season_games(raw_games: DataFrame) -> DataFrame:
+    """Parse raw games, add season, and filter to regular season games."""
+    parsed_games, df_non_positive_score = parse_raw_games(raw_games)
+    # save df_non_positive_score to csv
+    df_non_positive_score.to_csv(NON_POSITIVE_SCORE_PATH, index=False)
+    parsed_games = add_neutral_court_game_flag(
+        parsed_games, game_label_column="gameLabel", drop_label_column=True
+    )
     parsed_games["season"] = parsed_games["gameDate"].apply(get_nba_season)
-    regular_season_games = filter_regular_season_games(parsed_games)
-    regular_season_games.to_csv(LOCAL_REGULAR_SEASON_GAMES_PATH, index=False)
+    return filter_regular_season_games(parsed_games)
+
+
+if __name__ == "__main__":
+    raw_games = pd.read_csv(RAW_GAMES_PATH, parse_dates=["gameDate"])
+    regular_season_games = build_regular_season_games(raw_games)
+    regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)

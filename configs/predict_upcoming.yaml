@@ -1,14 +1,20 @@
 input_dir: "data/raw/incremental/upcoming_games"
 output_path: "data/predictions/upcoming_games_predictions.csv"
-features_path: "data/processed/games_features.csv"
+features_path: "data/processed/regular_season/features/games_features.csv"
 feature_config_path: "configs/my_experiment.yaml"
+
+data:
+  path: "data/processed/regular_season/features/games_features.csv"
+  target_column: "win_bool"
+  date_column: "gameDate"
+  drop_na: true
 
 # MLflow model URI (required)
 # Examples:
 #   - Registered model: "models:/nba_classification_random_forest/Production"
 #   - Specific version: "models:/nba_classification_random_forest/1"
 #   - Run ID: "runs:/<run_id>/model"
-model_uri: "models:/nba_classification_random_forest/1"
+model_uri: "models:/nba_classification_random_forest/5"
 
 tracking_uri: null
 experiment_name: "nba_bets_predictions"

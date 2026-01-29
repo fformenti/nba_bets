@@ -1,7 +1,9 @@
 """Pydantic schemas for experiment configuration."""
 
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, Field, ConfigDict
+
+from src.config import EARLIEST_GAME_DATE
 
 
 class DataConfig(BaseModel):
@@ -16,7 +18,7 @@ class DataConfig(BaseModel):
 class FiltersConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    start_date: str | None = "1980-08-01"
+    start_date: str | None = EARLIEST_GAME_DATE
     minimum_games: int = 10
 
 
@@ -93,3 +95,31 @@ class ExperimentConfig(BaseModel):
     model: ModelConfig = ModelConfig()
     evaluation: EvaluationConfig = EvaluationConfig()
     paths: PathsConfig = PathsConfig()
+
+
+class PredictionConfig(BaseModel):
+    """Configuration for running predictions on upcoming games."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    data: DataConfig = DataConfig()
+    input_dir: str = "data/raw/incremental/upcoming_games"
+    output_path: str = "data/predictions/upcoming_games_predictions.csv"
+    features_path: str = "data/processed/games_features.csv"
+    feature_config_path: str = "configs/my_experiment.yaml"
+
+    model_uri: str = Field(
+        ...,
+        description="MLflow model URI (e.g., 'models:/nba_classification_random_forest/Production' or 'runs:/<run_id>/model')",
+    )
+
+    tracking_uri: Optional[str] = None
+    experiment_name: str = "nba_bets_predictions"
+
+    conference_filter: str = Field(
+        default="different",
+        description="Filter games by conference matchup: different, same, or all.",
+    )
+    add_conference_delta: bool = False
+    allow_missing_features: bool = True
+    max_files: Optional[int] = None

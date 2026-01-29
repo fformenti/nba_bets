@@ -1,6 +1,7 @@
 """Common utility functions for data processing."""
 
 import pandas as pd
+from src.config.constants import NEUTRAL_COURT_GAME_LABELS
 
 
 def get_season_date_range(games):
@@ -116,3 +117,39 @@ def filter_games_by_date(games: pd.DataFrame, min_date: str) -> pd.DataFrame:
     print(f"Filtered games: {initial_count} -> {filtered_count} (min_date: {min_date})")
 
     return filtered_games
+
+
+def add_neutral_court_game_flag(
+    df: pd.DataFrame,
+    game_label_column: str = "gameLabel",
+    drop_label_column: bool = True,
+) -> pd.DataFrame:
+    """
+    Add a boolean flag indicating if a game is played on a neutral court.
+
+    Neutral court games include international games and Las Vegas games
+    as defined in NEUTRAL_COURT_GAME_LABELS.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Games DataFrame with a game label column
+    game_label_column : str, default="gameLabel"
+        Name of the column containing game labels
+    drop_label_column : bool, default=True
+        Whether to drop the game label column after processing
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with 'is_neutral_court_game' boolean column added.
+        If game_label_column doesn't exist, all values will be False.
+    """
+    df = df.copy()
+
+    df["is_neutral_court_game"] = df[game_label_column].isin(NEUTRAL_COURT_GAME_LABELS)
+
+    if drop_label_column:
+        df = df.drop(columns=[game_label_column]).copy()
+
+    return df

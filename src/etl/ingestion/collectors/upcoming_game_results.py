@@ -11,7 +11,7 @@ from typing import Any
 
 from nba_api.stats.endpoints import boxscoresummaryv2, boxscoresummaryv3
 
-from src.config import LOCAL_RAW_INCREMENTAL_DIR
+from src.config import RAW_INCREMENTAL_DIR
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -261,12 +261,12 @@ def main() -> None:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=LOCAL_RAW_INCREMENTAL_DIR / "upcoming_games",
+        default=RAW_INCREMENTAL_DIR / "upcoming_games",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=LOCAL_RAW_INCREMENTAL_DIR / "upcoming_games_results",
+        default=RAW_INCREMENTAL_DIR / "upcoming_games_results",
     )
     args = parser.parse_args()
 

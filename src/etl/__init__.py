@@ -10,6 +10,7 @@ This module provides utilities for:
 
 from .ingestion import (
     create_teams_history_table,
+    load_teams_history_table,
     parse_raw_games,
     filter_regular_season_games,
     get_nba_season,
@@ -33,11 +34,12 @@ from .utils import (
     get_season_date_range,
     filter_games_by_date,
 )
-from .pipeline import run_full_pipeline
+from .full_pipeline import run_full_pipeline
 
 __all__ = [
     # Ingestion
     "create_teams_history_table",
+    "load_teams_history_table",
     "parse_raw_games",
     "filter_regular_season_games",
     "get_nba_season",

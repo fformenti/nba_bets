@@ -10,18 +10,20 @@ from pathlib import Path
 
 
 from src.config import (
-    LOCAL_RAW_GAMES_PATH,
-    LOCAL_REGULAR_SEASON_GAMES_PATH,
-    LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH,
-    LOCAL_GAMES_FEATURES_PATH,
+    RAW_GAMES_PATH,
+    REGULAR_SEASON_GAMES_PATH,
+    TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
+    TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
+    GAMES_FEATURES_PATH,
     PROJECT_ROOT,
+    EARLIEST_GAME_DATE,
+    CURRENT_SEASON_START_YEAR,
 )
 
 from src.etl.ingestion import (
+    build_regular_season_games,
     create_teams_history_table,
-    parse_raw_games,
-    filter_regular_season_games,
-    get_nba_season,
+    load_teams_history_table,
 )
 from src.etl.transformation import add_conference
 from src.etl.features import create_features_tables, merge_features
@@ -33,7 +35,7 @@ def run_full_pipeline(
     raw_games_path: Path = None,
     teams_history_path: Path = None,
     output_path: Path = None,
-    current_season_year: int = 2024,
+    current_season_start_year: int = None,
     earliest_date: str = None,
 ):
     """
@@ -52,10 +54,10 @@ def run_full_pipeline(
     raw_games_path : Path, optional
         Path to raw games CSV. If None, uses default from constants.
     teams_history_path : Path, optional
-        Path to teams history CSV. If None, uses default from constants.
+        Path to the precomputed teams history CSV. If None, uses default from constants.
     output_path : Path, optional
         Path to save final features table. If None, uses default from constants.
-    current_season_year : int, default=2024
+    current_season_start_year
         Current season year for teams history processing
     min_date : str, optional
         Minimum date to filter games (format: "YYYY-MM-DD").
@@ -75,34 +77,37 @@ def run_full_pipeline(
     lags = feature_engineering_config.lags
     location_lags = feature_engineering_config.location_lags
 
-    # Step 1: Create teams history table
-    print("\n[Step 1/5] Creating teams history table...")
-    if teams_history_path is None:
-        teams_history_path = (
-            Path(__file__).parent.parent.parent
-            / "data"
-            / "raw"
-            / "historical"
-            / "TeamsHistoriesConferenceNBA.csv"
+    # Step 1: Load teams history table (create it if missing)
+    print("\n[Step 1/5] Loading teams history table...")
+    try:
+        teams_history = load_teams_history_table(
+            processed_file=str(teams_history_path)
+            if teams_history_path is not None
+            else None
         )
-
-    teams_history = create_teams_history_table(
-        input_file=str(teams_history_path),
-        output_file=str(LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH),
-        current_season_year=current_season_year,
-    )
-    print(f"✓ Created teams history table with {len(teams_history)} rows")
+        print(f"✓ Loaded teams history table with {len(teams_history)} rows")
+    except FileNotFoundError:
+        print("Teams history table missing. Creating it now...")
+        raw_teams_history_path = (
+            teams_history_path
+            if teams_history_path is not None
+            else TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH
+        )
+        teams_history = create_teams_history_table(
+            input_file=str(raw_teams_history_path),
+            output_file=str(TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH),
+            current_season_start_year=current_season_start_year,
+        )
+        print(f"✓ Created teams history table with {len(teams_history)} rows")
 
     # Step 2: Parse and filter raw games
     print("\n[Step 2/5] Parsing and filtering raw games...")
     if raw_games_path is None:
-        raw_games_path = LOCAL_RAW_GAMES_PATH
+        raw_games_path = RAW_GAMES_PATH
 
     raw_games = pd.read_csv(raw_games_path, parse_dates=["gameDate"], low_memory=False)
-    parsed_games = parse_raw_games(raw_games)
-    parsed_games["season"] = parsed_games["gameDate"].apply(get_nba_season)
-    regular_season_games = filter_regular_season_games(parsed_games)
-    regular_season_games.to_csv(LOCAL_REGULAR_SEASON_GAMES_PATH, index=False)
+    regular_season_games = build_regular_season_games(raw_games)
+    regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)
     print(f"✓ Processed {len(regular_season_games)} regular season games")
 
     # Step 3: Add conference information
@@ -118,7 +123,7 @@ def run_full_pipeline(
     # Step 5: Merge features
     print("\n[Step 5/6] Merging features into final table...")
     if output_path is None:
-        output_path = LOCAL_GAMES_FEATURES_PATH
+        output_path = GAMES_FEATURES_PATH
 
     final_features = merge_features(games_with_conference)
 
@@ -140,5 +145,8 @@ def run_full_pipeline(
 
 
 if __name__ == "__main__":
-    earliest_date = "1980-08-01"
-    run_full_pipeline(earliest_date=earliest_date)
+    earliest_date = EARLIEST_GAME_DATE
+    current_season_start_year = CURRENT_SEASON_START_YEAR
+    run_full_pipeline(
+        earliest_date=earliest_date, current_season_start_year=current_season_start_year
+    )

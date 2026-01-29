@@ -9,6 +9,13 @@ to seasonActiveTill range into individual season rows.
 import pandas as pd
 from pathlib import Path
 
+from src.config import (
+    TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
+    PROCESSED_DIR,
+    TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
+    CURRENT_SEASON_START_YEAR,
+)
+
 
 def format_season(year: int) -> str:
     """
@@ -25,7 +32,9 @@ def format_season(year: int) -> str:
 
 
 def create_teams_history_table(
-    input_file: str, output_file: str = None, current_season_year: int = 2024
+    input_file: str,
+    output_file: str = None,
+    current_season_start_year: int = CURRENT_SEASON_START_YEAR,
 ) -> pd.DataFrame:
     """
     Transform teams history table to expand seasons.
@@ -47,7 +56,7 @@ def create_teams_history_table(
 
     # Overwrite seasonActiveTill == 2100 to current_season_year + 1
     # (2025 for 2024/25 season as per user instruction)
-    max_season_year = current_season_year + 1
+    max_season_year = current_season_start_year + 1
     df.loc[df["seasonActiveTill"] == 2100, "seasonActiveTill"] = max_season_year
 
     # Create list to store expanded rows
@@ -64,7 +73,7 @@ def create_teams_history_table(
             # Generate seasons from seasonFounded to seasonActiveTill (exclusive)
             # seasonActiveTill represents the first year of the next period
             # But cap at current_season_year + 1 to ensure latest season is 2024/25
-            end_year = min(season_active_till, current_season_year + 1)
+            end_year = min(season_active_till, current_season_start_year + 1)
             for year in range(season_founded, end_year):
                 season_str = format_season(year)
 
@@ -98,23 +107,33 @@ def create_teams_history_table(
     return result_df
 
 
-if __name__ == "__main__":
-    # Define paths
-    project_root = Path(__file__).parent.parent.parent.parent
-    input_file = (
-        project_root / "data" / "raw" / "historical" / "TeamsHistoriesConferenceNBA.csv"
-    )
+def load_teams_history_table(
+    processed_file: str = None,
+) -> pd.DataFrame:
+    """
+    Load the precomputed teams history table from disk.
 
+    Raises a FileNotFoundError if the file does not exist.
+    """
+    if processed_file is None:
+        processed_file = str(TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH)
+    if not Path(processed_file).exists():
+        raise FileNotFoundError(
+            "Teams history table not found. Run src/etl/ingestion/teams_history.py "
+            "to generate it first."
+        )
+    return pd.read_csv(processed_file)
+
+
+if __name__ == "__main__":
     # Create output directory if it doesn't exist
-    output_dir = project_root / "data" / "processed"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "teams_history_expanded.csv"
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Process the data
     result = create_teams_history_table(
-        input_file=str(input_file),
-        output_file=str(output_file),
-        current_season_year=2024,
+        input_file=TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
+        output_file=TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
+        current_season_start_year=CURRENT_SEASON_START_YEAR,
     )
 
     print(f"\nProcessed {len(result)} rows")

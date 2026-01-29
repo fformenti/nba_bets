@@ -1,7 +1,7 @@
 """Games data cleaning and transformation utilities."""
 
 
-def add_conference(games, cities_conferences):
+def add_conference(games, cities_conferences, ignore_winner_column: bool = False):
     """
     Add conference information to games DataFrame.
 
@@ -34,12 +34,17 @@ def add_conference(games, cities_conferences):
     ).drop(columns=["teamId"])
     games = games.rename(columns={"Conference": "awayteamConference"}, inplace=False)
 
-    games = games.merge(
-        cities_conferences[["teamId", "Conference", "season"]],
-        how="left",
-        left_on=["winner", "season"],
-        right_on=["teamId", "season"],
-    ).drop(columns=["teamId"])
-    games = games.rename(columns={"Conference": "winnerteamConference"}, inplace=False)
+    if not ignore_winner_column:
+        games = games.merge(
+            cities_conferences[["teamId", "Conference", "season"]],
+            how="left",
+            left_on=["winner", "season"],
+            right_on=["teamId", "season"],
+        ).drop(columns=["teamId"])
+        games = games.rename(
+            columns={"Conference": "winnerteamConference"}, inplace=False
+        )
+    else:
+        games["winnerteamConference"] = None
 
     return games

@@ -6,8 +6,13 @@ including parameters, metrics, models, and artifacts.
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+# Avoid recording env vars in MLflow model logging unless explicitly enabled.
+os.environ.setdefault("MLFLOW_RECORD_ENV_VARS_IN_MODEL_LOGGING", "false")
+
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature

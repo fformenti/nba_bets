@@ -2,7 +2,7 @@
 # Copy this file and modify as needed for your experiments
 
 data:
-  path: "data/processed/games_features.csv"
+  path: "data/processed/regular_season/features/games_features.csv"
   target_column: "win_bool"
   date_column: "gameDate"
   drop_na: true

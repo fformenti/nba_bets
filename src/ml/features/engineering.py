@@ -191,15 +191,23 @@ def identify_feature_types(
 
     available_cols = [col for col in df.columns if col not in exclude_columns]
 
-    numerical_features = (
-        df[available_cols].select_dtypes(include=["number"]).columns.tolist()
+    # Identify boolean columns (binary categorical features)
+    boolean_features = (
+        df[available_cols].select_dtypes(include=["bool"]).columns.tolist()
     )
 
+    # Numerical features: get all numeric columns, then exclude boolean columns
+    all_numeric = df[available_cols].select_dtypes(include=["number"]).columns.tolist()
+    numerical_features = [col for col in all_numeric if col not in boolean_features]
+
+    # Categorical features: include object, category, and boolean columns
     categorical_features = (
         df[available_cols]
         .select_dtypes(include=["object", "category"])
         .columns.tolist()
     )
+    # Add boolean features to categorical (they're binary categorical)
+    categorical_features.extend(boolean_features)
 
     return {
         "numerical": numerical_features,

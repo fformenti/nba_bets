@@ -16,7 +16,7 @@ print(_project_root)
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from src.config import LOCAL_GAMES_FEATURES_PATH
+from src.config import GAMES_FEATURES_PATH
 from src.etl.specialized.games_class import Game
 
 
@@ -82,7 +82,7 @@ def upload_to_huggingface(dataset):
 
 def main():
     """Main function to create and upload HuggingFace dataset."""
-    games: pd.DataFrame = pd.read_csv(LOCAL_GAMES_FEATURES_PATH)
+    games: pd.DataFrame = pd.read_csv(GAMES_FEATURES_PATH)
     games_filtered_nulls: pd.DataFrame = games.dropna().copy(deep=True)
     games_filtered_fixed: pd.DataFrame = fix_float_to_int(games_filtered_nulls)
     games_dict = games_filtered_fixed.to_dict(orient="records")

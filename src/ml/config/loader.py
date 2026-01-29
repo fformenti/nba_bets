@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any
 
-from src.ml.config.schema import ExperimentConfig
+from src.ml.config.schema import ExperimentConfig, PredictionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,13 @@ def load_yaml_config(config_path: Path) -> Dict[str, Any]:
 
     logger.info(f"Loaded configuration from {config_path}")
     return config
+
+
+def load_prediction_config(config_path: Path) -> PredictionConfig:
+    """Load prediction config from YAML."""
+    with open(config_path, "r", encoding="utf-8") as handle:
+        raw_config = yaml.safe_load(handle) or {}
+    return PredictionConfig(**raw_config)
 
 
 def load_experiment_config(config_path: Path) -> ExperimentConfig:

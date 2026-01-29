@@ -10,48 +10,62 @@ from pathlib import Path
 script_dir = Path(__file__).parent
 PROJECT_ROOT = script_dir.parent.parent
 
-# Filenames
-LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_FILENAME = "teams_history_expanded.csv"
+# Base data directories
+DATA_DIR = PROJECT_ROOT / "data"
+RAW_DIR = DATA_DIR / "raw"
+INGESTED_DIR = DATA_DIR / "ingested"
+PROCESSED_DIR = DATA_DIR / "processed"
 
-# Raw data paths
-LOCAL_RAW_GAMES_PATH = (
-    PROJECT_ROOT / "data" / "raw" / "historical" / "games" / "Games.csv"
-)
-LOCAL_RAW_INCREMENTAL_DIR = PROJECT_ROOT / "data" / "raw" / "incremental"
-LOCAL_RAW_INCREMENTAL_ARCHIVE_DIR = LOCAL_RAW_INCREMENTAL_DIR / "archive"
-LOCAL_LEAGUE_SCHEDULE_PATH = (
-    PROJECT_ROOT / "data" / "raw" / "historical" / "LeagueSchedule24_25.csv"
+
+# ===== Raw =====
+RAW_HISTORICAL_DIR = RAW_DIR / "historical"
+RAW_GAMES_PATH = RAW_HISTORICAL_DIR / "games" / "Games.csv"
+
+# To do: Remove hardcoded "LeagueSchedule25_26.csv" from here. Find a better place for it
+LEAGUE_SCHEDULE_PATH = RAW_HISTORICAL_DIR / "LeagueSchedule25_26.csv"
+# downaloaded file
+ALL_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistories.csv"
+# filter from file above filter for NBA teams
+NBA_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistoriesNBA.csv"
+
+# ===== Handmade =====
+# Conference added by hand using the NBA_TEAMS_HISTORY_PATH file
+TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH = (
+    RAW_HISTORICAL_DIR / "handmade" / "TeamsHistoriesConferenceNBA.csv"
 )
 
-# Ingested data paths
-LOCAL_INGESTED_GAMES_PATH = PROJECT_ROOT / "data" / "ingested" / "historical" / "games"
-LOCAL_INGESTED_INCREMENTAL_GAMES_PATH = (
-    PROJECT_ROOT / "data" / "ingested" / "incremental" / "games"
-)
+# ===== Collected =====
+RAW_INCREMENTAL_DIR = RAW_DIR / "incremental"
+RAW_INCREMENTAL_ARCHIVE_DIR = RAW_INCREMENTAL_DIR / "archive"
+UPCOMING_GAMES_DIR = RAW_INCREMENTAL_DIR / "upcoming_games"
+UPCOMING_GAMES_RESULTS_DIR = RAW_INCREMENTAL_DIR / "upcoming_games_results"
 
-# Processed data paths
-LOCAL_PROCESSED_FOLDER = PROJECT_ROOT / "data" / "processed"
-LOCAL_REGULAR_SEASON_GAMES_PATH = (
-    LOCAL_PROCESSED_FOLDER / "regular_season" / "games.csv"
+# ===== Ingested =====
+INGESTED_GAMES_PATH = INGESTED_DIR / "historical" / "games"
+
+# ===== Processed =====
+TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH = (
+    PROCESSED_DIR / "TeamsHistoriesConferenceNBALookUpTable.csv"
 )
-LOCAL_PLAYOFFS_GAMES_PATH = LOCAL_PROCESSED_FOLDER / "playoffs" / "games"
+PROCESSED_LEAGUE_SCHEDULE_PATH = PROCESSED_DIR / "league_schedule.csv"
+REGULAR_SEASON_GAMES_PATH = PROCESSED_DIR / "regular_season" / "games.csv"
+NON_POSITIVE_SCORE_PATH = PROCESSED_DIR / "regular_season" / "non_positive_score.csv"
+PLAYOFFS_GAMES_PATH = PROCESSED_DIR / "playoffs" / "games"
 
 # Feature tables paths
-LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH = (
-    LOCAL_PROCESSED_FOLDER / LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_FILENAME
+REGULAR_SEASON_FEAURES_DIR = PROCESSED_DIR / "regular_season" / "features"
+TEAMS_HOME_RECORDS_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_home_record.csv"
+TEAMS_AWAY_RECORDS_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_away_record.csv"
+TEAMS_RECORDS_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_records.csv"
+TEAMS_HOME_PTS_DIFF_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_home_pts_diff.csv"
+TEAMS_AWAY_PTS_DIFF_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_away_pts_diff.csv"
+TEAMS_PTS_DIFF_PATH = REGULAR_SEASON_FEAURES_DIR / "teams_pts_diff.csv"
+EAST_WEST_RECORDS_PATH = REGULAR_SEASON_FEAURES_DIR / "east_west_record.csv"
+EAST_WEST_RECORDS_AT_EAST_PATH = (
+    REGULAR_SEASON_FEAURES_DIR / "east_west_record_at_east.csv"
 )
-LOCAL_TEAMS_HOME_RECORDS_PATH = LOCAL_PROCESSED_FOLDER / "teams_home_record.csv"
-LOCAL_TEAMS_AWAY_RECORDS_PATH = LOCAL_PROCESSED_FOLDER / "teams_away_record.csv"
-LOCAL_TEAMS_RECORDS_PATH = LOCAL_PROCESSED_FOLDER / "teams_records.csv"
-LOCAL_TEAMS_HOME_PTS_DIFF_PATH = LOCAL_PROCESSED_FOLDER / "teams_home_pts_diff.csv"
-LOCAL_TEAMS_AWAY_PTS_DIFF_PATH = LOCAL_PROCESSED_FOLDER / "teams_away_pts_diff.csv"
-LOCAL_TEAMS_PTS_DIFF_PATH = LOCAL_PROCESSED_FOLDER / "teams_pts_diff.csv"
-LOCAL_EAST_WEST_RECORDS_PATH = LOCAL_PROCESSED_FOLDER / "east_west_record.csv"
-LOCAL_EAST_WEST_RECORDS_AT_EAST_PATH = (
-    LOCAL_PROCESSED_FOLDER / "east_west_record_at_east.csv"
+EAST_WEST_RECORDS_AT_WEST_PATH = (
+    REGULAR_SEASON_FEAURES_DIR / "east_west_record_at_west.csv"
 )
-LOCAL_EAST_WEST_RECORDS_AT_WEST_PATH = (
-    LOCAL_PROCESSED_FOLDER / "east_west_record_at_west.csv"
-)
-LOCAL_RESTED_DAYS_PATH = LOCAL_PROCESSED_FOLDER / "rested_days.csv"
-LOCAL_GAMES_FEATURES_PATH = LOCAL_PROCESSED_FOLDER / "games_features.csv"
+RESTED_DAYS_PATH = REGULAR_SEASON_FEAURES_DIR / "rested_days.csv"
+GAMES_FEATURES_PATH = REGULAR_SEASON_FEAURES_DIR / "games_features.csv"
