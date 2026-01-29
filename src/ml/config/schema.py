@@ -64,6 +64,11 @@ class ModelConfig(BaseModel):
 
     type: str = "classification"
     name: str = "random_forest"
+    register_model: bool = Field(
+        default=True,
+        description="Whether to register the model in MLflow Model Registry. "
+        "Set to False for experimental runs (use run-based URIs instead).",
+    )
     hyperparameter_tuning: HyperparameterTuningConfig = HyperparameterTuningConfig()
     random_forest: dict[str, Any] = Field(default_factory=dict)
     gradient_boosting: dict[str, Any] = Field(default_factory=dict)

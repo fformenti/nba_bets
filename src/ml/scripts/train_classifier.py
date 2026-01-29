@@ -12,6 +12,7 @@ This script demonstrates best practices:
 import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -52,6 +53,54 @@ from src.ml.tracking import MLflowTracker
 from src.config import PROJECT_ROOT, GAMES_FEATURES_PATH
 
 logger = get_logger(__name__)
+
+
+def generate_run_name(
+    config_path: Optional[Path] = None,
+    model_name: Optional[str] = None,
+    include_timestamp: bool = True,
+) -> str:
+    """
+    Generate a descriptive MLflow run name following best practices.
+
+    Best practices for run names:
+    - Include config name to identify experiment configuration
+    - Include timestamp for uniqueness and chronological ordering
+    - Optionally include model name for multi-model experiments
+    - Keep names concise but informative
+
+    Parameters
+    ----------
+    config_path : Path, optional
+        Path to configuration file
+    model_name : str, optional
+        Model name (e.g., 'random_forest', 'gradient_boosting')
+    include_timestamp : bool, default=True
+        Whether to include timestamp in run name
+
+    Returns
+    -------
+    str
+        Generated run name
+    """
+    parts = []
+
+    # Add config name
+    if config_path:
+        parts.append(config_path.stem)
+    else:
+        parts.append("default")
+
+    # Optionally add model name
+    if model_name:
+        parts.append(model_name)
+
+    # Add timestamp for uniqueness
+    if include_timestamp:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        parts.append(timestamp)
+
+    return "-".join(parts)
 
 
 def clean_feature_names(feature_names: list) -> list:
@@ -399,10 +448,13 @@ def main(
     else:
         config = load_experiment_config(config_path)
 
+    # Generate descriptive run name following best practices
+    run_name = generate_run_name(config_path=config_path, include_timestamp=True)
+
     # Start MLflow tracking
     with MLflowTracker(
         experiment_name=experiment_name,
-        run_name=config_path.stem if config_path else None,
+        run_name=run_name,
     ) as tracker:
         # Log configuration
         tracker.log_config(config.model_dump())
@@ -448,6 +500,15 @@ def main(
                 "only_different_conferences": only_different_conferences,
                 "model_name": model_config.get("name", "random_forest"),
                 "scaling_method": config.preprocessing.scaling_method,
+            }
+        )
+
+        # Set tags for better organization and filtering
+        tracker.set_tags(
+            {
+                "task": "classification",
+                "config_file": config_path.stem if config_path else "default",
+                "experiment_type": "training",
             }
         )
 
@@ -896,12 +957,36 @@ def main(
                 logger.info("Skipping local model save; MLflow handles model logging.")
 
             # Log best model to MLflow
+            # Option 1: Register model (creates versions) - good for production candidates
+            # Option 2: Don't register, use run-based URI - good for experimentation
+            # Check config to determine if we should register
+            should_register = config.model.register_model
+            registered_model_name = (
+                f"nba_classification_{best_model_name}" if should_register else None
+            )
+
+            if should_register:
+                logger.info(
+                    f"Registering model '{registered_model_name}' in MLflow Model Registry"
+                )
+            else:
+                logger.info(
+                    "Model will be logged but not registered. Use run-based URI for access."
+                )
+
             tracker.log_model(
                 best_pipeline,
                 artifact_path="model",
-                registered_model_name=f"nba_classification_{best_model_name}",
+                registered_model_name=registered_model_name,
                 input_example=X_train.head(5),
             )
+
+            # Log run URI for easy model retrieval
+            run_id = tracker.get_run_id()
+            if run_id:
+                run_model_uri = f"runs:/{run_id}/model"
+                logger.info(f"Model logged at run URI: {run_model_uri}")
+                tracker.log_params({"model_run_uri": run_model_uri})
 
         logger.info("Training complete!")
 
