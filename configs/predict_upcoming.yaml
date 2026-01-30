@@ -14,7 +14,7 @@ data:
 #   - Registered model: "models:/nba_classification_random_forest/Production"
 #   - Specific version: "models:/nba_classification_random_forest/1"
 #   - Run ID: "runs:/<run_id>/model"
-model_uri: "models:/nba_classification_random_forest_all/3"
+model_uri: "models:/nba_classification_random_forest_all/4"
 
 tracking_uri: null
 experiment_name: "nba_bets_predictions"
