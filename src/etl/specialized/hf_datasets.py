@@ -16,7 +16,7 @@ print(_project_root)
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from src.config import GAMES_FEATURES_PATH
+from src.config.paths import GAMES_FEATURES_PATH
 from src.etl.specialized.games_class import Game
 
 

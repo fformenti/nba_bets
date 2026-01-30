@@ -1,7 +1,5 @@
-"""Data transformation module for cleaning and basic transformations."""
+"""Data transformation module for cleaning and basic transformations.
 
-from .add_conference import add_conference
-
-__all__ = [
-    "add_conference",
-]
+Import directly from submodules, e.g.:
+- from src.etl.transformation.add_conference import add_conference
+"""

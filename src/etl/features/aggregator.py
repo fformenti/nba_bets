@@ -3,7 +3,7 @@
 import pandas as pd
 
 
-from src.config import (
+from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     GAMES_FEATURES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
@@ -221,7 +221,9 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
 if __name__ == "__main__":
     # Read Tables
     games = pd.read_csv(REGULAR_SEASON_GAMES_PATH)
-    teams_cities_conferences = pd.read_csv(TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH)
+    teams_cities_conferences = pd.read_csv(
+        TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH
+    )
     games = add_conference(games, teams_cities_conferences)
 
     # Create feature tables

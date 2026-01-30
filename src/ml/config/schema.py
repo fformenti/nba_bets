@@ -3,7 +3,7 @@
 from typing import Any, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
-from src.config import EARLIEST_GAME_DATE
+from src.config.constants import EARLIEST_GAME_DATE
 
 
 class DataConfig(BaseModel):

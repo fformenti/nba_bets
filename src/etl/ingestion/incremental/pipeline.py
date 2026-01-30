@@ -7,13 +7,11 @@ from typing import Optional
 
 import pandas as pd
 
-from src.config import (
-    PROJECT_ROOT,
-    GAMES_FEATURES_PATH,
-)
-from src.etl.features import create_features_tables, merge_features
-from src.etl.ingestion import build_regular_season_games, load_teams_history_table
-from src.etl.transformation import add_conference
+from src.config.paths import PROJECT_ROOT, GAMES_FEATURES_PATH
+from src.etl.features.aggregator import create_features_tables, merge_features
+from src.etl.ingestion.raw_games import build_regular_season_games
+from src.etl.ingestion.teams_history import load_teams_history_table
+from src.etl.transformation.add_conference import add_conference
 from src.ml.config.loader import load_experiment_config
 from src.utils.logging_config import setup_logging, get_logger
 

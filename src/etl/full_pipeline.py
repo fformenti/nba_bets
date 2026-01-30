@@ -9,25 +9,24 @@ import pandas as pd
 from pathlib import Path
 
 
-from src.config import (
+from src.config.paths import (
     RAW_GAMES_PATH,
     REGULAR_SEASON_GAMES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
     GAMES_FEATURES_PATH,
     PROJECT_ROOT,
-    EARLIEST_GAME_DATE,
-    CURRENT_SEASON_START_YEAR,
 )
+from src.config.constants import EARLIEST_GAME_DATE, CURRENT_SEASON_START_YEAR
 
-from src.etl.ingestion import (
-    build_regular_season_games,
+from src.etl.ingestion.raw_games import build_regular_season_games
+from src.etl.ingestion.teams_history import (
     create_teams_history_table,
     load_teams_history_table,
 )
-from src.etl.transformation import add_conference
-from src.etl.features import create_features_tables, merge_features
-from src.etl.utils import filter_games_by_date
+from src.etl.transformation.add_conference import add_conference
+from src.etl.features.aggregator import create_features_tables, merge_features
+from src.etl.utils.common import filter_games_by_date
 from src.ml.config.loader import load_experiment_config
 
 

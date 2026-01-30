@@ -11,7 +11,7 @@ from typing import Any
 
 from nba_api.stats.endpoints import boxscoresummaryv2, boxscoresummaryv3
 
-from src.config import RAW_INCREMENTAL_DIR
+from src.config.paths import RAW_INCREMENTAL_DIR
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)

@@ -48,8 +48,8 @@ from src.ml.evaluation.visualization import (
 )
 from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig
-from src.ml.tracking import MLflowTracker
-from src.config import PROJECT_ROOT, GAMES_FEATURES_PATH
+from src.ml.tracking.mlflow_tracker import MLflowTracker
+from src.config.paths import PROJECT_ROOT, GAMES_FEATURES_PATH
 
 logger = get_logger(__name__)
 

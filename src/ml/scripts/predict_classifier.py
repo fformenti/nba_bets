@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 
 from src.utils.logging_config import setup_logging, get_logger
-from src.config import PROJECT_ROOT
-from src.etl.features import create_features_tables, merge_features
+from src.config.paths import PROJECT_ROOT
+from src.etl.features.aggregator import create_features_tables, merge_features
 from src.ml.config.loader import load_experiment_config, load_prediction_config
 from src.ml.config.schema import ExperimentConfig, PredictionConfig
 
@@ -30,7 +30,7 @@ from src.ml.features.engineering import (
     create_delta_features,
     apply_conference_features,
 )
-from src.ml.tracking import MLflowTracker
+from src.ml.tracking.mlflow_tracker import MLflowTracker
 
 logger = get_logger(__name__)
 

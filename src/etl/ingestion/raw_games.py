@@ -3,7 +3,7 @@
 from pandas import DataFrame
 import pandas as pd
 
-from src.config import (
+from src.config.paths import (
     RAW_GAMES_PATH,
     REGULAR_SEASON_GAMES_PATH,
     NON_POSITIVE_SCORE_PATH,

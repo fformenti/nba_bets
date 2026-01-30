@@ -9,12 +9,12 @@ to seasonActiveTill range into individual season rows.
 import pandas as pd
 from pathlib import Path
 
-from src.config import (
+from src.config.paths import (
     TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     PROCESSED_DIR,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
-    CURRENT_SEASON_START_YEAR,
 )
+from src.config.constants import CURRENT_SEASON_START_YEAR
 
 
 def format_season(year: int) -> str:

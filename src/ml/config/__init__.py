@@ -1,17 +1,6 @@
-"""Configuration management for ML experiments."""
+"""Configuration management for ML experiments.
 
-from .loader import (
-    load_yaml_config,
-    load_experiment_config,
-    get_nested_config,
-    validate_config,
-)
-from .schema import ExperimentConfig
-
-__all__ = [
-    "ExperimentConfig",
-    "load_yaml_config",
-    "load_experiment_config",
-    "get_nested_config",
-    "validate_config",
-]
+Import directly from submodules, e.g.:
+- from src.ml.config.loader import load_experiment_config
+- from src.ml.config.schema import ExperimentConfig
+"""

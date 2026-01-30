@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config import (
+from src.config.paths import (
     LEAGUE_SCHEDULE_PATH,
     UPCOMING_GAMES_DIR,
     GAMES_FEATURES_PATH,
