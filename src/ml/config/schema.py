@@ -20,6 +20,12 @@ class FiltersConfig(BaseModel):
 
     start_date: str | None = EARLIEST_GAME_DATE
     minimum_games: int = 10
+    conference_filter: str = Field(
+        default="all",
+        description="Conference filter type: 'same' (same conference only), "
+        "'different' (different conferences only), or 'all' (all games). "
+        "Determines which conference features to create.",
+    )
 
 
 class SplittingConfig(BaseModel):
@@ -123,8 +129,14 @@ class PredictionConfig(BaseModel):
 
     conference_filter: str = Field(
         default="different",
-        description="Filter games by conference matchup: different, same, or all.",
+        description="Filter games by conference matchup: different, same, or all. "
+        "Note: This is used for filtering only. Feature engineering uses "
+        "conference_filter from the experiment config.",
     )
-    add_conference_delta: bool = False
+    add_conference_delta: bool = Field(
+        default=False,
+        description="[DEPRECATED] Conference features are now determined by "
+        "conference_filter in the experiment config. This parameter is ignored.",
+    )
     allow_missing_features: bool = True
     max_files: Optional[int] = None

@@ -16,6 +16,7 @@ os.environ.setdefault("MLFLOW_RECORD_ENV_VARS_IN_MODEL_LOGGING", "false")
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
+from mlflow.tracking import MlflowClient
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,13 @@ def setup_mlflow_experiment(
                 f"Created new MLflow experiment: {experiment_name} (ID: {experiment_id})"
             )
         else:
+            # Check if experiment is deleted
+            if experiment.lifecycle_stage == "deleted":
+                logger.info(
+                    f"Found deleted experiment: {experiment_name}. Restoring it."
+                )
+                client = MlflowClient()
+                client.restore_experiment(experiment.experiment_id)
             experiment_id = experiment.experiment_id
             logger.info(
                 f"Using existing MLflow experiment: {experiment_name} (ID: {experiment_id})"

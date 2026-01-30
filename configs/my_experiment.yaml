@@ -9,10 +9,11 @@ data:
 
 filters:
   start_date: "1980-08-01"
-  minimum_games: 34
+  conference_filter: "all"
+  minimum_games: 20
 
 splitting:
-  method: "temporal"  # 'random', 'temporal', or 'stratified'
+  method: "random"  # 'random', 'temporal', or 'stratified'
   test_size: 0.2
   val_size: 0.2
   random_state: 42

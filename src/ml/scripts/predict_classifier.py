@@ -27,9 +27,8 @@ from src.ml.scripts.train_classifier import load_and_validate_data
 from src.ml.prediction.io import load_upcoming_games
 
 from src.ml.features.engineering import (
-    create_conference_delta,
-    get_home_conference_vs_away_conference_record,
     create_delta_features,
+    apply_conference_features,
 )
 from src.ml.tracking import MLflowTracker
 
@@ -220,7 +219,6 @@ def build_features_for_prediction(
     historical_features: pd.DataFrame,
     experiment_config: ExperimentConfig,
     conference_filter: str,
-    add_conference_delta: bool,
 ) -> pd.DataFrame:
     """
     Build features for upcoming games prediction.
@@ -234,9 +232,11 @@ def build_features_for_prediction(
     experiment_config : ExperimentConfig
         Experiment configuration with feature engineering settings
     conference_filter : str
-        Conference filter type
-    add_conference_delta : bool
-        Whether to add conference delta features
+        Conference filter type ('same', 'different', or 'all').
+        Determines which conference features to create:
+        - 'same': No conference features
+        - 'different': Conference vs conference record features
+        - 'all': Conference delta feature (0.0 for same conference)
 
     Returns
     -------
@@ -284,16 +284,11 @@ def build_features_for_prediction(
         location_lags=location_lags,
     )
 
-    # Add conference-specific features
-    if conference_filter == "different":
-        logger.info("Adding home conference vs away conference record features")
-        upcoming_with_features = get_home_conference_vs_away_conference_record(
-            upcoming_with_features
-        )
-
-    if add_conference_delta:
-        logger.info("Adding conference delta features")
-        upcoming_with_features = create_conference_delta(upcoming_with_features)
+    # Apply conference-specific features based on filter type
+    # This matches the training logic exactly - conference_filter determines features
+    upcoming_with_features = apply_conference_features(
+        upcoming_with_features, conference_filter
+    )
 
     return upcoming_with_features
 
@@ -380,6 +375,26 @@ def main(
     experiment_config = load_experiment_config(feature_config_path)
     logger.info(f"Loaded experiment configuration from {feature_config_path}")
 
+    # Get conference filter from experiment config (should match training)
+    # This ensures feature engineering matches what was used during training
+    training_conference_filter = experiment_config.filters.conference_filter
+
+    # Warn if prediction config filter doesn't match experiment config filter
+    if prediction_config.conference_filter != training_conference_filter:
+        logger.warning(
+            f"Prediction conference_filter ('{prediction_config.conference_filter}') "
+            f"does not match training conference_filter ('{training_conference_filter}'). "
+            f"Using training filter for feature engineering consistency."
+        )
+
+    # Warn if deprecated add_conference_delta is set
+    if prediction_config.add_conference_delta:
+        logger.warning(
+            "add_conference_delta parameter is deprecated. "
+            "Conference features are now determined by conference_filter. "
+            "This parameter will be ignored."
+        )
+
     # Start MLflow tracking
     with MLflowTracker(
         experiment_name=experiment_name,
@@ -396,7 +411,7 @@ def main(
                 "features_path": prediction_config.features_path,
                 "feature_config_path": prediction_config.feature_config_path,
                 "conference_filter": prediction_config.conference_filter,
-                "add_conference_delta": prediction_config.add_conference_delta,
+                "training_conference_filter": training_conference_filter,
                 "allow_missing_features": prediction_config.allow_missing_features,
             }
         )
@@ -440,13 +455,12 @@ def main(
             ].copy()
             logger.info(f"Filtered historical features to seasons: {upcoming_seasons}")
 
-        # Build features
+        # Build features using the same conference filter as training
         upcoming_with_features = build_features_for_prediction(
             upcoming_games=upcoming_games,
             historical_features=historical_features,
             experiment_config=experiment_config,
-            conference_filter=prediction_config.conference_filter,
-            add_conference_delta=prediction_config.add_conference_delta,
+            conference_filter=training_conference_filter,
         )
 
         if upcoming_with_features.empty:

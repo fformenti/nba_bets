@@ -10,6 +10,7 @@ from .engineering import (
     create_delta_features,
     create_conference_delta,
     get_home_conference_vs_away_conference_record,
+    apply_conference_features,
     identify_feature_types,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "create_delta_features",
     "create_conference_delta",
     "get_home_conference_vs_away_conference_record",
+    "apply_conference_features",
     "identify_feature_types",
 ]

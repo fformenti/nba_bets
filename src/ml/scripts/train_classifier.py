@@ -32,9 +32,8 @@ from src.ml.datasets.splitters import (
     stratified_split,
 )
 from src.ml.features.engineering import (
-    create_conference_delta,
-    get_home_conference_vs_away_conference_record,
     create_delta_features,
+    apply_conference_features,
     identify_feature_types,
 )
 from src.ml.features.preprocessing import create_preprocessing_pipeline
@@ -421,8 +420,544 @@ def train_baseline_model(
         )
 
 
+def train_single_model(
+    config: ExperimentConfig,
+    config_path: Optional[Path],
+    experiment_name: str,
+    tracker: Any,
+) -> Dict[str, Any]:
+    """
+    Train a single model with the given configuration.
+
+    This is the core training logic extracted from main() to allow training
+    multiple model variants (same/different/all conferences).
+
+    Parameters
+    ----------
+    config : ExperimentConfig
+        Experiment configuration
+    config_path : Path, optional
+        Path to configuration file (for logging)
+    experiment_name : str
+        MLflow experiment name
+    tracker : MLflowTracker
+        MLflow tracker instance (should be active)
+
+    Returns
+    -------
+    dict
+        Dictionary with training results and model information
+    """
+    # Extract configuration with defaults
+    data_config = config.data
+    split_config = config.splitting
+    model_config = config.model.model_dump()
+    eval_config = config.evaluation
+    paths_config = config.paths
+    feat_eng_config = config.feature_engineering
+    filters_config = config.filters
+
+    # Data loading
+    data_path = (
+        Path(data_config.path) if data_config.path else Path(GAMES_FEATURES_PATH)
+    )
+    target_column = data_config.target_column
+    date_column = data_config.date_column
+
+    # feature engineering configuration
+    lags = feat_eng_config.lags
+    location_lags = feat_eng_config.location_lags
+    metadata_columns = feat_eng_config.metadata_columns
+    originally_enriched_columns = feat_eng_config.originally_enriched_columns
+
+    # filters configuration
+    minimum_games = filters_config.minimum_games
+    conference_filter = filters_config.conference_filter
+
+    # Validate conference filter
+    if conference_filter not in ["same", "different", "all"]:
+        raise ValueError(
+            f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
+        )
+
+    # Log key parameters to MLflow
+    tracker.log_params(
+        {
+            "target_column": target_column,
+            "split_method": split_config.method,
+            "test_size": split_config.test_size,
+            "val_size": split_config.val_size,
+            "minimum_games": minimum_games,
+            "conference_filter": conference_filter,
+            "model_name": model_config.get("name", "random_forest"),
+            "scaling_method": config.preprocessing.scaling_method,
+        }
+    )
+
+    # Set tags for better organization and filtering
+    tracker.set_tags(
+        {
+            "task": "classification",
+            "config_file": config_path.stem if config_path else "default",
+            "experiment_type": "training",
+            "conference_filter": conference_filter,
+        }
+    )
+
+    games_enriched = load_and_validate_data(
+        data_path=data_path,
+        target_column=target_column,
+        date_column=date_column,
+    )
+
+    # Filter games by conference type
+    if conference_filter == "different":
+        games_enriched = games_enriched[
+            games_enriched["hometeamConference"] != games_enriched["awayteamConference"]
+        ].copy()
+        logger.info(f"Filtered to {len(games_enriched)} games (different conferences)")
+    elif conference_filter == "same":
+        games_enriched = games_enriched[
+            games_enriched["hometeamConference"] == games_enriched["awayteamConference"]
+        ].copy()
+        logger.info(f"Filtered to {len(games_enriched)} games (same conference)")
+    else:  # conference_filter == "all"
+        logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
+
+    # Minimum games played
+    games_enriched = filter_minimun_games_played(games_enriched, minimum_games)
+
+    df, y, metadata = prepare_data(
+        df=games_enriched,
+        target_column=target_column,
+        drop_na=data_config.drop_na,
+        metadata_columns=metadata_columns,
+    )
+
+    # Create delta features (always needed)
+    df = create_delta_features(df, lags, location_lags)
+
+    # Apply conference-specific features based on filter type
+    df = apply_conference_features(df, conference_filter)
+
+    # Data splitting configuration
+    split_method = split_config.method
+    test_size = split_config.test_size
+    val_size = split_config.val_size
+    random_state = split_config.random_state
+
+    # Prepare features (drop metadata columns)
+    exclude_cols = metadata_columns + originally_enriched_columns + [target_column]
+
+    # Only exclude date_column if NOT doing temporal split
+    if split_method != "temporal":
+        exclude_cols = exclude_cols + [date_column]
+
+    X = df.drop(columns=[col for col in exclude_cols if col in df.columns])
+    logger.info(f"Features sent to model: {X.columns}")
+    logger.info(f"Splitting data using {split_method} method")
+
+    # Identify feature types on X (the actual features that will be used)
+    # This ensures accurate feature type counts - excludes date_column when not using temporal split
+    feature_types = identify_feature_types(X, exclude_columns=[])
+    numerical_features = feature_types["numerical"]
+    categorical_features = feature_types["categorical"]
+    boolean_features = feature_types["boolean"]
+    logger.info(
+        f"Feature engineering complete: {len(numerical_features)} numerical, "
+        f"{len(categorical_features)} categorical, {len(boolean_features)} boolean features"
+    )
+
+    if split_method == "temporal":
+        if date_column not in X.columns:
+            raise ValueError(f"Date column '{date_column}' required for temporal split")
+        X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
+            X, y, date_column=date_column, test_size=test_size, val_size=val_size
+        )
+        # Drop date column after temporal split
+        X_train = X_train.drop(columns=[date_column])
+        X_val = X_val.drop(columns=[date_column])
+        X_test = X_test.drop(columns=[date_column])
+    elif split_method == "stratified":
+        X_train, X_val, X_test, y_train, y_val, y_test = stratified_split(
+            X, y, test_size=test_size, val_size=val_size, random_state=random_state
+        )
+    else:
+        X_train, X_val, X_test, y_train, y_val, y_test = train_val_test_split(
+            X, y, test_size=test_size, val_size=val_size, random_state=random_state
+        )
+
+    # Extract metadata for splits
+    metadata_train = metadata.loc[X_train.index].copy()
+    metadata_val = metadata.loc[X_val.index].copy()
+    metadata_test = metadata.loc[X_test.index].copy()
+
+    logger.info(
+        f"Data splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
+    )
+
+    # Log data split info to MLflow
+    tracker.log_params(
+        {
+            "n_train": len(X_train),
+            "n_val": len(X_val),
+            "n_test": len(X_test),
+            "n_features": len(X_train.columns),
+        }
+    )
+
+    # Identify feature types AFTER splitting and dropping columns
+    # This ensures feature lists match what's actually in X_train
+    feature_types = identify_feature_types(X_train, exclude_columns=[])
+    numerical_features = feature_types["numerical"]
+    categorical_features = feature_types["categorical"]
+    boolean_features = feature_types["boolean"]
+
+    logger.info(
+        f"Feature types identified: {len(numerical_features)} numerical, "
+        f"{len(categorical_features)} categorical, {len(boolean_features)} boolean features"
+    )
+
+    # Preprocessing pipeline
+    preproc_config = config.preprocessing
+    preprocessor = create_preprocessing_pipeline(
+        numerical_features=numerical_features,
+        categorical_features=categorical_features if categorical_features else None,
+        boolean_features=boolean_features if boolean_features else None,
+        scaling_method=preproc_config.scaling_method,
+        imputation_strategy=preproc_config.imputation_strategy,
+        handle_outliers=preproc_config.handle_outliers,
+    )
+
+    # Train multiple models (including baseline)
+    models_to_train = {}
+
+    # Train baseline model first
+    logger.info(f"\n{'=' * 60}")
+    logger.info("Training Baseline Model")
+    logger.info(f"{'=' * 60}")
+
+    baseline_model = RecordDifferenceBaseline()
+    models_to_train[baseline_model.name] = train_baseline_model(
+        baseline_model,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        X_test,
+        y_test,
+    )
+
+    # Log baseline metrics to MLflow
+    if baseline_model.name in models_to_train and models_to_train[baseline_model.name]:
+        baseline_metrics = models_to_train[baseline_model.name].get("test_metrics", {})
+        tracker.log_metrics(
+            {f"{baseline_model.name}_{k}": v for k, v in baseline_metrics.items()}
+        )
+
+    try:
+        baseline_model = PointDifferentialBaseline(
+            feature_column="pts_diff_avg_L82_delta"
+        )
+
+        baseline_model.fit(X_train, y_train)
+
+        # Compute metrics using trainer for consistency
+        baseline_trainer = ModelTrainer(
+            model=baseline_model,
+            task_type="classification",
+            random_state=random_state,
+        )
+        baseline_trainer.is_fitted = True
+
+        baseline_train_metrics = baseline_trainer.evaluate(
+            X_train, y_train, prefix="train"
+        )
+        baseline_val_metrics = baseline_trainer.evaluate(X_val, y_val, prefix="val")
+        baseline_test_metrics = baseline_trainer.evaluate(X_test, y_test, prefix="test")
+
+        models_to_train[baseline_model.name] = {
+            "pipeline": baseline_model,
+            "trainer": baseline_trainer,
+            "training_results": {
+                "train": baseline_train_metrics,
+                "val": baseline_val_metrics,
+            },
+            "test_metrics": baseline_test_metrics,
+        }
+
+        logger.info(f"Baseline test metrics: {baseline_test_metrics}")
+        # Log baseline metrics to MLflow
+        tracker.log_metrics(
+            {f"{baseline_model.name}_{k}": v for k, v in baseline_test_metrics.items()}
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error training {baseline_model.name_caption}: {e}", exc_info=True
+        )
+
+    # Train ML models
+    model_names = [model_name for model_name in models_to_train.keys()]
+    model_names.extend(["random_forest", "gradient_boosting"])
+    # model_names.extend(["random_forest"])
+    for model_name in model_names:
+        if "baseline" in model_name:
+            continue  # Already trained above
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"Training {model_name}")
+        logger.info(f"{'=' * 60}")
+
+        try:
+            pipeline, trainer, training_results = train_model_with_config(
+                model_name=model_name,
+                model_config=model_config,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                preprocessor=preprocessor,
+                random_state=random_state,
+            )
+
+            # Evaluate on test set
+            test_metrics = trainer.evaluate(X_test, y_test, prefix="test")
+
+            models_to_train[model_name] = {
+                "pipeline": pipeline,
+                "trainer": trainer,
+                "training_results": training_results,
+                "test_metrics": test_metrics,
+            }
+
+            logger.info(f"{model_name} test metrics: {test_metrics}")
+
+            # Log metrics to MLflow
+            tracker.log_metrics(
+                {f"{model_name}_{k}": v for k, v in test_metrics.items()}
+            )
+
+            # Log model parameters if available
+            if hasattr(trainer.model, "named_steps"):
+                model_obj = trainer.model.named_steps.get("model")
+                if model_obj and hasattr(model_obj, "get_params"):
+                    model_params = {
+                        f"{model_name}_{k}": str(v)
+                        for k, v in model_obj.get_params().items()
+                    }
+                    tracker.log_params(model_params)
+
+        except Exception as e:
+            logger.error(f"Error training {model_name}: {e}", exc_info=True)
+            continue
+
+    # Compare models
+    logger.info(f"\n{'=' * 60}")
+    logger.info("Model Comparison - Test Set Results")
+    logger.info(f"{'=' * 60}")
+
+    for model_name, model_data in models_to_train.items():
+        logger.info(f"\n{model_name}:")
+        print_metrics_summary(model_data["test_metrics"], prefix="Test")
+
+    # Find best model
+    if models_to_train:
+        best_model_name = max(
+            models_to_train.keys(),
+            key=lambda name: models_to_train[name]["test_metrics"].get(
+                "test_accuracy", 0
+            ),
+        )
+        best_model_data = models_to_train[best_model_name]
+
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"Best Model: {best_model_name}")
+        logger.info(
+            f"Test Accuracy: {best_model_data['test_metrics']['test_accuracy']:.4f}"
+        )
+        logger.info(f"{'=' * 60}")
+
+        # Log best model info to MLflow
+        tracker.set_tags(
+            {
+                "best_model": best_model_name,
+                "best_test_accuracy": str(
+                    best_model_data["test_metrics"].get("test_accuracy", 0)
+                ),
+            }
+        )
+        tracker.log_metrics(
+            {
+                "best_test_accuracy": best_model_data["test_metrics"].get(
+                    "test_accuracy", 0
+                ),
+                "best_test_f1": best_model_data["test_metrics"].get("test_f1", 0),
+                "best_test_precision": best_model_data["test_metrics"].get(
+                    "test_precision", 0
+                ),
+                "best_test_recall": best_model_data["test_metrics"].get(
+                    "test_recall", 0
+                ),
+            }
+        )
+
+        best_pipeline = best_model_data["pipeline"]
+
+        # Visualizations
+        if eval_config.save_visualizations:
+            logger.info("Generating visualizations...")
+            output_dir = Path(paths_config.outputs)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            y_test_pred = best_pipeline.predict(X_test)
+
+        # Confusion matrix
+        class_names = sorted(y.unique())
+        fig_cm = plot_confusion_matrix(
+            y_test,
+            y_test_pred,
+            class_names=class_names,
+            title=f"Test Set Confusion Matrix - {best_model_name} ({conference_filter})",
+        )
+        fig_cm.savefig(
+            output_dir / "confusion_matrix.png", dpi=300, bbox_inches="tight"
+        )
+
+        # Feature importance (skip for baseline model)
+        if "baseline" not in best_model_name:
+            if hasattr(best_pipeline, "named_steps"):
+                trained_model = best_pipeline.named_steps["model"]
+                preprocessor = best_pipeline.named_steps["preprocessor"]
+            else:
+                trained_model = best_pipeline
+                preprocessor = None
+
+            if hasattr(trained_model, "feature_importances_"):
+                # Extract actual feature names from the fitted preprocessing pipeline
+                if preprocessor is not None and hasattr(
+                    preprocessor, "get_feature_names_out"
+                ):
+                    try:
+                        input_feature_names = list(X_train.columns)
+                        feature_names = preprocessor.get_feature_names_out(
+                            input_feature_names
+                        )
+                        feature_names = clean_feature_names(feature_names)
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not extract feature names from preprocessor: {e}. "
+                            f"Using original feature names (may cause length mismatch)."
+                        )
+                        feature_names = numerical_features + (
+                            categorical_features or []
+                        )
+                else:
+                    feature_names = numerical_features + (categorical_features or [])
+
+                # Validate that feature names length matches feature importances
+                if len(feature_names) != len(trained_model.feature_importances_):
+                    logger.error(
+                        f"Feature names length ({len(feature_names)}) does not match "
+                        f"feature importances length ({len(trained_model.feature_importances_)}). "
+                        f"Skipping feature importance plot."
+                    )
+                else:
+                    fig_importance = plot_feature_importance(
+                        trained_model,
+                        feature_names,
+                        top_n=20,
+                        title=f"Feature Importance - {best_model_name} ({conference_filter})",
+                    )
+                    fig_importance.savefig(
+                        output_dir / "feature_importance.png",
+                        dpi=300,
+                        bbox_inches="tight",
+                    )
+
+            # ROC curve
+            y_test_proba = best_pipeline.predict_proba(X_test)
+            if y_test_proba.ndim > 1:
+                y_test_proba = y_test_proba[:, 1]
+            fig_roc = plot_roc_curve(
+                y_test,
+                y_test_proba,
+                title=f"ROC Curve - {best_model_name} ({conference_filter})",
+            )
+            fig_roc.savefig(output_dir / "roc_curve.png", dpi=300, bbox_inches="tight")
+
+            logger.info(f"Visualizations saved to {output_dir}")
+
+            # Log visualizations to MLflow
+            tracker.log_artifacts(str(output_dir), artifact_path="visualizations")
+
+        # Save model locally (optional)
+        if paths_config.save_local_models:
+            logger.info(f"Saving best model ({best_model_name}) locally...")
+            registry_path = Path(paths_config.model_registry)
+            registry = ModelRegistry(registry_path)
+
+            model_path = registry.save(
+                model=best_pipeline,
+                model_name=f"nba_classification_{best_model_name}_{conference_filter}",
+                task_type="classification",
+                metrics=best_model_data["test_metrics"],
+                feature_names=list(X_train.columns),
+            )
+
+            logger.info(f"Best model saved to: {model_path}")
+        else:
+            logger.info("Skipping local model save; MLflow handles model logging.")
+
+        # Log best model to MLflow
+        should_register = config.model.register_model
+
+        # Include conference filter in model name for proper model versioning
+        if should_register:
+            registered_model_name = (
+                f"nba_classification_{best_model_name}_{conference_filter}"
+            )
+            logger.info(
+                f"Registering model '{registered_model_name}' in MLflow Model Registry"
+            )
+        else:
+            registered_model_name = None
+            logger.info(
+                "Model will be logged but not registered. Use run-based URI for access."
+            )
+
+        tracker.log_model(
+            best_pipeline,
+            artifact_path="model",
+            registered_model_name=registered_model_name,
+            input_example=X_train.head(5),
+        )
+
+        # Log run URI for easy model retrieval
+        run_id = tracker.get_run_id()
+        if run_id:
+            run_model_uri = f"runs:/{run_id}/model"
+            logger.info(f"Model logged at run URI: {run_model_uri}")
+            tracker.log_params({"model_run_uri": run_model_uri})
+
+            # Also log the registered model name if registered
+            if registered_model_name:
+                tracker.log_params({"registered_model_name": registered_model_name})
+
+        return {
+            "conference_filter": conference_filter,
+            "best_model_name": best_model_name,
+            "best_model_data": best_model_data,
+            "models_to_train": models_to_train,
+            "registered_model_name": registered_model_name,
+        }
+
+    return {}
+
+
 def main(
-    config_path: Optional[Path] = None, experiment_name: str = "nba_bets_classification"
+    config_path: Optional[Path] = None,
+    experiment_name: str = "nba_bets_classification",
+    train_all_conference_types: bool = False,
 ):
     """
     Main training function.
@@ -433,562 +968,104 @@ def main(
         Path to configuration YAML file. If None, uses default configuration.
     experiment_name : str, default='nba_bets_classification'
         MLflow experiment name for tracking
+    train_all_conference_types : bool, default=False
+        If True, trains 3 separate models (same/different/all conferences).
+        If False, trains one model based on config's conference_filter.
     """
     # Setup logging
     setup_logging(level="INFO")
 
     # Load configuration
     if config_path is None:
-        # config_path = PROJECT_ROOT / "configs" / "train_classification_example.yaml"
         config_path = PROJECT_ROOT / "configs" / "my_experiment.yaml"
 
     if not config_path.exists():
         logger.warning(f"Config file not found: {config_path}. Using defaults.")
-        config = ExperimentConfig()
+        base_config = ExperimentConfig()
     else:
-        config = load_experiment_config(config_path)
+        base_config = load_experiment_config(config_path)
 
-    # Generate descriptive run name following best practices
-    run_name = generate_run_name(config_path=config_path, include_timestamp=True)
+    if train_all_conference_types:
+        # Train all 3 conference filter types
+        logger.info("=" * 80)
+        logger.info("Training all 3 conference filter types")
+        logger.info("=" * 80)
 
-    # Start MLflow tracking
-    with MLflowTracker(
-        experiment_name=experiment_name,
-        run_name=run_name,
-    ) as tracker:
-        # Log configuration
-        tracker.log_config(config.model_dump())
+        results = {}
+        for conference_filter in ["same", "different", "all"]:
+            logger.info(f"\n{'=' * 80}")
+            logger.info(f"Training model for conference_filter='{conference_filter}'")
+            logger.info(f"{'=' * 80}")
 
-        # Extract configuration with defaults
-        data_config = config.data
-        split_config = config.splitting
-        model_config = config.model.model_dump()
-        eval_config = config.evaluation
-        paths_config = config.paths
-        feat_eng_config = config.feature_engineering
-        filters_config = config.filters
+            # Create a copy of config with updated conference filter
+            config = base_config.model_copy(deep=True)
+            config.filters.conference_filter = conference_filter
 
-        # Data loading
-        data_path = (
-            Path(data_config.path) if data_config.path else Path(GAMES_FEATURES_PATH)
-        )
-        target_column = data_config.target_column
-        date_column = data_config.date_column
-
-        # feature engineering configuration
-        lags = feat_eng_config.lags
-        location_lags = feat_eng_config.location_lags
-        metadata_columns = feat_eng_config.metadata_columns
-        originally_enriched_columns = feat_eng_config.originally_enriched_columns
-
-        # filters configuration
-        minimum_games = filters_config.minimum_games
-
-        # model configuration
-        only_different_conferences = True
-        only_same_conferences = False
-        within_and_across_conferences = False
-
-        # Log key parameters to MLflow
-        tracker.log_params(
-            {
-                "target_column": target_column,
-                "split_method": split_config.method,
-                "test_size": split_config.test_size,
-                "val_size": split_config.val_size,
-                "minimum_games": minimum_games,
-                "only_different_conferences": only_different_conferences,
-                "model_name": model_config.get("name", "random_forest"),
-                "scaling_method": config.preprocessing.scaling_method,
-            }
-        )
-
-        # Set tags for better organization and filtering
-        tracker.set_tags(
-            {
-                "task": "classification",
-                "config_file": config_path.stem if config_path else "default",
-                "experiment_type": "training",
-            }
-        )
-
-        # Only one can be True
-        if (
-            sum(
-                [
-                    only_different_conferences,
-                    only_same_conferences,
-                    within_and_across_conferences,
-                ]
+            # Generate run name with conference filter
+            run_name = generate_run_name(
+                config_path=config_path, include_timestamp=True
             )
-            != 1
-        ):
-            raise ValueError(
-                "Only one of only_different_conferences, only_same_conferences, or within_and_across_conferences can be True"
-            )
+            run_name = f"{run_name}-{conference_filter}"
 
-        games_enriched = load_and_validate_data(
-            data_path=data_path,
-            target_column=target_column,
-            date_column=date_column,
-        )
+            # Start MLflow tracking for this model variant
+            with MLflowTracker(
+                experiment_name=experiment_name,
+                run_name=run_name,
+            ) as tracker:
+                # Log configuration
+                tracker.log_config(config.model_dump())
 
-        # Subset only games where teams are from different conferences
-        if only_different_conferences:
-            games_enriched = games_enriched[
-                games_enriched["hometeamConference"]
-                != games_enriched["awayteamConference"]
-            ]
-        if only_same_conferences:
-            games_enriched = games_enriched[
-                games_enriched["hometeamConference"]
-                == games_enriched["awayteamConference"]
-            ]
-
-        # Minimum games played
-        games_enriched = filter_minimun_games_played(games_enriched, minimum_games)
-
-        df, y, metadata = prepare_data(
-            df=games_enriched,
-            target_column=target_column,
-            drop_na=data_config.drop_na,
-            metadata_columns=metadata_columns,
-        )
-
-        # Combine features
-        df = create_delta_features(df, lags, location_lags)
-
-        # Combine conference features (not necessary if only within conferences)
-        if only_different_conferences:
-            # This will create the features: home_conference_vs_away_conference_record and games_played_at_home_conference
-            df = get_home_conference_vs_away_conference_record(df)
-        if within_and_across_conferences:
-            # This will create the feature: conference_diff_east_pct
-            df = create_conference_delta(df)
-
-        # Select features for model
-        exclude_cols = feat_eng_config.exclude_columns
-
-        # Identify feature types
-        feature_types = identify_feature_types(df, exclude_columns=exclude_cols)
-
-        numerical_features = feature_types["numerical"]
-        categorical_features = feature_types["categorical"]
-        logger.info(
-            f"Feature engineering complete: {len(numerical_features)} numerical, "
-            f"{len(categorical_features)} categorical features"
-        )
-
-        # Data splitting configuration
-        split_method = split_config.method
-        test_size = split_config.test_size
-        val_size = split_config.val_size
-        random_state = split_config.random_state
-
-        # Prepare features (drop metadata columns)
-        exclude_cols = metadata_columns + originally_enriched_columns + [target_column]
-
-        # Only exclude date_column if NOT doing temporal split
-        if split_method != "temporal":
-            exclude_cols = exclude_cols + [date_column]
-
-        X = df.drop(columns=[col for col in exclude_cols if col in df.columns])
-        logger.info(f"Features sent to model: {X.columns}")
-        logger.info(f"Splitting data using {split_method} method")
-
-        if split_method == "temporal":
-            if date_column not in X.columns:
-                raise ValueError(
-                    f"Date column '{date_column}' required for temporal split"
+                # Train the model
+                result = train_single_model(
+                    config=config,
+                    config_path=config_path,
+                    experiment_name=experiment_name,
+                    tracker=tracker,
                 )
-            X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
-                X, y, date_column=date_column, test_size=test_size, val_size=val_size
-            )
-            # Drop date column after temporal split
-            X_train = X_train.drop(columns=[date_column])
-            X_val = X_val.drop(columns=[date_column])
-            X_test = X_test.drop(columns=[date_column])
-        elif split_method == "stratified":
-            X_train, X_val, X_test, y_train, y_val, y_test = stratified_split(
-                X, y, test_size=test_size, val_size=val_size, random_state=random_state
-            )
-        else:
-            X_train, X_val, X_test, y_train, y_val, y_test = train_val_test_split(
-                X, y, test_size=test_size, val_size=val_size, random_state=random_state
-            )
+                results[conference_filter] = result
 
-        # Extract metadata for splits
-        metadata_train = metadata.loc[X_train.index].copy()
-        metadata_val = metadata.loc[X_val.index].copy()
-        metadata_test = metadata.loc[X_test.index].copy()
-
-        logger.info(
-            f"Data splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
-        )
-
-        # Log data split info to MLflow
-        tracker.log_params(
-            {
-                "n_train": len(X_train),
-                "n_val": len(X_val),
-                "n_test": len(X_test),
-                "n_features": len(X_train.columns),
-            }
-        )
-
-        # Identify feature types AFTER splitting and dropping columns
-        # This ensures feature lists match what's actually in X_train
-        feature_types = identify_feature_types(X_train, exclude_columns=[])
-        numerical_features = feature_types["numerical"]
-        categorical_features = feature_types["categorical"]
-
-        logger.info(
-            f"Feature types identified: {len(numerical_features)} numerical, "
-            f"{len(categorical_features)} categorical features"
-        )
-
-        # Preprocessing pipeline
-        preproc_config = config.preprocessing
-        preprocessor = create_preprocessing_pipeline(
-            numerical_features=numerical_features,
-            categorical_features=categorical_features if categorical_features else None,
-            scaling_method=preproc_config.scaling_method,
-            imputation_strategy=preproc_config.imputation_strategy,
-            handle_outliers=preproc_config.handle_outliers,
-        )
-
-        # Train multiple models (including baseline)
-        models_to_train = {}
-        # model_names = ["baseline", "random_forest", "gradient_boosting"]
-
-        # Train baseline model first
-        logger.info(f"\n{'=' * 60}")
-        logger.info("Training Baseline Model")
-        logger.info(f"{'=' * 60}")
-
-        baseline_model = RecordDifferenceBaseline()
-        models_to_train[baseline_model.name] = train_baseline_model(
-            baseline_model,
-            X_train,
-            y_train,
-            X_val,
-            y_val,
-            X_test,
-            y_test,
-        )
-
-        # Log baseline metrics to MLflow
-        if (
-            baseline_model.name in models_to_train
-            and models_to_train[baseline_model.name]
-        ):
-            baseline_metrics = models_to_train[baseline_model.name].get(
-                "test_metrics", {}
-            )
-            tracker.log_metrics(
-                {f"{baseline_model.name}_{k}": v for k, v in baseline_metrics.items()}
-            )
-
-        try:
-            baseline_model = PointDifferentialBaseline(
-                feature_column="pts_diff_avg_L82_delta"
-            )
-
-            baseline_model.fit(X_train, y_train)
-
-            # Compute metrics using trainer for consistency
-            baseline_trainer = ModelTrainer(
-                model=baseline_model,
-                task_type="classification",
-                random_state=random_state,
-            )
-            baseline_trainer.is_fitted = True
-
-            baseline_train_metrics = baseline_trainer.evaluate(
-                X_train, y_train, prefix="train"
-            )
-            baseline_val_metrics = baseline_trainer.evaluate(X_val, y_val, prefix="val")
-            baseline_test_metrics = baseline_trainer.evaluate(
-                X_test, y_test, prefix="test"
-            )
-
-            models_to_train[baseline_model.name] = {
-                "pipeline": baseline_model,
-                "trainer": baseline_trainer,
-                "training_results": {
-                    "train": baseline_train_metrics,
-                    "val": baseline_val_metrics,
-                },
-                "test_metrics": baseline_test_metrics,
-            }
-
-            logger.info(f"Baseline test metrics: {baseline_test_metrics}")
-            # Log baseline metrics to MLflow
-            tracker.log_metrics(
-                {
-                    f"{baseline_model.name}_{k}": v
-                    for k, v in baseline_test_metrics.items()
-                }
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Error training {baseline_model.name_caption}: {e}", exc_info=True
-            )
-
-        # Train ML models
-        model_names = [model_name for model_name in models_to_train.keys()]
-        model_names.extend(["random_forest", "gradient_boosting"])
-        for model_name in model_names:
-            if "baseline" in model_name:
-                continue  # Already trained above
-            logger.info(f"\n{'=' * 60}")
-            logger.info(f"Training {model_name}")
-            logger.info(f"{'=' * 60}")
-
-            try:
-                pipeline, trainer, training_results = train_model_with_config(
-                    model_name=model_name,
-                    model_config=model_config,
-                    X_train=X_train,
-                    y_train=y_train,
-                    X_val=X_val,
-                    y_val=y_val,
-                    preprocessor=preprocessor,
-                    random_state=random_state,
+        # Summary of all models
+        logger.info(f"\n{'=' * 80}")
+        logger.info("Summary: All Conference Filter Types")
+        logger.info(f"{'=' * 80}")
+        for conf_filter, result in results.items():
+            if result:
+                best_model = result.get("best_model_name", "N/A")
+                best_acc = (
+                    result.get("best_model_data", {})
+                    .get("test_metrics", {})
+                    .get("test_accuracy", 0)
                 )
-
-                # Evaluate on test set
-                test_metrics = trainer.evaluate(X_test, y_test, prefix="test")
-
-                models_to_train[model_name] = {
-                    "pipeline": pipeline,
-                    "trainer": trainer,
-                    "training_results": training_results,
-                    "test_metrics": test_metrics,
-                }
-
-                logger.info(f"{model_name} test metrics: {test_metrics}")
-
-                # Log metrics to MLflow
-                tracker.log_metrics(
-                    {f"{model_name}_{k}": v for k, v in test_metrics.items()}
-                )
-
-                # Log model parameters if available
-                if hasattr(trainer.model, "named_steps"):
-                    model_obj = trainer.model.named_steps.get("model")
-                    if model_obj and hasattr(model_obj, "get_params"):
-                        model_params = {
-                            f"{model_name}_{k}": str(v)
-                            for k, v in model_obj.get_params().items()
-                        }
-                        tracker.log_params(model_params)
-
-            except Exception as e:
-                logger.error(f"Error training {model_name}: {e}", exc_info=True)
-                continue
-
-        # Compare models
-        logger.info(f"\n{'=' * 60}")
-        logger.info("Model Comparison - Test Set Results")
-        logger.info(f"{'=' * 60}")
-
-        for model_name, model_data in models_to_train.items():
-            logger.info(f"\n{model_name}:")
-            print_metrics_summary(model_data["test_metrics"], prefix="Test")
-
-        # Find best model
-        if models_to_train:
-            best_model_name = max(
-                models_to_train.keys(),
-                key=lambda name: models_to_train[name]["test_metrics"].get(
-                    "test_accuracy", 0
-                ),
-            )
-            best_model_data = models_to_train[best_model_name]
-
-            logger.info(f"\n{'=' * 60}")
-            logger.info(f"Best Model: {best_model_name}")
-            logger.info(
-                f"Test Accuracy: {best_model_data['test_metrics']['test_accuracy']:.4f}"
-            )
-            logger.info(f"{'=' * 60}")
-
-            # Log best model info to MLflow
-            tracker.set_tags(
-                {
-                    "best_model": best_model_name,
-                    "best_test_accuracy": str(
-                        best_model_data["test_metrics"].get("test_accuracy", 0)
-                    ),
-                }
-            )
-            tracker.log_metrics(
-                {
-                    "best_test_accuracy": best_model_data["test_metrics"].get(
-                        "test_accuracy", 0
-                    ),
-                    "best_test_f1": best_model_data["test_metrics"].get("test_f1", 0),
-                    "best_test_precision": best_model_data["test_metrics"].get(
-                        "test_precision", 0
-                    ),
-                    "best_test_recall": best_model_data["test_metrics"].get(
-                        "test_recall", 0
-                    ),
-                }
-            )
-
-            best_pipeline = best_model_data["pipeline"]
-
-            # Visualizations
-            if eval_config.save_visualizations:
-                logger.info("Generating visualizations...")
-                output_dir = Path(paths_config.outputs)
-                output_dir.mkdir(parents=True, exist_ok=True)
-
-                y_test_pred = best_pipeline.predict(X_test)
-
-            # Confusion matrix
-            class_names = sorted(y.unique())
-            fig_cm = plot_confusion_matrix(
-                y_test,
-                y_test_pred,
-                class_names=class_names,
-                title=f"Test Set Confusion Matrix - {best_model_name}",
-            )
-            fig_cm.savefig(
-                output_dir / "confusion_matrix.png", dpi=300, bbox_inches="tight"
-            )
-
-            # Feature importance (skip for baseline model)
-            # if best_model_name != "baseline":
-            if "baseline" not in best_model_name:
-                if hasattr(best_pipeline, "named_steps"):
-                    trained_model = best_pipeline.named_steps["model"]
-                    preprocessor = best_pipeline.named_steps["preprocessor"]
-                else:
-                    trained_model = best_pipeline
-                    preprocessor = None
-
-                if hasattr(trained_model, "feature_importances_"):
-                    # Extract actual feature names from the fitted preprocessing pipeline
-                    # This accounts for one-hot encoding and other transformations
-                    if preprocessor is not None and hasattr(
-                        preprocessor, "get_feature_names_out"
-                    ):
-                        try:
-                            # Pass input feature names to get_feature_names_out if needed
-                            # ColumnTransformer can infer from transformers, but passing explicitly is safer
-                            input_feature_names = list(X_train.columns)
-                            feature_names = preprocessor.get_feature_names_out(
-                                input_feature_names
-                            )
-                            # Remove ColumnTransformer prefixes (numerical__, categorical__)
-                            feature_names = clean_feature_names(feature_names)
-                        except Exception as e:
-                            logger.warning(
-                                f"Could not extract feature names from preprocessor: {e}. "
-                                f"Using original feature names (may cause length mismatch)."
-                            )
-                            feature_names = numerical_features + (
-                                categorical_features or []
-                            )
-                    else:
-                        # Fallback to original feature names if preprocessor not available
-                        feature_names = numerical_features + (
-                            categorical_features or []
-                        )
-
-                    # Validate that feature names length matches feature importances
-                    if len(feature_names) != len(trained_model.feature_importances_):
-                        logger.error(
-                            f"Feature names length ({len(feature_names)}) does not match "
-                            f"feature importances length ({len(trained_model.feature_importances_)}). "
-                            f"Skipping feature importance plot."
-                        )
-                    else:
-                        fig_importance = plot_feature_importance(
-                            trained_model,
-                            feature_names,
-                            top_n=20,
-                            title=f"Feature Importance - {best_model_name}",
-                        )
-                        fig_importance.savefig(
-                            output_dir / "feature_importance.png",
-                            dpi=300,
-                            bbox_inches="tight",
-                        )
-
-                # ROC curve
-                y_test_proba = best_pipeline.predict_proba(X_test)
-                if y_test_proba.ndim > 1:
-                    y_test_proba = y_test_proba[:, 1]
-                fig_roc = plot_roc_curve(
-                    y_test,
-                    y_test_proba,
-                    title=f"ROC Curve - {best_model_name}",
-                )
-                fig_roc.savefig(
-                    output_dir / "roc_curve.png", dpi=300, bbox_inches="tight"
-                )
-
-                logger.info(f"Visualizations saved to {output_dir}")
-
-                # Log visualizations to MLflow
-                tracker.log_artifacts(str(output_dir), artifact_path="visualizations")
-
-            # Save model locally (optional)
-            if paths_config.save_local_models:
-                logger.info(f"Saving best model ({best_model_name}) locally...")
-                registry_path = Path(paths_config.model_registry)
-                registry = ModelRegistry(registry_path)
-
-                model_path = registry.save(
-                    model=best_pipeline,
-                    model_name=f"nba_classification_{best_model_name}",
-                    task_type="classification",
-                    metrics=best_model_data["test_metrics"],
-                    feature_names=list(X_train.columns),
-                )
-
-                logger.info(f"Best model saved to: {model_path}")
-            else:
-                logger.info("Skipping local model save; MLflow handles model logging.")
-
-            # Log best model to MLflow
-            # Option 1: Register model (creates versions) - good for production candidates
-            # Option 2: Don't register, use run-based URI - good for experimentation
-            # Check config to determine if we should register
-            should_register = config.model.register_model
-            registered_model_name = (
-                f"nba_classification_{best_model_name}" if should_register else None
-            )
-
-            if should_register:
                 logger.info(
-                    f"Registering model '{registered_model_name}' in MLflow Model Registry"
-                )
-            else:
-                logger.info(
-                    "Model will be logged but not registered. Use run-based URI for access."
+                    f"{conf_filter:12s}: {best_model:25s} - Accuracy: {best_acc:.4f}"
                 )
 
-            tracker.log_model(
-                best_pipeline,
-                artifact_path="model",
-                registered_model_name=registered_model_name,
-                input_example=X_train.head(5),
+        logger.info("Training complete for all conference filter types!")
+        return results
+
+    else:
+        # Train single model based on config
+        config = base_config
+        run_name = generate_run_name(config_path=config_path, include_timestamp=True)
+
+        # Start MLflow tracking
+        with MLflowTracker(
+            experiment_name=experiment_name,
+            run_name=run_name,
+        ) as tracker:
+            # Log configuration
+            tracker.log_config(config.model_dump())
+
+            # Train the model
+            result = train_single_model(
+                config=config,
+                config_path=config_path,
+                experiment_name=experiment_name,
+                tracker=tracker,
             )
 
-            # Log run URI for easy model retrieval
-            run_id = tracker.get_run_id()
-            if run_id:
-                run_model_uri = f"runs:/{run_id}/model"
-                logger.info(f"Model logged at run URI: {run_model_uri}")
-                tracker.log_params({"model_run_uri": run_model_uri})
-
-        logger.info("Training complete!")
+            logger.info("Training complete!")
+            return result
 
 
 if __name__ == "__main__":
@@ -1000,6 +1077,14 @@ if __name__ == "__main__":
         type=Path,
         help="Path to configuration YAML file",
     )
+    parser.add_argument(
+        "--train-all-conference-types",
+        action="store_true",
+        help="Train all 3 conference filter types (same/different/all) in separate runs",
+    )
     args = parser.parse_args()
 
-    main(config_path=args.config)
+    main(
+        config_path=args.config,
+        train_all_conference_types=args.train_all_conference_types,
+    )

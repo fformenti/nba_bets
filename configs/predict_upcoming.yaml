@@ -14,13 +14,13 @@ data:
 #   - Registered model: "models:/nba_classification_random_forest/Production"
 #   - Specific version: "models:/nba_classification_random_forest/1"
 #   - Run ID: "runs:/<run_id>/model"
-model_uri: "models:/nba_classification_random_forest/5"
+model_uri: "models:/nba_classification_random_forest_all/3"
 
 tracking_uri: null
 experiment_name: "nba_bets_predictions"
 
 # "different", "same", or "all"
-conference_filter: "different"
+conference_filter: "all"
 add_conference_delta: false
 allow_missing_features: true
 max_files: null
