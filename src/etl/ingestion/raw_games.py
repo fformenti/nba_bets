@@ -5,10 +5,41 @@ import pandas as pd
 
 from src.config.paths import (
     RAW_GAMES_PATH,
-    REGULAR_SEASON_GAMES_PATH,
-    NON_POSITIVE_SCORE_PATH,
+    INGESTED_GAMES_PATH,
+    TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH,
 )
-from src.etl.utils.common import get_nba_season, add_neutral_court_game_flag
+from src.etl.utils.common import coerce_numeric_columns, get_nba_season
+from src.utils.logging_config import get_logger, setup_logging
+
+logger = get_logger(__name__)
+setup_logging(level="INFO")
+
+
+def get_teams_locations(df: DataFrame) -> DataFrame:
+    teams_cities_states = pd.read_csv(TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH)
+    # Home team location
+    df = df.merge(
+        teams_cities_states[["teamId", "season", "city", "state"]],
+        left_on=["hometeamId", "season"],
+        right_on=["teamId", "season"],
+        how="left",
+    ).drop(columns=["teamId"])
+    df["hometeamLocation"] = df["city"] + ", " + df["state"]
+    df.drop(columns=["city", "state"], inplace=True)
+
+    # Game Location (To do: in the future it should reference arenaId)
+    df["gameLocation"] = df["hometeamLocation"]
+
+    # Away team location
+    df = df.merge(
+        teams_cities_states[["teamId", "season", "city", "state"]],
+        left_on=["awayteamId", "season"],
+        right_on=["teamId", "season"],
+        how="left",
+    ).drop(columns=["teamId"])
+    df["awayteamLocation"] = df["city"] + ", " + df["state"]
+    df.drop(columns=["city", "state"], inplace=True)
+    return df
 
 
 def parse_raw_games(df: DataFrame) -> DataFrame:
@@ -18,65 +49,55 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
         df["gameDate"] = pd.to_datetime(df["gameDate"], errors="coerce")
 
     # Convert specific columns to appropriate data types
-    # Use pd.to_numeric with errors='coerce' to handle empty strings/NaN before converting to int
-    df["gameId"] = pd.to_numeric(df["gameId"], errors="coerce").astype("int64")
-    df["hometeamId"] = pd.to_numeric(df["hometeamId"], errors="coerce").astype("int64")
-    df["awayteamId"] = pd.to_numeric(df["awayteamId"], errors="coerce").astype("int64")
-    df["winner"] = pd.to_numeric(df["winner"], errors="coerce").astype("int64")
+    coerce_numeric_columns(df, ["gameId", "hometeamId", "awayteamId", "winner"])
     # arenaId may have NaN values, so use nullable integer type
-    df["arenaId"] = pd.to_numeric(df["arenaId"], errors="coerce").astype("Int64")
+    coerce_numeric_columns(df, ["arenaId"], dtype="Int64")
     df["seriesGameNumber"] = df["seriesGameNumber"].astype("float64")
+
+    # Rename column
+    df.rename(
+        columns={"hometeamCity": "hometeamPrename", "awayteamCity": "awayteamPrename"},
+        inplace=True,
+    )
+
+    # Normalize
+    normalize_citi_names = {"LA": "Los Angeles"}
+    df["hometeamPrename"] = df["hometeamPrename"].replace(normalize_citi_names)
+    df["awayteamPrename"] = df["awayteamPrename"].replace(normalize_citi_names)
 
     # Handle empty strings in numeric columns (convert to NaN)
     numeric_cols = ["homeScore", "awayScore", "attendance"]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Filter out invalid rows (combine conditions and use .copy() to preserve dtypes)
-    mask = (
-        df["gameDate"].notna()
-        & df["homeScore"].notna()
-        & df["awayScore"].notna()
-        & (df["homeScore"] > 0)
-        & (df["awayScore"] > 0)
-    )
-
-    mask_non_positive_scores = (df["homeScore"] <= 0) | (df["awayScore"] <= 0)
-
-    df = df.loc[mask].copy()
-    df_non_positive_score = df.loc[mask_non_positive_scores].copy()
-
-    # Add formatted date string
+    # remove rows where gameDate is na
+    df = df[df["gameDate"].notna()].copy()
     df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
-    return df, df_non_positive_score
 
+    # add season column
+    df["season"] = df["gameDate"].apply(get_nba_season)
 
-def filter_regular_season_games(games) -> DataFrame:
-    """Filter games to only include regular season games."""
+    # Get real city and state from teamId and season
+    df = get_teams_locations(df)
 
-    # Changes were made to the raw games season 2025/26 has a different patttern from previous years
-    not_gametype_regular_season = ["Playoffs", "Preseason", "Play-in Tournament"]
-    games = games.loc[~games["gameType"].isin(not_gametype_regular_season)]
-    gamelabel_preseason = ["Preseason"]
-    games = games.loc[~games["gameType"].isin(gamelabel_preseason)]
-    games = games.drop(columns=["gameSubLabel", "seriesGameNumber"]).copy()
-
-    return games
-
-
-def build_regular_season_games(raw_games: DataFrame) -> DataFrame:
-    """Parse raw games, add season, and filter to regular season games."""
-    parsed_games, df_non_positive_score = parse_raw_games(raw_games)
-    # save df_non_positive_score to csv
-    df_non_positive_score.to_csv(NON_POSITIVE_SCORE_PATH, index=False)
-    parsed_games = add_neutral_court_game_flag(
-        parsed_games, game_label_column="gameLabel", drop_label_column=True
+    # add postponed column
+    df["postponed"] = 0
+    mask_postponed = (df["homeScore"] <= 0) | (
+        df["awayScore"] <= 0 | df["homeScore"].isna() | df["awayScore"].isna()
     )
-    parsed_games["season"] = parsed_games["gameDate"].apply(get_nba_season)
-    return filter_regular_season_games(parsed_games)
+    df.loc[mask_postponed, "postponed"] = 1
+
+    # add overtimes column
+    df["overtimes"] = 0
+    return df
+
+
+def main():
+    raw_games = pd.read_csv(RAW_GAMES_PATH, parse_dates=["gameDate"], low_memory=False)
+    parsed_games = parse_raw_games(raw_games)
+    parsed_games.to_csv(INGESTED_GAMES_PATH, index=False)
+    logger.info(f"Saved {len(parsed_games)} parsed games to {INGESTED_GAMES_PATH}")
 
 
 if __name__ == "__main__":
-    raw_games = pd.read_csv(RAW_GAMES_PATH, parse_dates=["gameDate"])
-    regular_season_games = build_regular_season_games(raw_games)
-    regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)
+    main()

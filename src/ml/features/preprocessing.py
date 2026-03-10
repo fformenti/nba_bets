@@ -265,7 +265,11 @@ def create_preprocessing_pipeline(
             # Convert bool to int, then impute with most_frequent
             (
                 "bool_to_int",
-                FunctionTransformer(func=lambda x: x.astype(int), validate=False),
+                FunctionTransformer(
+                    func=lambda x: x.astype(int),
+                    validate=False,
+                    feature_names_out="one-to-one",
+                ),
             ),
             ("imputer", SimpleImputer(strategy="most_frequent")),
         ]

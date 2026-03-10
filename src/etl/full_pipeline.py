@@ -11,22 +11,28 @@ from pathlib import Path
 
 from src.config.paths import (
     RAW_GAMES_PATH,
+    INGESTED_GAMES_UPDATED_HISTORY_PATH,
     REGULAR_SEASON_GAMES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
-    GAMES_FEATURES_PATH,
+    REGULAR_SEASON_GAMES_FEATURES_PATH,
     PROJECT_ROOT,
+    INGESTED_GAMES_PATH,
+    POSTPONED_GAMES_PATH,
 )
 from src.config.constants import EARLIEST_GAME_DATE, CURRENT_SEASON_START_YEAR
 
-from src.etl.ingestion.raw_games import build_regular_season_games
+from src.etl.ingestion.raw_games import parse_raw_games
+from src.etl.process_ingested_games import filter_regular_season_games
+
 from src.etl.ingestion.teams_history import (
     create_teams_history_table,
     load_teams_history_table,
 )
 from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
-from src.etl.utils.common import filter_games_by_date
+
+from src.etl.utils.common import filter_games_by_date, add_neutral_court_game_flag
 from src.ml.config.loader import load_experiment_config
 
 
@@ -58,7 +64,7 @@ def run_full_pipeline(
         Path to save final features table. If None, uses default from constants.
     current_season_start_year
         Current season year for teams history processing
-    min_date : str, optional
+    earliest_date : str, optional
         Minimum date to filter games (format: "YYYY-MM-DD").
         Only games on or after this date will be included in the final output.
         If None, no date filtering is applied.
@@ -105,13 +111,25 @@ def run_full_pipeline(
         raw_games_path = RAW_GAMES_PATH
 
     raw_games = pd.read_csv(raw_games_path, parse_dates=["gameDate"], low_memory=False)
-    regular_season_games = build_regular_season_games(raw_games)
+    parsed_games = parse_raw_games(raw_games)
+    parsed_games.to_csv(INGESTED_GAMES_PATH, index=False)
+
+    # save postponed games
+    df_postponed = parsed_games[parsed_games["postponed"] == 1].copy()
+    df_postponed.to_csv(POSTPONED_GAMES_PATH, index=False)
+
+    # save regular season games
+    parsed_played_games = parsed_games[parsed_games["postponed"] == 0]
+    regular_season_games = filter_regular_season_games(parsed_played_games)
     regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)
     print(f"✓ Processed {len(regular_season_games)} regular season games")
 
-    # Step 3: Add conference information
-    print("\n[Step 3/5] Adding conference information...")
+    # Step 3: Add neutral court game flag and conference information
+    print("\n[Step 3/5] Adding neutral court game flag and conference information...")
     games_with_conference = add_conference(regular_season_games, teams_history)
+    games_with_conference = add_neutral_court_game_flag(
+        games_with_conference, game_label_column="gameLabel", drop_label_column=True
+    )
     print(f"✓ Added conference information to {len(games_with_conference)} games")
 
     # Step 4: Create feature tables
@@ -122,7 +140,7 @@ def run_full_pipeline(
     # Step 5: Merge features
     print("\n[Step 5/6] Merging features into final table...")
     if output_path is None:
-        output_path = GAMES_FEATURES_PATH
+        output_path = REGULAR_SEASON_GAMES_FEATURES_PATH
 
     final_features = merge_features(games_with_conference)
 
@@ -147,5 +165,7 @@ if __name__ == "__main__":
     earliest_date = EARLIEST_GAME_DATE
     current_season_start_year = CURRENT_SEASON_START_YEAR
     run_full_pipeline(
-        earliest_date=earliest_date, current_season_start_year=current_season_start_year
+        raw_games_path=INGESTED_GAMES_UPDATED_HISTORY_PATH,
+        earliest_date=earliest_date,
+        current_season_start_year=current_season_start_year,
     )

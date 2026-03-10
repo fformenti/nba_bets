@@ -42,6 +42,7 @@ class FeatureEngineeringConfig(BaseModel):
 
     lags: list[int] = Field(default_factory=list)
     location_lags: list[int] = Field(default_factory=list)
+    distances_lags: list[int] = Field(default_factory=list)
     metadata_columns: list[str] = Field(default_factory=list)
     originally_enriched_columns: list[str] = Field(default_factory=list)
     exclude_columns: list[str] = Field(default_factory=list)
@@ -133,10 +134,5 @@ class PredictionConfig(BaseModel):
         "Note: This is used for filtering only. Feature engineering uses "
         "conference_filter from the experiment config.",
     )
-    add_conference_delta: bool = Field(
-        default=False,
-        description="[DEPRECATED] Conference features are now determined by "
-        "conference_filter in the experiment config. This parameter is ignored.",
-    )
-    allow_missing_features: bool = True
+    allow_missing_features: bool = False
     max_files: Optional[int] = None

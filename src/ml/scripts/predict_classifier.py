@@ -31,6 +31,7 @@ from src.ml.features.engineering import (
     apply_conference_features,
 )
 from src.ml.tracking.mlflow_tracker import MLflowTracker
+from src.etl.utils.common import get_nba_season
 
 logger = get_logger(__name__)
 
@@ -168,10 +169,20 @@ def fix_upcoming_games_cols(
     logger.info(f"Preparing {len(upcoming_games)} upcoming games")
 
     df = upcoming_games.copy()
+    if "gameDateOnlyStr" not in df.columns and "gameDate" in df.columns:
+        df["gameDateOnlyStr"] = pd.to_datetime(df["gameDate"], errors="coerce").dt.strftime(
+            "%Y-%m-%d"
+        )
+    if "season" not in df.columns and "gameDate" in df.columns:
+        df["season"] = pd.to_datetime(df["gameDate"], errors="coerce").apply(
+            get_nba_season
+        )
     columns_to_drop = ["arenaCity", "arenaName"]
     df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
     # Set placeholder values for upcoming games
+    df["postponed"] = 0
+    df["overtimes"] = None
     df["winner"] = 0
     df["homeScore"] = 0
     df["awayScore"] = 0
@@ -252,10 +263,10 @@ def build_features_for_prediction(
     feat_eng_config = experiment_config.feature_engineering
     lags = feat_eng_config.lags
     location_lags = feat_eng_config.location_lags
-
+    distances_lags = feat_eng_config.distances_lags
     # Create feature tables
     logger.info("Creating feature tables")
-    create_features_tables(historical_combined, lags, location_lags)
+    create_features_tables(historical_combined, lags, location_lags, distances_lags)
 
     # Merge features for upcoming games
     upcoming_with_features = merge_features(upcoming_games)
@@ -282,6 +293,7 @@ def build_features_for_prediction(
         upcoming_with_features,
         lags=lags,
         location_lags=location_lags,
+        distances_lags=distances_lags,
     )
 
     # Apply conference-specific features based on filter type
@@ -332,6 +344,7 @@ def prepare_features_for_model(
     X = df.drop(columns=[col for col in columns_to_exclude if col in df.columns])
 
     logger.info(f"Prepared {len(X.columns)} features for model prediction")
+    logger.info(f"List of features {X.columns} features for model prediction")
     logger.debug(f"Feature columns: {list(X.columns)}")
 
     return X
@@ -385,14 +398,6 @@ def main(
             f"Prediction conference_filter ('{prediction_config.conference_filter}') "
             f"does not match training conference_filter ('{training_conference_filter}'). "
             f"Using training filter for feature engineering consistency."
-        )
-
-    # Warn if deprecated add_conference_delta is set
-    if prediction_config.add_conference_delta:
-        logger.warning(
-            "add_conference_delta parameter is deprecated. "
-            "Conference features are now determined by conference_filter. "
-            "This parameter will be ignored."
         )
 
     # Start MLflow tracking
@@ -512,10 +517,11 @@ def main(
         if probabilities is not None:
             output["home_win_probability"] = probabilities
 
-        # Save predictions
+        # Save predictions (append if file exists, otherwise write with header)
         output_path = PROJECT_ROOT / prediction_config.output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output.to_csv(output_path, index=False)
+        write_header = not output_path.exists()
+        output.to_csv(output_path, index=False, mode="a", header=write_header)
         logger.info(f"Saved predictions to {output_path}")
 
         # Log metrics and artifacts

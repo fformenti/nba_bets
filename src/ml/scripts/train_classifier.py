@@ -9,7 +9,6 @@ This script demonstrates best practices:
 - Clean separation of concerns
 """
 
-import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -19,10 +18,6 @@ from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.pipeline import Pipeline
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 from src.utils.logging_config import setup_logging, get_logger
 from src.ml.datasets.loaders import load_dataframe, validate_dataframe
@@ -49,9 +44,11 @@ from src.ml.evaluation.visualization import (
 from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.tracking.mlflow_tracker import MLflowTracker
-from src.config.paths import PROJECT_ROOT, GAMES_FEATURES_PATH
+from src.config.paths import PROJECT_ROOT, REGULAR_SEASON_GAMES_FEATURES_PATH
+
 
 logger = get_logger(__name__)
+setup_logging(level="INFO")
 
 
 def generate_run_name(
@@ -135,7 +132,7 @@ def clean_feature_names(feature_names: list) -> list:
     return cleaned
 
 
-def filter_minimun_games_played(
+def filter_minimum_games_played(
     df: pd.DataFrame, minimum_games: int = 15
 ) -> pd.DataFrame:
     """
@@ -459,7 +456,9 @@ def train_single_model(
 
     # Data loading
     data_path = (
-        Path(data_config.path) if data_config.path else Path(GAMES_FEATURES_PATH)
+        Path(data_config.path)
+        if data_config.path
+        else Path(REGULAR_SEASON_GAMES_FEATURES_PATH)
     )
     target_column = data_config.target_column
     date_column = data_config.date_column
@@ -467,6 +466,7 @@ def train_single_model(
     # feature engineering configuration
     lags = feat_eng_config.lags
     location_lags = feat_eng_config.location_lags
+    distances_lags = feat_eng_config.distances_lags
     metadata_columns = feat_eng_config.metadata_columns
     originally_enriched_columns = feat_eng_config.originally_enriched_columns
 
@@ -525,7 +525,7 @@ def train_single_model(
         logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
 
     # Minimum games played
-    games_enriched = filter_minimun_games_played(games_enriched, minimum_games)
+    games_enriched = filter_minimum_games_played(games_enriched, minimum_games)
 
     df, y, metadata = prepare_data(
         df=games_enriched,
@@ -535,7 +535,7 @@ def train_single_model(
     )
 
     # Create delta features (always needed)
-    df = create_delta_features(df, lags, location_lags)
+    df = create_delta_features(df, lags, location_lags, distances_lags)
 
     # Apply conference-specific features based on filter type
     df = apply_conference_features(df, conference_filter)
@@ -556,17 +556,6 @@ def train_single_model(
     X = df.drop(columns=[col for col in exclude_cols if col in df.columns])
     logger.info(f"Features sent to model: {X.columns}")
     logger.info(f"Splitting data using {split_method} method")
-
-    # Identify feature types on X (the actual features that will be used)
-    # This ensures accurate feature type counts - excludes date_column when not using temporal split
-    feature_types = identify_feature_types(X, exclude_columns=[])
-    numerical_features = feature_types["numerical"]
-    categorical_features = feature_types["categorical"]
-    boolean_features = feature_types["boolean"]
-    logger.info(
-        f"Feature engineering complete: {len(numerical_features)} numerical, "
-        f"{len(categorical_features)} categorical, {len(boolean_features)} boolean features"
-    )
 
     if split_method == "temporal":
         if date_column not in X.columns:
@@ -848,11 +837,17 @@ def train_single_model(
                             f"Could not extract feature names from preprocessor: {e}. "
                             f"Using original feature names (may cause length mismatch)."
                         )
-                        feature_names = numerical_features + (
-                            categorical_features or []
+                        feature_names = (
+                            numerical_features
+                            + (boolean_features or [])
+                            + (categorical_features or [])
                         )
                 else:
-                    feature_names = numerical_features + (categorical_features or [])
+                    feature_names = (
+                        numerical_features
+                        + (boolean_features or [])
+                        + (categorical_features or [])
+                    )
 
                 # Validate that feature names length matches feature importances
                 if len(feature_names) != len(trained_model.feature_importances_):

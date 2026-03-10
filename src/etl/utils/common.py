@@ -4,6 +4,26 @@ import pandas as pd
 from src.config.constants import NEUTRAL_COURT_GAME_LABELS
 
 
+def coerce_numeric_columns(
+    df: pd.DataFrame, columns: list[str], dtype: str = "int64"
+) -> pd.DataFrame:
+    """Convert columns to numeric types, coercing errors to NaN.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame (modified in place).
+    columns : list[str]
+        Column names to convert.
+    dtype : str, default="int64"
+        Target dtype after conversion. Use "Int64" for nullable integers.
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").astype(dtype)
+    return df
+
+
 def get_season_date_range(games):
     all_season_date_range = []
     seasons = games["season"].unique()

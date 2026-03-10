@@ -7,9 +7,9 @@ from typing import Optional
 
 import pandas as pd
 
-from src.config.paths import PROJECT_ROOT, GAMES_FEATURES_PATH
+from src.config.paths import PROJECT_ROOT, REGULAR_SEASON_GAMES_FEATURES_PATH
 from src.etl.features.aggregator import create_features_tables, merge_features
-from src.etl.ingestion.raw_games import build_regular_season_games
+from src.etl.process_ingested_games import filter_regular_season_games
 from src.etl.ingestion.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
 from src.ml.config.loader import load_experiment_config
@@ -120,7 +120,8 @@ def run_incremental_pipeline(
 
     archive_files(files, archive_dir)
 
-    regular_season_games = build_regular_season_games(combined)
+    played_games = combined[combined["postponed"] == 0].copy() if "postponed" in combined.columns else combined.copy()
+    regular_season_games = filter_regular_season_games(played_games)
     regular_season_games.to_csv(processed_games_path, index=False)
     logger.info("Saved regular season games to %s", processed_games_path)
 
@@ -139,8 +140,8 @@ def run_incremental_pipeline(
         location_lags=location_lags,
     )
     final_features = merge_features(games_with_conference)
-    final_features.to_csv(GAMES_FEATURES_PATH, index=False)
-    logger.info("Saved merged features to %s", GAMES_FEATURES_PATH)
+    final_features.to_csv(REGULAR_SEASON_GAMES_FEATURES_PATH, index=False)
+    logger.info("Saved merged features to %s", REGULAR_SEASON_GAMES_FEATURES_PATH)
 
     return final_features
 

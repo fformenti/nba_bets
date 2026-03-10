@@ -6,18 +6,21 @@ from pathlib import Path
 
 import pandas as pd
 
+# import argparse
 from src.config.paths import (
-    LEAGUE_SCHEDULE_PATH,
+    PROCESSED_LEAGUE_SCHEDULE_PATH,
+    INGESTED_GAMES_UPDATED_HISTORY_PATH,
     UPCOMING_GAMES_DIR,
-    GAMES_FEATURES_PATH,
+    INGESTED_GAMES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
 )
 from src.etl.ingestion.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
 from src.etl.utils.common import get_nba_season, add_neutral_court_game_flag
-from src.utils.logging_config import setup_logging, get_logger
+from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
+setup_logging(level="INFO")
 
 
 def _load_games_played(games_path: Path) -> pd.DataFrame:
@@ -51,9 +54,12 @@ def _load_schedule(schedule_path: Path) -> pd.DataFrame:
 def _get_next_upcoming_games(
     schedule: pd.DataFrame, games_played: pd.DataFrame
 ) -> pd.DataFrame:
+    """Get the next upcoming games from the schedule."""
+
     last_played_timestamp = games_played["gameDate"].max()
     last_played_date = last_played_timestamp.date()
     last_played_date_str = last_played_date.strftime("%Y-%m-%d")
+    logger.info(f"Last played date: {last_played_date_str}")
 
     games_played_at_date = games_played[
         games_played["gameDateOnlyStr"] == last_played_date_str
@@ -69,7 +75,10 @@ def _get_next_upcoming_games(
     remaining_schedule_at_date = schedule_at_date[
         ~schedule_at_date["gameId"].isin(games_played_at_date["gameId"])
     ]
-    print("count of remaining_schedule_at_date", len(remaining_schedule_at_date))
+
+    logger.info(
+        f"Remaining schedule at {last_played_date_str}: {len(remaining_schedule_at_date)}"
+    )
     if remaining_schedule_at_date.empty:
         remaining_schedule = schedule[schedule["gameDate"] > last_played_date]
         if remaining_schedule.empty:
@@ -77,6 +86,7 @@ def _get_next_upcoming_games(
             return remaining_schedule
         next_date = remaining_schedule["gameDate"].min()
         upcoming_games = remaining_schedule[remaining_schedule["gameDate"] == next_date]
+        logger.info(f"Next date: {next_date}, {len(upcoming_games)} games")
         return upcoming_games
     return remaining_schedule_at_date
 
@@ -96,9 +106,13 @@ def _save_upcoming_games(upcoming_games: pd.DataFrame, output_path: Path) -> Non
     return
 
 
-def collect_upcoming_games() -> None:
-    schedule = _load_schedule(LEAGUE_SCHEDULE_PATH)
-    games_played = _load_games_played(GAMES_FEATURES_PATH)
+def get_upcoming_games() -> None:
+    schedule = _load_schedule(PROCESSED_LEAGUE_SCHEDULE_PATH)
+    if INGESTED_GAMES_UPDATED_HISTORY_PATH.exists():
+        games_path = INGESTED_GAMES_UPDATED_HISTORY_PATH
+    else:
+        games_path = INGESTED_GAMES_PATH
+    games_played = _load_games_played(games_path)
     # To do - Create a script called process schedule and rename raw_games.py to process_raw_games.py
     schedule["gameDateOnlyStr"] = schedule["gameDate"].apply(
         lambda x: x.strftime("%Y-%m-%d")
@@ -144,17 +158,24 @@ def collect_upcoming_games() -> None:
     ].copy()
 
     _save_upcoming_games(upcoming_games, UPCOMING_GAMES_DIR)
-    logger.info(
-        "upcoming games: %s",
-        upcoming_games,
-    )
     return
 
 
 def main() -> None:
-    setup_logging(level="INFO")
+    # parser = argparse.ArgumentParser(
+    #     description="Get upcoming games from the schedule."
+    # )
+    # parser.add_argument("games_path", type=Path, nargs="?")
+    # parser.add_argument("schedule_path", type=Path, nargs="?")
+    # args = parser.parse_args()
 
-    collect_upcoming_games()
+    # if args.games_path is None:
+    #     args.games_path = INGESTED_GAMES_PATH
+    # if args.schedule_path is None:
+    #     args.schedule_path = LEAGUE_SCHEDULE_PATH
+
+    # get_upcoming_games(args.games_path, args.schedule_path)
+    get_upcoming_games()
 
 
 if __name__ == "__main__":

@@ -4,9 +4,6 @@ import pandas as pd
 
 
 from src.config.paths import (
-    REGULAR_SEASON_GAMES_PATH,
-    GAMES_FEATURES_PATH,
-    TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
     TEAMS_HOME_RECORDS_PATH,
     TEAMS_AWAY_RECORDS_PATH,
     TEAMS_RECORDS_PATH,
@@ -17,6 +14,7 @@ from src.config.paths import (
     EAST_WEST_RECORDS_AT_EAST_PATH,
     EAST_WEST_RECORDS_AT_WEST_PATH,
     RESTED_DAYS_PATH,
+    TEAMS_DISTANCES_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -33,10 +31,13 @@ from src.etl.features.point_differential import (
     calculate_pts_diff,
 )
 from src.etl.features.rest_days import make_rested_days_table
-from src.etl.transformation.add_conference import add_conference
+
+from src.etl.features.distances import make_teams_distances_table_season
 
 
-def create_features_tables(games: pd.DataFrame, lags=[], location_lags=[]):
+def create_features_tables(
+    games: pd.DataFrame, lags=[], location_lags=[], distances_lags=[]
+):
     """
     Create all feature tables from games DataFrame.
 
@@ -66,6 +67,7 @@ def create_features_tables(games: pd.DataFrame, lags=[], location_lags=[]):
     east_west_record_at_east = make_east_west_record(games, location="East")
     east_west_record_at_west = make_east_west_record(games, location="West")
     rested_days = make_rested_days_table(games)
+    teams_distances = make_teams_distances_table_season(distances_lags, games=games)
 
     # Save the dataframes to CSV files
     home_records.to_csv(TEAMS_HOME_RECORDS_PATH, index=False)
@@ -80,6 +82,7 @@ def create_features_tables(games: pd.DataFrame, lags=[], location_lags=[]):
     east_west_record_at_east.to_csv(EAST_WEST_RECORDS_AT_EAST_PATH, index=False)
     east_west_record_at_west.to_csv(EAST_WEST_RECORDS_AT_WEST_PATH, index=False)
     rested_days.to_csv(RESTED_DAYS_PATH, index=False)
+    teams_distances.to_csv(TEAMS_DISTANCES_PATH, index=False)
     return
 
 
@@ -112,6 +115,7 @@ def merge_features(games):
     east_west_record_at_east = pd.read_csv(EAST_WEST_RECORDS_AT_EAST_PATH)
     east_west_record_at_west = pd.read_csv(EAST_WEST_RECORDS_AT_WEST_PATH)
     rested_days = pd.read_csv(RESTED_DAYS_PATH)
+    teams_distances = pd.read_csv(TEAMS_DISTANCES_PATH)
 
     # Records
     # teams_records = teams_records.drop(columns=["gameDate", "season", "win_bool"])
@@ -155,8 +159,9 @@ def merge_features(games):
     games = get_rested_days(games, rested_days, is_hometeam=True)
     games = get_rested_days(games, rested_days, is_hometeam=False)
 
-    # Create win_bool column: 1 if home team wins, 0 if away team wins
-    # games["win_bool"] = (games["hometeamId"] == games["winner"]).astype(int)
+    # Distances (joins on gameDateOnlyStr since teams_distances has one row per team/date)
+    games = join_games_and_teams_feature(games, teams_distances, "hometeamId", "HT")
+    games = join_games_and_teams_feature(games, teams_distances, "awayteamId", "VT")
 
     games = games.drop(
         columns=[
@@ -188,8 +193,6 @@ def join_games_and_teams_feature(games, teams_feature, join_column, suffix):
 
 
 # ==== Rested Days ====
-
-
 def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam: bool):
     rest_columns = [
         "gameDateOnlyStr",
@@ -216,21 +219,3 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
             "rested_days": f"rested_days_{suffix}",
         }
     )
-
-
-if __name__ == "__main__":
-    # Read Tables
-    games = pd.read_csv(REGULAR_SEASON_GAMES_PATH)
-    teams_cities_conferences = pd.read_csv(
-        TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH
-    )
-    games = add_conference(games, teams_cities_conferences)
-
-    # Create feature tables
-    create_features_tables(games)
-
-    # Merge features
-    games_with_features = merge_features(games)
-
-    # Save Table
-    games_with_features.to_csv(GAMES_FEATURES_PATH, index=False)
