@@ -18,6 +18,7 @@ def create_delta_features(
     df: pd.DataFrame,
     lags: List[int],
     location_lags,
+    distances_lags,
 ) -> pd.DataFrame:
     """
     Create delta features (home - away) for specified feature pairs.
@@ -38,8 +39,11 @@ def create_delta_features(
     """
     record_features = ["record" + "_L" + str(lag) for lag in lags]
     pts_diff_features = ["pts_diff_avg" + "_L" + str(lag) for lag in lags]
+    distances_features = ["distance_L" + str(lag) for lag in distances_lags]
     rested_days_features = ["rested_days"]
-    feature_names = record_features + pts_diff_features + rested_days_features
+    feature_names = (
+        record_features + pts_diff_features + distances_features + rested_days_features
+    )
 
     df = df.copy()
     created_features = []
@@ -122,6 +126,8 @@ def create_conference_delta(
     # Drop intermediate columns
     df = df.drop(
         columns=[
+            "hometeamConference",
+            "awayteamConference",
             "east_record_adjusted",
             "west_record_adjusted",
             "hometeamConference_binary",
@@ -131,14 +137,33 @@ def create_conference_delta(
         ]
     )
 
-    logger.info("Created conference_diff_east_pct feature")
+    logger.info(
+        "Created conference_diff_home_advantage_pct feature (0.0 for same conference teams)"
+    )
     return df
 
 
 def get_home_conference_vs_away_conference_record(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Select east or west record features.
+    Create conference-specific features for different conference matchups.
+
+    Creates:
+    - home_conference_vs_away_conference_record: Record of home team's conference
+      when playing at home conference
+    - games_played_at_home_conference: Games played by home team at their conference
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with conference columns and east/west record features
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with conference features added and intermediate columns dropped
     """
+    df = df.copy()
+
     df["home_conference_vs_away_conference_record"] = df.apply(
         lambda x: x["east_record_at_east"]
         if x["hometeamConference"] == "East"
@@ -155,6 +180,8 @@ def get_home_conference_vs_away_conference_record(df: pd.DataFrame) -> pd.DataFr
 
     df = df.drop(
         columns=[
+            "east_record_adjusted",
+            "west_record_adjusted",
             "east_record_at_east",
             "west_record_at_west",
             "games_played_at_east",
@@ -162,6 +189,83 @@ def get_home_conference_vs_away_conference_record(df: pd.DataFrame) -> pd.DataFr
             "games_played_east_vs_west",
         ]
     )
+
+    logger.info(
+        "Created conference features: home_conference_vs_away_conference_record, "
+        "games_played_at_home_conference"
+    )
+    return df
+
+
+def apply_conference_features(
+    df: pd.DataFrame,
+    conference_filter: str,
+) -> pd.DataFrame:
+    """
+    Apply appropriate conference features based on conference filter type.
+
+    This function ensures consistent feature engineering across training and prediction:
+    - 'same': No conference features (teams from same conference)
+    - 'different': Conference vs conference record features (teams from different conferences)
+    - 'all': Conference delta feature (works for both same and different conferences,
+             equals 0.0 for same conference matchups)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with delta features already created
+    conference_filter : str
+        Conference filter type: 'same', 'different', or 'all'
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with appropriate conference features added
+
+    Raises
+    ------
+    ValueError
+        If conference_filter is not one of the valid options
+    """
+    if conference_filter not in ["same", "different", "all"]:
+        raise ValueError(
+            f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
+        )
+
+    df = df.copy()
+
+    if conference_filter == "same":
+        # Same conference teams: no conference features needed
+        logger.info("Same conference filter: skipping conference features")
+        # Drop any conference-related columns that might exist
+        conference_cols_to_drop = [
+            "east_record_adjusted",
+            "west_record_adjusted",
+            "east_record_at_east",
+            "west_record_at_west",
+            "games_played_at_east",
+            "games_played_at_west",
+            "games_played_east_vs_west",
+            "home_conference_vs_away_conference_record",
+            "games_played_at_home_conference",
+            "conference_diff_home_advantage_pct",
+        ]
+        df = df.drop(
+            columns=[col for col in conference_cols_to_drop if col in df.columns]
+        )
+
+    elif conference_filter == "different":
+        # Different conference teams: use conference vs conference record features
+        logger.info(
+            "Different conference filter: adding conference vs conference record features"
+        )
+        df = get_home_conference_vs_away_conference_record(df)
+
+    elif conference_filter == "all":
+        # All teams: use conference delta feature (0.0 for same conference)
+        logger.info("All teams filter: adding conference delta feature")
+        df = create_conference_delta(df)
+
     return df
 
 
@@ -170,7 +274,7 @@ def identify_feature_types(
     exclude_columns: Optional[List[str]] = None,
 ) -> dict[str, List[str]]:
     """
-    Identify numerical and categorical features in a DataFrame.
+    Identify numerical, categorical, and boolean features in a DataFrame.
 
     Parameters
     ----------
@@ -182,17 +286,24 @@ def identify_feature_types(
     Returns
     -------
     dict
-        Dictionary with keys 'numerical' and 'categorical' containing lists of column names
+        Dictionary with keys 'numerical', 'categorical', and 'boolean'
+        containing lists of column names
     """
     if exclude_columns is None:
         exclude_columns = []
 
     available_cols = [col for col in df.columns if col not in exclude_columns]
 
-    numerical_features = (
-        df[available_cols].select_dtypes(include=["number"]).columns.tolist()
+    # Identify boolean columns (binary categorical features)
+    boolean_features = (
+        df[available_cols].select_dtypes(include=["bool"]).columns.tolist()
     )
 
+    # Numerical features: get all numeric columns, then exclude boolean columns
+    all_numeric = df[available_cols].select_dtypes(include=["number"]).columns.tolist()
+    numerical_features = [col for col in all_numeric if col not in boolean_features]
+
+    # Categorical features: include object and category (but NOT boolean)
     categorical_features = (
         df[available_cols]
         .select_dtypes(include=["object", "category"])
@@ -202,4 +313,5 @@ def identify_feature_types(
     return {
         "numerical": numerical_features,
         "categorical": categorical_features,
+        "boolean": boolean_features,
     }

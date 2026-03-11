@@ -2,55 +2,7 @@
 Configuration module for NBA betting project.
 
 This module contains:
-- Path constants for data files
-- AWS configuration
-- Project-level settings
+- Path constants for data files (see src.config.paths)
+- AWS configuration (see src.config.aws)
+- Project-level settings (see src.config.constants)
 """
-
-from .paths import (
-    PROJECT_ROOT,
-    LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_FILENAME,
-    LOCAL_RAW_GAMES_PATH,
-    LOCAL_INGESTED_GAMES_PATH,
-    LOCAL_PROCESSED_FOLDER,
-    LOCAL_REGULAR_SEASON_GAMES_PATH,
-    LOCAL_PLAYOFFS_GAMES_PATH,
-    LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH,
-    LOCAL_TEAMS_HOME_RECORDS_PATH,
-    LOCAL_TEAMS_AWAY_RECORDS_PATH,
-    LOCAL_TEAMS_RECORDS_PATH,
-    LOCAL_TEAMS_HOME_PTS_DIFF_PATH,
-    LOCAL_TEAMS_AWAY_PTS_DIFF_PATH,
-    LOCAL_TEAMS_PTS_DIFF_PATH,
-    LOCAL_EAST_WEST_RECORDS_PATH,
-    LOCAL_RESTED_DAYS_PATH,
-    LOCAL_GAMES_FEATURES_PATH,
-)
-from .aws import AWS_BUCKET_NAME, AWS_PROCESSED_FOLDER
-
-__all__ = [
-    "PROJECT_ROOT",
-    "LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_FILENAME",
-    "LOCAL_RAW_GAMES_PATH",
-    "LOCAL_INGESTED_GAMES_PATH",
-    "LOCAL_PROCESSED_FOLDER",
-    "LOCAL_REGULAR_SEASON_GAMES_PATH",
-    "LOCAL_PLAYOFFS_GAMES_PATH",
-    "LOCAL_TEAMS_HISTORY_CITIES_CONFERENCES_PATH",
-    "LOCAL_TEAMS_HOME_RECORDS_PATH",
-    "LOCAL_TEAMS_AWAY_RECORDS_PATH",
-    "LOCAL_TEAMS_RECORDS_PATH",
-    "LOCAL_TEAMS_HOME_PTS_DIFF_PATH",
-    "LOCAL_TEAMS_AWAY_PTS_DIFF_PATH",
-    "LOCAL_TEAMS_PTS_DIFF_PATH",
-    "LOCAL_EAST_WEST_RECORDS_PATH",
-    "LOCAL_RESTED_DAYS_PATH",
-    "LOCAL_GAMES_FEATURES_PATH",
-    "AWS_BUCKET_NAME",
-    "AWS_PROCESSED_FOLDER",
-]
-
-# Backward compatibility - import from config instead of constants
-from .paths import *  # noqa: F403, F405
-from .aws import *  # noqa: F403, F405
-

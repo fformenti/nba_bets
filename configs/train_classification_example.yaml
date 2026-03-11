@@ -27,7 +27,7 @@ feature_engineering:
   exclude_columns:
     - "gameId"
     - "winner"
-    - "hometeamCity"
+    - "hometeamPrename"
     - "hometeamId"
     - "homeScore"  # CRITICAL: Exclude to prevent data leakage (directly determines pts_diff)
     - "awayteamName"

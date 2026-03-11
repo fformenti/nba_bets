@@ -113,6 +113,16 @@ uv run python -m src.ml.scripts.train_regression
 uv run python -m src.ml.scripts.train_classifier --config configs/my_experiment.yaml
 ```
 
+## Predictions (MLflow)
+
+Run predictions for upcoming games stored in `data/raw/incremental/upcoming_games`:
+
+```bash
+uv run python -m src.ml.scripts.predict_upcoming --config configs/predict_upcoming.yaml
+```
+
+Predictions are saved to `data/predictions/upcoming_games_predictions.csv`.
+
 ## Model Registry
 
 Models are saved to the `models/` directory with:

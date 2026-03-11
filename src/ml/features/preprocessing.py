@@ -8,6 +8,7 @@ from sklearn.preprocessing import (
     RobustScaler,
     MinMaxScaler,
     OneHotEncoder,
+    FunctionTransformer,
 )
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
@@ -202,12 +203,13 @@ class OutlierHandler(BaseEstimator, TransformerMixin):
 def create_preprocessing_pipeline(
     numerical_features: List[str],
     categorical_features: Optional[List[str]] = None,
+    boolean_features: Optional[List[str]] = None,
     scaling_method: Literal["standard", "robust", "minmax"] = "standard",
     imputation_strategy: str = "mean",
     handle_outliers: bool = True,
 ) -> ColumnTransformer:
     """
-    Create a preprocessing pipeline for numerical and categorical features.
+    Create a preprocessing pipeline for numerical, categorical, and boolean features.
 
     Parameters
     ----------
@@ -215,6 +217,10 @@ def create_preprocessing_pipeline(
         List of numerical feature column names
     categorical_features : list of str, optional
         List of categorical feature column names
+    boolean_features : list of str, optional
+        List of boolean feature column names. Boolean features are handled separately
+        from numerical features because SimpleImputer with mean/median strategy
+        doesn't support boolean dtype.
     scaling_method : {'standard', 'robust', 'minmax'}, default='standard'
         Scaling method for numerical features
     imputation_strategy : str, default='mean'
@@ -228,27 +234,46 @@ def create_preprocessing_pipeline(
         Preprocessing pipeline
     """
     transformers = []
-
-    # Numerical features pipeline
-    num_steps = []
-
-    if handle_outliers:
-        num_steps.append(
-            ("outlier_handler", OutlierHandler(columns=numerical_features))
-        )
-
-    num_steps.append(("imputer", SimpleImputer(strategy=imputation_strategy)))
-
-    if scaling_method == "standard":
-        num_steps.append(("scaler", StandardScaler()))
-    elif scaling_method == "robust":
-        num_steps.append(("scaler", RobustScaler()))
-    elif scaling_method == "minmax":
-        num_steps.append(("scaler", MinMaxScaler()))
-
     from sklearn.pipeline import Pipeline
 
-    transformers.append(("numerical", Pipeline(num_steps), numerical_features))
+    if boolean_features is None:
+        boolean_features = []
+
+    # Numerical features pipeline
+    if numerical_features:
+        num_steps = []
+
+        if handle_outliers:
+            num_steps.append(
+                ("outlier_handler", OutlierHandler(columns=numerical_features))
+            )
+
+        num_steps.append(("imputer", SimpleImputer(strategy=imputation_strategy)))
+
+        if scaling_method == "standard":
+            num_steps.append(("scaler", StandardScaler()))
+        elif scaling_method == "robust":
+            num_steps.append(("scaler", RobustScaler()))
+        elif scaling_method == "minmax":
+            num_steps.append(("scaler", MinMaxScaler()))
+
+        transformers.append(("numerical", Pipeline(num_steps), numerical_features))
+
+    # Boolean features pipeline (treat as binary categorical)
+    if boolean_features:
+        bool_steps = [
+            # Convert bool to int, then impute with most_frequent
+            (
+                "bool_to_int",
+                FunctionTransformer(
+                    func=lambda x: x.astype(int),
+                    validate=False,
+                    feature_names_out="one-to-one",
+                ),
+            ),
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+        ]
+        transformers.append(("boolean", Pipeline(bool_steps), boolean_features))
 
     # Categorical features pipeline
     if categorical_features:

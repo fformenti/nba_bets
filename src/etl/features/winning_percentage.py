@@ -77,7 +77,6 @@ def calculate_home_record(home_games, lags=[]):
     )
 
     home_games = home_games.rename(
-        index=str,
         columns={
             "hometeamId": "teamId",
             "hometeamConference": "conference",
@@ -95,7 +94,6 @@ def calculate_away_record(away_games, lags=[]):
     )
 
     df = df.rename(
-        index=str,
         columns={
             "awayteamId": "teamId",
             "awayteamConference": "conference",

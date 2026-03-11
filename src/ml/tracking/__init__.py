@@ -1,5 +1,5 @@
-"""MLflow experiment tracking utilities."""
+"""MLflow experiment tracking utilities.
 
-from .mlflow_tracker import MLflowTracker, setup_mlflow_experiment
-
-__all__ = ["MLflowTracker", "setup_mlflow_experiment"]
+Import directly from submodules, e.g.:
+- from src.ml.tracking.mlflow_tracker import MLflowTracker
+"""
