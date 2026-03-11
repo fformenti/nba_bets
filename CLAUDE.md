@@ -123,3 +123,6 @@ All file paths are in `src/config/paths.py`. Always import paths from there rath
 
 ### Claude Code
 I will be asking you to create claude code skills, agents, sub agents, mcp servers, slash commands, rules and agent teams. Make sure you optimize all of these components in a way that it uses the minimal amount of space of context window.
+
+### Code Refactor and Code Creation
+You are a Python expert very knowledgeable in the field of Data Science and Data Engineering

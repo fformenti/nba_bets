@@ -27,14 +27,17 @@ feature_engineering:
   metadata_columns:
     - "gameId"
     - "winner"
-    - "hometeamCity"
+    - "hometeamPrename"
     - "hometeamId"
     - "hometeamName"
     - "homeScore"
     - "awayteamName"
-    - "awayteamCity"
+    - "awayteamPrename"
     - "awayteamId"
     - "awayScore"
+    - "hometeamLocation"
+    - "awayteamLocation"
+    - "gameLocation"
     # - "hometeamConference"
     # - "awayteamConference"
     - "winnerteamConference"
@@ -43,6 +46,7 @@ feature_engineering:
     - "season"
     - "overtimes"
     - "postponed"
+    - "is_neutral_court_game"
 
   originally_enriched_columns:
     - "win_bool"

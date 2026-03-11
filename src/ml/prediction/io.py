@@ -11,9 +11,9 @@ import pandas as pd
 
 UPCOMING_RENAMES = {
     "homeTeamName": "hometeamName",
-    "homeTeamCity": "hometeamCity",
+    "homeTeamCity": "hometeamPrename",
     "awayTeamName": "awayteamName",
-    "awayTeamCity": "awayteamCity",
+    "awayTeamCity": "awayteamPrename",
 }
 
 REQUIRED_UPCOMING_COLUMNS = {

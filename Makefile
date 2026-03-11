@@ -18,7 +18,13 @@ polymarket-teams-abrev:
 ingest-raw-games:
 	uv run python -m src.etl.ingestion.raw_games
 
-process_ingested_games:
+get-upcoming-games-results:
+	uv run python src/etl/collectors/upcoming_games_results.py
+
+append-games-results:
+	uv run python src/etl/ingestion/append_games_results.py
+
+process-ingested-games:
 	uv run python src/etl/process_ingested_games.py
 
 process-league-schedule:
@@ -29,15 +35,6 @@ get-upcoming-games:
 
 predict-upcoming:
 	uv run python -m src.ml.scripts.predict_classifier --config configs/predict_upcoming.yaml
-
-get-upcoming-games-results:
-	uv run python src/etl/collectors/upcoming_games_results.py
-
-append-games-results:
-	uv run python src/etl/ingestion/append_games_results.py
-
-process-ingested-games:
-	uv run python src/etl/process_ingested_games.py
 
 make-features:
 	uv run python src/etl/make_features.py
@@ -52,11 +49,21 @@ bet-polymarket:
 	uv run python src/ml/scripts/place_bets.py
 
 historical-etl:
-	teams-history
-	teams-locations
-	make-distances-table
-	ingest-raw-games
-	process-league-schedule
+	make teams-history
+	make teams-locations
+	make make-distances-table
+	make ingest-raw-games
+	make append-games-results
+	make process-league-schedule
+	make process-ingested-games
+	make make-features
+
+full-rebuild:
+	make teams-history
+	make teams-locations
+	make make-distances-table
+	make ingest-raw-games
+	make append-games-results
 	make process-ingested-games
 	make make-features
 

@@ -26,10 +26,10 @@ def normalize_column_name(name: str) -> str:
 CANONICAL_SYNONYMS = {
     "gameId": ["game_id", "id", "gameid"],
     "gameDate": ["game_date", "date", "gamedate", "game_datetime"],
-    "hometeamCity": ["home_city", "homecity", "home_team_city"],
+    "hometeamPrename": ["home_city", "homecity", "home_team_city"],
     "hometeamName": ["home_name", "homename", "home_team_name"],
     "hometeamId": ["home_team_id", "hometeamid", "homeid", "home_teamid"],
-    "awayteamCity": ["away_city", "awaycity", "away_team_city"],
+    "awayteamPrename": ["away_city", "awaycity", "away_team_city"],
     "awayteamName": ["away_name", "awayname", "away_team_name"],
     "awayteamId": ["away_team_id", "awayteamid", "awayid", "away_teamid"],
     "homeScore": ["home_score", "homescore", "home_pts", "homepoints"],

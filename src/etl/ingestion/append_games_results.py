@@ -12,35 +12,15 @@ from src.config.paths import (
     INGESTED_GAMES_UPDATED_HISTORY_PATH,
     UPCOMING_GAMES_RESULTS_DIR,
 )
-from src.etl.utils.common import coerce_numeric_columns
+from src.etl.utils.common import (
+    CANONICAL_INGESTED_COLUMNS,
+    coerce_numeric_columns,
+    deduplicate_games,
+    enrich_games_locations,
+)
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
-
-
-EXPECTED_COLUMNS = [
-    "gameId",
-    "gameDate",
-    "gameDateOnlyStr",
-    "season",
-    "hometeamCity",
-    "hometeamName",
-    "hometeamId",
-    "awayteamCity",
-    "awayteamName",
-    "awayteamId",
-    "homeScore",
-    "awayScore",
-    "winner",
-    "overtimes",
-    "postponed",
-    "gameType",
-    "attendance",
-    "arenaId",
-    "gameLabel",
-    "gameSubLabel",
-    "seriesGameNumber",
-]
 
 
 def _read_json_file(file_path: Path) -> dict[str, Any]:
@@ -83,10 +63,10 @@ def _transform_game_result_to_dataframe_row(
         "gameDate": game_date,
         "gameDateOnlyStr": game_date_str,
         "season": game_data.get("season"),
-        "hometeamCity": game_data.get("homeTeamCity", ""),
+        "hometeamPrename": game_data.get("homeTeamCity", ""),
         "hometeamName": game_data.get("homeTeamName", ""),
         "hometeamId": hometeam_id,
-        "awayteamCity": game_data.get("awayTeamCity", ""),
+        "awayteamPrename": game_data.get("awayTeamCity", ""),
         "awayteamName": game_data.get("awayTeamName", ""),
         "awayteamId": awayteam_id,
         "homeScore": home_score,
@@ -212,19 +192,23 @@ def add_game_results_to_historical(
 
     # Load upcoming game results and track file mappings
     upcoming_df = load_upcoming_game_results(upcoming_results_dir)
-    # games_ids = upcoming_df["gameId"].tolist()
     if upcoming_df.empty:
-        logger.warning("No upcoming game results to add")
+        logger.warning("No upcoming game results to add — writing historical data as-is")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        historical_df.to_csv(output_path, index=False)
+        logger.info(f"Saved {len(historical_df)} historical games to {output_path}")
         return historical_df
 
-    # Ensure both dataframes have the same columns in the same order
-    historical_df = historical_df.reindex(columns=EXPECTED_COLUMNS)
-    upcoming_df = upcoming_df.reindex(columns=EXPECTED_COLUMNS)
+    # Enrich upcoming results with location columns
+    upcoming_df = enrich_games_locations(upcoming_df)
 
-    historical_df = historical_df[~historical_df["gameId"].isin(upcoming_df["gameId"])]
+    # Deduplicate using composite key (gameDateOnlyStr, hometeamId, awayteamId)
+    historical_df = deduplicate_games(historical_df, upcoming_df)
 
-    # _archive_processed_games(archive_ids, game_id_to_file, archive_dir)
-    combined_df = pd.concat([historical_df, upcoming_df], ignore_index=True)
+    # Combine and align to canonical schema — filter out empty frames to avoid FutureWarning
+    frames = [df for df in [historical_df, upcoming_df] if not df.empty]
+    combined_df = pd.concat(frames, ignore_index=True)
+    combined_df = combined_df.reindex(columns=CANONICAL_INGESTED_COLUMNS)
     # Sort by gameDate and gameId for consistency
     combined_df = combined_df.sort_values(
         ["gameDate", "gameId"], na_position="last"

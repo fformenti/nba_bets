@@ -2,6 +2,100 @@
 
 import pandas as pd
 from src.config.constants import NEUTRAL_COURT_GAME_LABELS
+from src.config.paths import TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH
+
+
+CANONICAL_INGESTED_COLUMNS = [
+    "gameId",
+    "gameDate",
+    "gameDateOnlyStr",
+    "season",
+    "hometeamPrename",
+    "hometeamName",
+    "hometeamId",
+    "awayteamPrename",
+    "awayteamName",
+    "awayteamId",
+    "homeScore",
+    "awayScore",
+    "winner",
+    "overtimes",
+    "postponed",
+    "gameType",
+    "attendance",
+    "arenaId",
+    "gameLabel",
+    "gameSubLabel",
+    "seriesGameNumber",
+    "hometeamLocation",
+    "gameLocation",
+    "awayteamLocation",
+]
+
+
+def get_teams_locations(df: pd.DataFrame) -> pd.DataFrame:
+    """Enrich a games DataFrame with home/away/game location columns via teams history lookup."""
+    teams_cities_states = pd.read_csv(TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH)
+    # Home team location
+    df = df.merge(
+        teams_cities_states[["teamId", "season", "city", "state"]],
+        left_on=["hometeamId", "season"],
+        right_on=["teamId", "season"],
+        how="left",
+    ).drop(columns=["teamId"])
+    df["hometeamLocation"] = df["city"] + ", " + df["state"]
+    df.drop(columns=["city", "state"], inplace=True)
+
+    # Game Location (To do: in the future it should reference arenaId)
+    df["gameLocation"] = df["hometeamLocation"]
+
+    # Away team location
+    df = df.merge(
+        teams_cities_states[["teamId", "season", "city", "state"]],
+        left_on=["awayteamId", "season"],
+        right_on=["teamId", "season"],
+        how="left",
+    ).drop(columns=["teamId"])
+    df["awayteamLocation"] = df["city"] + ", " + df["state"]
+    df.drop(columns=["city", "state"], inplace=True)
+    return df
+
+
+def enrich_games_locations(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize city names and add location columns if missing or incomplete."""
+    normalize_city_names = {"LA": "Los Angeles"}
+    if "hometeamPrename" in df.columns:
+        df["hometeamPrename"] = df["hometeamPrename"].replace(normalize_city_names)
+    if "awayteamPrename" in df.columns:
+        df["awayteamPrename"] = df["awayteamPrename"].replace(normalize_city_names)
+
+    location_cols = ["hometeamLocation", "awayteamLocation", "gameLocation"]
+    needs_enrichment = any(col not in df.columns for col in location_cols)
+    if not needs_enrichment:
+        needs_enrichment = df[location_cols].isna().any().any()
+
+    if needs_enrichment:
+        # Drop any partial location columns before re-merging
+        existing_loc_cols = [c for c in location_cols if c in df.columns]
+        if existing_loc_cols:
+            df = df.drop(columns=existing_loc_cols)
+        df = get_teams_locations(df)
+
+    return df
+
+
+def deduplicate_games(
+    existing_df: pd.DataFrame, new_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Remove rows from existing_df that match any row in new_df on composite key."""
+    key_cols = ["gameDateOnlyStr", "hometeamId", "awayteamId"]
+    new_keys = set(
+        tuple(row)
+        for row in new_df[key_cols].dropna().itertuples(index=False)
+    )
+    existing_keys = existing_df[key_cols].dropna().itertuples(index=False)
+    mask = [tuple(row) not in new_keys for row in existing_keys]
+    return existing_df.loc[mask].copy()
 
 
 def coerce_numeric_columns(

@@ -3,12 +3,10 @@ from typing import Optional
 import pandas as pd
 
 from src.config.paths import (
-    RAW_DISTANCES_PATH,
     REGULAR_SEASON_GAMES_PATH,
-    TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
+    LOCATIONS_DISTANCES_PATH,
     TEAMS_DISTANCES_PATH,
 )
-from src.config.constants import TEAMS_CITIES_MAP
 
 
 def make_teams_games_dates(games: Optional[pd.DataFrame] = None) -> pd.DataFrame:
@@ -41,10 +39,19 @@ def make_teams_games_dates(games: Optional[pd.DataFrame] = None) -> pd.DataFrame
         "gameDateOnlyStr",
         "season",
         "hometeamId",
-        "hometeamCity",
+        "hometeamPrename",
+        "hometeamName",
+        "hometeamLocation",
+        "gameLocation",
     ]
-    home_games = games[home_cols]
-    home_games.rename(columns={"hometeamId": "teamId"}, inplace=True)
+    home_games = games[home_cols].copy().rename(
+        columns={
+            "hometeamId": "teamId",
+            "hometeamPrename": "teamPrename",
+            "hometeamName": "teamName",
+            "hometeamLocation": "teamLocation",
+        }
+    )
 
     away_cols = [
         "gameId",
@@ -52,40 +59,28 @@ def make_teams_games_dates(games: Optional[pd.DataFrame] = None) -> pd.DataFrame
         "gameDateOnlyStr",
         "season",
         "awayteamId",
-        "hometeamCity",
+        "awayteamPrename",
+        "awayteamName",
+        "awayteamLocation",
+        "gameLocation",
     ]
-    away_games = games[away_cols]
-    away_games.rename(columns={"awayteamId": "teamId"}, inplace=True)
-
-    teams_game_dates = (
-        pd.concat([home_games, away_games])
-        .reset_index(drop=True)
-        .rename(columns={"hometeamCity": "game_city"})
+    away_games = games[away_cols].copy().rename(
+        columns={
+            "awayteamId": "teamId",
+            "awayteamPrename": "teamPrename",
+            "awayteamName": "teamName",
+            "awayteamLocation": "teamLocation",
+        }
     )
 
-    teams_info = pd.read_csv(TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH)
-
-    teams_game_dates = teams_game_dates.merge(
-        teams_info[["teamId", "teamCity", "season"]],
-        on=["teamId", "season"],
-        how="inner",
-    )
-    teams_game_dates["team_city_name"] = teams_game_dates["teamCity"].replace(
-        TEAMS_CITIES_MAP
-    )
-
-    teams_game_dates["game_city_name"] = teams_game_dates["game_city"].replace(
-        TEAMS_CITIES_MAP
-    )
-
-    return teams_game_dates
+    return pd.concat([home_games, away_games]).reset_index(drop=True)
 
 
 def conditional_backfill_group(group):
-    group["current_city"] = group["current_city"].mask(
-        group["current_city"].isna()
-        & (group["next_game_city_name"].bfill() == group["team_city_name"]),
-        group["next_game_city_name"].bfill(),
+    next_loc = group["next_gameLocation"].bfill().infer_objects(copy=False)
+    group["current_location"] = group["current_location"].mask(
+        group["current_location"].isna() & (next_loc == group["teamLocation"]),
+        next_loc,
     )
     return group
 
@@ -104,7 +99,7 @@ def make_teams_distances_table_season(
         prediction), distances are computed for all games including
         upcoming ones. When None, uses REGULAR_SEASON_GAMES_PATH.
     """
-    distances = pd.read_csv(RAW_DISTANCES_PATH)
+    distances = pd.read_csv(LOCATIONS_DISTANCES_PATH)
     aux_distances = distances.rename(columns={"city1": "city2", "city2": "city1"})
     distances = pd.concat([distances, aux_distances]).reset_index(drop=True)
 
@@ -140,63 +135,66 @@ def make_teams_distances_table_season(
             ["teamId", "gameDateOnlyStr"]
         ).reset_index(drop=True)
 
-        full_calendar_teams["team_city_name"] = full_calendar_teams["team_city_name"].ffill()
-        full_calendar_teams["current_city"] = full_calendar_teams["game_city_name"]
-        full_calendar_teams["next_game_city_name"] = full_calendar_teams.groupby(
+        full_calendar_teams["teamLocation"] = full_calendar_teams[
+            "teamLocation"
+        ].ffill().infer_objects(copy=False)
+        full_calendar_teams["current_location"] = full_calendar_teams["gameLocation"]
+        full_calendar_teams["next_gameLocation"] = full_calendar_teams.groupby(
             ["teamId"]
-        )["game_city_name"].shift(-1)
+        )["gameLocation"].shift(-1)
 
         full_calendar_teams = full_calendar_teams.groupby(
             "teamId", group_keys=False
-        ).apply(conditional_backfill_group)
+        ).apply(conditional_backfill_group, include_groups=False)
 
         # to do: repensar se um basta eu fazer um backfill na tabela toda
-        full_calendar_teams["current_city"] = full_calendar_teams.groupby("teamId")[
-            "current_city"
+        full_calendar_teams["current_location"] = full_calendar_teams.groupby("teamId")[
+            "current_location"
         ].ffill()
 
-        full_calendar_teams["team_city_name"] = full_calendar_teams.groupby("teamId")[
-            "team_city_name"
+        full_calendar_teams["teamLocation"] = full_calendar_teams.groupby("teamId")[
+            "teamLocation"
         ].bfill()
 
-        full_calendar_teams.drop(columns=["next_game_city_name"], inplace=True)
-        full_calendar_teams[full_calendar_teams["teamCity"] == "New York"]
+        full_calendar_teams.drop(columns=["next_gameLocation"], inplace=True)
 
-        full_calendar_teams["previous_city"] = full_calendar_teams.groupby(["teamId"])[
-            "current_city"
-        ].shift(1)
+        full_calendar_teams["previous_location"] = full_calendar_teams.groupby(
+            ["teamId"]
+        )["current_location"].shift(1)
 
         # Fill Na for teams that didn't play the first game at home
         def if_na_select_column(group):
-            group["previous_city"] = group["previous_city"].mask(
-                group["previous_city"].isna(),
-                group["team_city_name"],
+            group["previous_location"] = group["previous_location"].mask(
+                group["previous_location"].isna(),
+                group["teamLocation"],
             )
             return group
 
         full_calendar_teams = full_calendar_teams.groupby(
             "teamId", group_keys=False
-        ).apply(if_na_select_column)
+        ).apply(if_na_select_column, include_groups=False)
         # ---------------------
 
         # ---- Fill Na for teams that didn't play in the first day of the season
-        full_calendar_teams["current_city"] = full_calendar_teams.groupby("teamId")[
-            "current_city"
+        full_calendar_teams["current_location"] = full_calendar_teams.groupby("teamId")[
+            "current_location"
         ].bfill()
 
+        # ---- Merge distances table
         full_calendar_teams = full_calendar_teams.merge(
-            distances,
-            left_on=["current_city", "previous_city"],
-            right_on=["city1", "city2"],
+            distances[["from", "to", "driving_distance"]],
+            left_on=["current_location", "previous_location"],
+            right_on=["from", "to"],
             how="left",
-        )
-        # ---------------------
+        ).drop(columns=["from", "to"])
 
-        # ---- Fill 0 for same city distances
-        full_calendar_teams["distance"] = (
-            full_calendar_teams["distance"].fillna(0).astype(int)
+        full_calendar_teams["driving_distance"] = (
+            full_calendar_teams["driving_distance"].fillna(0).astype(int)
         )
-        full_calendar_teams.drop(columns=["city1", "city2"], inplace=True)
+
+        full_calendar_teams.rename(
+            columns={"driving_distance": "distance"}, inplace=True
+        )
         # ---------------------
 
         # ---- Calculate distances lags L1 represents the current game distance
@@ -222,5 +220,5 @@ def make_teams_distances_table_season(
 
 
 if __name__ == "__main__":
-    temas_distances = make_teams_distances_table_season(lags=[1, 7, 14])
-    temas_distances.to_csv(TEAMS_DISTANCES_PATH, index=False)
+    teams_distances = make_teams_distances_table_season(lags=[1, 3, 7, 14])
+    teams_distances.to_csv(TEAMS_DISTANCES_PATH, index=False)

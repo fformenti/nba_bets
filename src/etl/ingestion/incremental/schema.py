@@ -3,10 +3,10 @@
 CANONICAL_GAME_COLUMNS = [
     "gameId",
     "gameDate",
-    "hometeamCity",
+    "hometeamPrename",
     "hometeamName",
     "hometeamId",
-    "awayteamCity",
+    "awayteamPrename",
     "awayteamName",
     "awayteamId",
     "homeScore",

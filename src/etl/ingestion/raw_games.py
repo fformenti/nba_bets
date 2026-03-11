@@ -6,40 +6,12 @@ import pandas as pd
 from src.config.paths import (
     RAW_GAMES_PATH,
     INGESTED_GAMES_PATH,
-    TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH,
 )
-from src.etl.utils.common import coerce_numeric_columns, get_nba_season
+from src.etl.utils.common import coerce_numeric_columns, enrich_games_locations, get_nba_season
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
 setup_logging(level="INFO")
-
-
-def get_teams_locations(df: DataFrame) -> DataFrame:
-    teams_cities_states = pd.read_csv(TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH)
-    # Home team location
-    df = df.merge(
-        teams_cities_states[["teamId", "season", "city", "state"]],
-        left_on=["hometeamId", "season"],
-        right_on=["teamId", "season"],
-        how="left",
-    ).drop(columns=["teamId"])
-    df["hometeamLocation"] = df["city"] + ", " + df["state"]
-    df.drop(columns=["city", "state"], inplace=True)
-
-    # Game Location (To do: in the future it should reference arenaId)
-    df["gameLocation"] = df["hometeamLocation"]
-
-    # Away team location
-    df = df.merge(
-        teams_cities_states[["teamId", "season", "city", "state"]],
-        left_on=["awayteamId", "season"],
-        right_on=["teamId", "season"],
-        how="left",
-    ).drop(columns=["teamId"])
-    df["awayteamLocation"] = df["city"] + ", " + df["state"]
-    df.drop(columns=["city", "state"], inplace=True)
-    return df
 
 
 def parse_raw_games(df: DataFrame) -> DataFrame:
@@ -60,11 +32,6 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
         inplace=True,
     )
 
-    # Normalize
-    normalize_citi_names = {"LA": "Los Angeles"}
-    df["hometeamPrename"] = df["hometeamPrename"].replace(normalize_citi_names)
-    df["awayteamPrename"] = df["awayteamPrename"].replace(normalize_citi_names)
-
     # Handle empty strings in numeric columns (convert to NaN)
     numeric_cols = ["homeScore", "awayScore", "attendance"]
     for col in numeric_cols:
@@ -77,8 +44,8 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
     # add season column
     df["season"] = df["gameDate"].apply(get_nba_season)
 
-    # Get real city and state from teamId and season
-    df = get_teams_locations(df)
+    # Normalize city names and enrich with location columns
+    df = enrich_games_locations(df)
 
     # add postponed column
     df["postponed"] = 0
