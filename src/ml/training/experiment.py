@@ -448,7 +448,7 @@ def train_single_model(
                     cv_results_df = grid_search_info["cv_results"]
                     output_dir = Path(paths_config.outputs)
                     output_dir.mkdir(parents=True, exist_ok=True)
-                    cv_path = output_dir / f"cv_results_{model_name}.csv"
+                    cv_path = output_dir / "cv_results" / f"{model_name}.csv"
                     cv_results_df.to_csv(cv_path, index=False)
                     tracker.log_artifact(str(cv_path), artifact_path="tuning")
                 else:
@@ -538,16 +538,20 @@ def train_single_model(
 
         brier_uncal = compute_brier_score(y_test, y_test_proba_uncal)
         ece_uncal = compute_ece(y_test, y_test_proba_uncal)
-        tracker.log_metrics({
-            "test_brier_score_uncalibrated": round(brier_uncal, 4),
-            "test_ece_uncalibrated": round(ece_uncal, 4),
-        })
+        tracker.log_metrics(
+            {
+                "test_brier_score_uncalibrated": round(brier_uncal, 4),
+                "test_ece_uncalibrated": round(ece_uncal, 4),
+            }
+        )
         logger.info(f"Uncalibrated — Brier: {brier_uncal:.4f}, ECE: {ece_uncal:.4f}")
 
         calibration_results = {}
         for method in ["sigmoid", "isotonic"]:
             try:
-                cal_model = CalibratedClassifierCV(best_pipeline, method=method, cv="prefit")
+                cal_model = CalibratedClassifierCV(
+                    best_pipeline, method=method, cv="prefit"
+                )
                 cal_model.fit(X_val, y_val)
                 y_test_proba_cal = cal_model.predict_proba(X_test)
                 if y_test_proba_cal.ndim > 1:
@@ -560,28 +564,38 @@ def train_single_model(
                     "ece": ece_cal,
                     "proba": y_test_proba_cal,
                 }
-                tracker.log_metrics({
-                    f"test_brier_score_{method}": round(brier_cal, 4),
-                    f"test_ece_{method}": round(ece_cal, 4),
-                })
-                logger.info(f"Calibrated [{method}] — Brier: {brier_cal:.4f}, ECE: {ece_cal:.4f}")
+                tracker.log_metrics(
+                    {
+                        f"test_brier_score_{method}": round(brier_cal, 4),
+                        f"test_ece_{method}": round(ece_cal, 4),
+                    }
+                )
+                logger.info(
+                    f"Calibrated [{method}] — Brier: {brier_cal:.4f}, ECE: {ece_cal:.4f}"
+                )
             except Exception as e:
                 logger.warning(f"Calibration with {method} failed: {e}")
 
         if calibration_results:
-            best_cal_method = min(calibration_results, key=lambda m: calibration_results[m]["brier"])
+            best_cal_method = min(
+                calibration_results, key=lambda m: calibration_results[m]["brier"]
+            )
             if calibration_results[best_cal_method]["brier"] < brier_uncal:
                 best_calibration_method = best_cal_method
                 calibrated_pipeline = calibration_results[best_cal_method]["model"]
                 # Propagate feature_names_in_ for prediction alignment
                 if hasattr(best_pipeline, "feature_names_in_"):
-                    calibrated_pipeline.feature_names_in_ = best_pipeline.feature_names_in_
+                    calibrated_pipeline.feature_names_in_ = (
+                        best_pipeline.feature_names_in_
+                    )
                 best_pipeline = calibrated_pipeline
                 best_model_data["pipeline"] = best_pipeline
                 tracker.set_tags({"calibration_method": best_calibration_method})
                 logger.info(f"Using calibrated model ({best_calibration_method})")
             else:
-                logger.info("Calibration did not improve Brier score; keeping uncalibrated model.")
+                logger.info(
+                    "Calibration did not improve Brier score; keeping uncalibrated model."
+                )
 
     if eval_config.save_visualizations:
         logger.info("Generating visualizations...")
@@ -605,9 +619,13 @@ def train_single_model(
             if hasattr(best_pipeline, "named_steps"):
                 trained_model = best_pipeline.named_steps["model"]
                 preprocessor_fitted = best_pipeline.named_steps["preprocessor"]
-            elif hasattr(best_pipeline, "estimator") and hasattr(best_pipeline.estimator, "named_steps"):
+            elif hasattr(best_pipeline, "estimator") and hasattr(
+                best_pipeline.estimator, "named_steps"
+            ):
                 trained_model = best_pipeline.estimator.named_steps["model"]
-                preprocessor_fitted = best_pipeline.estimator.named_steps["preprocessor"]
+                preprocessor_fitted = best_pipeline.estimator.named_steps[
+                    "preprocessor"
+                ]
             else:
                 trained_model = best_pipeline
                 preprocessor_fitted = None
