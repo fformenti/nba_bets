@@ -101,6 +101,12 @@ def train_model_with_config(
         val_metrics = trainer.evaluate(X_val, y_val, prefix="val")
         training_results = {"train": train_metrics, "val": val_metrics}
 
+        logger.info(
+            f"HP tuning best CV score ({hp_config.get('scoring', 'f1')}): "
+            f"{trainer.search_results_.best_score_:.4f} "
+            f"(compare with val metrics to confirm no data leakage)"
+        )
+
         # Attach grid search metadata
         search = trainer.search_results_
         training_results["grid_search"] = {

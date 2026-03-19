@@ -32,20 +32,22 @@ def create_model(
         rf_config = model_config.get("random_forest", {})
         model = RandomForestClassifier(
             n_estimators=rf_config.get("n_estimators", 100),
-            max_depth=rf_config.get("max_depth"),
+            max_depth=rf_config.get("max_depth", 10),
             min_samples_split=rf_config.get("min_samples_split", 20),
-            min_samples_leaf=rf_config.get("min_samples_leaf", 10),
+            min_samples_leaf=rf_config.get("min_samples_leaf", 15),
             max_features=rf_config.get("max_features", "sqrt"),
+            max_samples=rf_config.get("max_samples", 0.7),
             class_weight=rf_config.get("class_weight", "balanced"),
             random_state=random_state,
             n_jobs=-1,
         )
         param_grid = {
-            "model__n_estimators": [50, 100, 200, 300],
-            "model__max_depth": [5, 7, 10, 15, None],
-            "model__min_samples_split": [10, 20, 30, 50],
-            "model__min_samples_leaf": [5, 10, 15, 20],
-            "model__max_features": ["sqrt", "log2", 0.5, 0.7],
+            "model__n_estimators": [100, 200, 300, 500],
+            "model__max_depth": [5, 7, 10],
+            "model__min_samples_split": [20, 30, 50],
+            "model__min_samples_leaf": [10, 15, 20, 30],
+            "model__max_features": ["sqrt", "log2", 0.5],
+            "model__max_samples": [0.6, 0.7, 0.8],
         }
     elif model_name == "gradient_boosting":
         gb_config = model_config.get("gradient_boosting", {})
@@ -55,15 +57,17 @@ def create_model(
             max_depth=gb_config.get("max_depth", 5),
             min_samples_split=gb_config.get("min_samples_split", 20),
             min_samples_leaf=gb_config.get("min_samples_leaf", 10),
+            max_features=gb_config.get("max_features", "sqrt"),
             random_state=random_state,
         )
         param_grid = {
             "model__n_estimators": [50, 100, 200, 300],
-            "model__learning_rate": [0.01, 0.05, 0.1, 0.2],
+            "model__learning_rate": [0.01, 0.05, 0.1],
             "model__max_depth": [3, 4, 5, 6],
             "model__min_samples_split": [10, 20, 30, 50],
             "model__min_samples_leaf": [5, 10, 15, 20],
-            "model__subsample": [0.8, 0.9, 1.0],
+            "model__subsample": [0.7, 0.8, 0.9],
+            "model__max_features": ["sqrt", "log2", 0.5],
         }
     elif model_name == "xgboost":
         xgb_config = model_config.get("xgboost", {})
@@ -99,6 +103,8 @@ def create_model(
             min_child_samples=lgbm_config.get("min_child_samples", 20),
             subsample=lgbm_config.get("subsample", 0.8),
             colsample_bytree=lgbm_config.get("colsample_bytree", 0.8),
+            reg_alpha=lgbm_config.get("reg_alpha", 0.1),
+            reg_lambda=lgbm_config.get("reg_lambda", 1.0),
             class_weight=lgbm_config.get("class_weight", "balanced"),
             verbose=lgbm_config.get("verbose", -1),
             random_state=random_state,
@@ -107,11 +113,13 @@ def create_model(
         param_grid = {
             "model__n_estimators": [100, 200, 300, 500],
             "model__learning_rate": [0.01, 0.05, 0.1],
-            "model__max_depth": [4, 6, 8, -1],
-            "model__num_leaves": [15, 31, 63],
-            "model__min_child_samples": [10, 20, 30],
+            "model__max_depth": [4, 6, 8],
+            "model__num_leaves": [15, 23, 31],
+            "model__min_child_samples": [20, 30, 50],
             "model__subsample": [0.7, 0.8, 0.9],
             "model__colsample_bytree": [0.6, 0.8, 1.0],
+            "model__reg_alpha": [0, 0.1, 0.5],
+            "model__reg_lambda": [0.5, 1.0, 2.0],
         }
     else:
         raise ValueError(f"Unknown model name: {model_name}")

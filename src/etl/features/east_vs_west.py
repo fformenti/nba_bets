@@ -94,21 +94,37 @@ def make_east_west_record(games, location=None):
         by=["season", "gameDateOnlyStr"]
     ).reset_index(drop=True)
 
-    east_west_record_by_date["east_wins"] = east_west_record_by_date.groupby(
-        ["season"]
-    )["east_wins_date"].cumsum()
+    east_west_record_by_date["east_wins"] = (
+        east_west_record_by_date.groupby("season")["east_wins_date"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
 
-    east_west_record_by_date["west_wins"] = east_west_record_by_date.groupby(
-        ["season"]
-    )["west_wins_date"].cumsum()
+    east_west_record_by_date["west_wins"] = (
+        east_west_record_by_date.groupby("season")["west_wins_date"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
 
-    east_west_record_by_date["games_played_at_east"] = east_west_record_by_date.groupby(
-        ["season"]
-    )["games_played_date_at_east"].cumsum()
+    east_west_record_by_date["games_played_at_east"] = (
+        east_west_record_by_date.groupby("season")["games_played_date_at_east"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
 
-    east_west_record_by_date["games_played_at_west"] = east_west_record_by_date.groupby(
-        ["season"]
-    )["games_played_date_at_west"].cumsum()
+    east_west_record_by_date["games_played_at_west"] = (
+        east_west_record_by_date.groupby("season")["games_played_date_at_west"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
 
     east_west_record_by_date.drop(
         columns=[
@@ -124,14 +140,13 @@ def make_east_west_record(games, location=None):
         + east_west_record_by_date["games_played_at_east"]
     )
 
+    safe_gp = east_west_record_by_date["games_played_east_vs_west"].replace(0, float("nan"))
     east_west_record_by_date[f"east_record{suffix}"] = (
-        east_west_record_by_date["east_wins"]
-        / east_west_record_by_date["games_played_east_vs_west"]
-    )
+        east_west_record_by_date["east_wins"] / safe_gp
+    ).fillna(0.0)
     east_west_record_by_date[f"west_record{suffix}"] = (
-        east_west_record_by_date["west_wins"]
-        / east_west_record_by_date["games_played_east_vs_west"]
-    )
+        east_west_record_by_date["west_wins"] / safe_gp
+    ).fillna(0.0)
 
     if location is None:
         east_west_record_by_date["east_record_adjusted"] = (

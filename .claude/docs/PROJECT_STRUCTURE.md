@@ -130,6 +130,23 @@ nba_bets/
 │   └── utils/
 │       └── logging_config.py                   # Shared logging setup
 │
+├── outputs/                                    # Training artifacts (gitignored)
+│   ├── all/                                    # Outputs for train_all experiment
+│   │   ├── tables/                             # CV result tables
+│   │   ├── analysis/                           # Error analysis outputs
+│   │   ├── feature_selection/                  # Boruta-SHAP outputs
+│   │   └── visualizations/                     # Plots (ROC, confusion matrix, etc.)
+│   ├── different/                              # Outputs for train_different experiment
+│   │   ├── tables/
+│   │   ├── analysis/
+│   │   ├── feature_selection/
+│   │   └── visualizations/
+│   └── same/                                   # Outputs for train_same experiment
+│       ├── tables/
+│       ├── analysis/
+│       ├── feature_selection/
+│       └── visualizations/
+│
 ├── sandbox/                                    # Notebooks for exploration
 ├── mlruns/                                     # MLflow run tracking data
 ├── mlflow.db                                   # MLflow backend database

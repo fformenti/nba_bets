@@ -12,8 +12,8 @@ data:
 # Use runs:/ URIs when register_model is false (artifact_path = nba_{model}_{conference}).
 # Use models:/ URIs only when register_model is true in training config.
 model_uris:
-  same: "runs:/60ac9b1fc231422a945dd627467266f0/nba_xgboost_same"
-  different: "runs:/92e6e1fabc9643cf8c733be08ea9c00e/nba_xgboost_different"
+  same: "runs:/4f4b53f0de5c4716aa571a069dceebbe/nba_xgboost_same"
+  different: "runs:/77edd1b51a4f43b394b43814e33e27fb/nba_xgboost_different"
   all: "runs:/a3d6a327ba564baeb37e4a4ea8eae5ed/nba_xgboost_all"
 
 mlflow:

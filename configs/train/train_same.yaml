@@ -100,10 +100,11 @@ model:
   # Model-specific parameters + per-model hyperparameter tuning
   random_forest:
     n_estimators: 300
-    max_depth: 15
+    max_depth: 10
     min_samples_split: 20
-    min_samples_leaf: 10
+    min_samples_leaf: 15
     max_features: "sqrt"
+    max_samples: 0.7
     class_weight: "balanced"
     hyperparameter_tuning:
       enabled: true
@@ -113,10 +114,11 @@ model:
       scoring: "accuracy"
       param_grid:
         n_estimators: [100, 200, 300, 500]
-        max_depth: [7, 10, 15, 20]
+        max_depth: [5, 7, 10]
         min_samples_split: [20, 30, 50]
-        min_samples_leaf: [3, 5, 10, 15]
+        min_samples_leaf: [10, 15, 20, 30]
         max_features: ["sqrt", "log2", 0.5]
+        max_samples: [0.6, 0.7, 0.8]
 
   gradient_boosting:
     n_estimators: 300
@@ -124,6 +126,7 @@ model:
     max_depth: 5
     min_samples_split: 20
     min_samples_leaf: 10
+    max_features: "sqrt"
     hyperparameter_tuning:
       enabled: true
       method: "random"
@@ -137,6 +140,7 @@ model:
         min_samples_split: [10, 20, 30, 50]
         min_samples_leaf: [5, 10, 15, 20]
         subsample: [0.7, 0.8, 0.9]
+        max_features: ["sqrt", "log2", 0.5]
 
   xgboost:
     n_estimators: 300
@@ -169,6 +173,8 @@ model:
     min_child_samples: 20
     subsample: 0.8
     colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
     class_weight: "balanced"
     verbose: -1
     hyperparameter_tuning:
@@ -180,11 +186,13 @@ model:
       param_grid:
         n_estimators: [100, 200, 300, 500]
         learning_rate: [0.01, 0.05, 0.1]
-        max_depth: [4, 6, 8, -1]
-        num_leaves: [15, 31, 63]
-        min_child_samples: [10, 20, 30]
+        max_depth: [4, 6, 8]
+        num_leaves: [15, 23, 31]
+        min_child_samples: [20, 30, 50]
         subsample: [0.7, 0.8, 0.9]
         colsample_bytree: [0.6, 0.8, 1.0]
+        reg_alpha: [0, 0.1, 0.5]
+        reg_lambda: [0.5, 1.0, 2.0]
 
 evaluation:
   save_visualizations: true
