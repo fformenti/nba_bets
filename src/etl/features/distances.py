@@ -76,14 +76,6 @@ def make_teams_games_dates(games: Optional[pd.DataFrame] = None) -> pd.DataFrame
     return pd.concat([home_games, away_games]).reset_index(drop=True)
 
 
-def conditional_backfill_group(group):
-    next_loc = group["next_gameLocation"].bfill().infer_objects(copy=False)
-    group["current_location"] = group["current_location"].mask(
-        group["current_location"].isna() & (next_loc == group["teamLocation"]),
-        next_loc,
-    )
-    return group
-
 
 def make_teams_distances_table_season(
     lags: list, games: Optional[pd.DataFrame] = None
@@ -143,9 +135,14 @@ def make_teams_distances_table_season(
             ["teamId"]
         )["gameLocation"].shift(-1)
 
-        full_calendar_teams = full_calendar_teams.groupby(
-            "teamId", group_keys=False
-        ).apply(conditional_backfill_group, include_groups=False)
+        _next_filled = full_calendar_teams.groupby("teamId")["next_gameLocation"].transform(
+            lambda x: x.bfill().infer_objects(copy=False)
+        )
+        full_calendar_teams["current_location"] = full_calendar_teams["current_location"].mask(
+            full_calendar_teams["current_location"].isna()
+            & (_next_filled == full_calendar_teams["teamLocation"]),
+            _next_filled,
+        )
 
         # to do: repensar se um basta eu fazer um backfill na tabela toda
         full_calendar_teams["current_location"] = full_calendar_teams.groupby("teamId")[
@@ -163,16 +160,12 @@ def make_teams_distances_table_season(
         )["current_location"].shift(1)
 
         # Fill Na for teams that didn't play the first game at home
-        def if_na_select_column(group):
-            group["previous_location"] = group["previous_location"].mask(
-                group["previous_location"].isna(),
-                group["teamLocation"],
-            )
-            return group
-
-        full_calendar_teams = full_calendar_teams.groupby(
-            "teamId", group_keys=False
-        ).apply(if_na_select_column, include_groups=False)
+        full_calendar_teams["previous_location"] = full_calendar_teams[
+            "previous_location"
+        ].mask(
+            full_calendar_teams["previous_location"].isna(),
+            full_calendar_teams["teamLocation"],
+        )
         # ---------------------
 
         # ---- Fill Na for teams that didn't play in the first day of the season

@@ -16,7 +16,8 @@ AWAY_ON_ROAD_SUFFIX = f"{AWAY_SUFFIX}_on_road"
 
 def create_delta_features(
     df: pd.DataFrame,
-    lags: List[int],
+    record_lags: List[int],
+    point_differential_lags: List[int],
     location_lags,
     distances_lags,
 ) -> pd.DataFrame:
@@ -27,22 +28,29 @@ def create_delta_features(
     ----------
     df : pd.DataFrame
         Input DataFrame with home and away features
-    lags : list
-        List of lags to create delta features for
-    feature_names : list, optional
-        List of feature base names (without prefix). If None, uses common features.
+    record_lags : list
+        List of lags to create record delta features for
+    point_differential_lags : list
+        List of lags to create point differential delta features for
 
     Returns
     -------
     pd.DataFrame
         DataFrame with delta features added
     """
-    record_features = ["record" + "_L" + str(lag) for lag in lags]
-    pts_diff_features = ["pts_diff_avg" + "_L" + str(lag) for lag in lags]
+    record_features = ["record" + "_L" + str(lag) for lag in record_lags]
+    pts_diff_features = [
+        "pts_diff_avg" + "_L" + str(lag) for lag in point_differential_lags
+    ]
     distances_features = ["distance_L" + str(lag) for lag in distances_lags]
     rested_days_features = ["rested_days"]
+    last_season_record_features = ["last_season_record"]
     feature_names = (
-        record_features + pts_diff_features + distances_features + rested_days_features
+        record_features
+        + pts_diff_features
+        + distances_features
+        + rested_days_features
+        + last_season_record_features
     )
 
     df = df.copy()
@@ -63,7 +71,11 @@ def create_delta_features(
     location_pts_diff_features = [
         "pts_diff_avg" + "_L" + str(lag) for lag in location_lags
     ]
-    feature_names = location_record_features + location_pts_diff_features
+    feature_names = (
+        location_record_features
+        + location_pts_diff_features
+        + last_season_record_features
+    )
     for feature in feature_names:
         home_col = f"{feature}_{HOME_AT_HOME_SUFFIX}"
         away_col = f"{feature}_{AWAY_ON_ROAD_SUFFIX}"

@@ -129,14 +129,16 @@ def run_incremental_pipeline(
         return regular_season_games
 
     feature_config = load_experiment_config(PROJECT_ROOT / config.feature_config_path)
-    lags = feature_config.feature_engineering.lags
+    record_lags = feature_config.feature_engineering.record_lags
+    point_differential_lags = feature_config.feature_engineering.point_differential_lags
     location_lags = feature_config.feature_engineering.location_lags
 
     teams_history = load_teams_history_table()
     games_with_conference = add_conference(regular_season_games, teams_history)
     create_features_tables(
         games_with_conference,
-        lags=lags,
+        record_lags=record_lags,
+        point_differential_lags=point_differential_lags,
         location_lags=location_lags,
     )
     final_features = merge_features(games_with_conference)

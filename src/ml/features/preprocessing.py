@@ -290,7 +290,9 @@ def create_preprocessing_pipeline(
         ]
         transformers.append(("categorical", Pipeline(cat_steps), categorical_features))
 
-    return ColumnTransformer(
+    ct = ColumnTransformer(
         transformers=transformers,
         remainder="passthrough",
     )
+    ct.set_output(transform="pandas")
+    return ct

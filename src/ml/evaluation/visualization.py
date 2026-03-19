@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Optional
 from sklearn.base import BaseEstimator
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 # Set style
@@ -340,4 +341,293 @@ def plot_roc_curve(
 
     plt.tight_layout()
 
+    return fig
+
+
+def plot_prediction_accuracy_by_bin(
+    y_true: pd.Series,
+    y_pred_proba: np.ndarray,
+    title: str = "Prediction Accuracy by Probability Bin",
+    figsize: tuple = (12, 7),
+) -> plt.Figure:
+    """
+    Plot model accuracy grouped by 5% prediction probability bins.
+
+    For each bin, accuracy is the fraction of correct predictions where the
+    predicted class is home (proba >= 0.5) or away (proba < 0.5).
+    """
+    bins = np.arange(0, 1.05, 0.05)
+    bin_indices = np.digitize(y_pred_proba, bins) - 1
+    bin_indices = np.clip(bin_indices, 0, len(bins) - 2)
+
+    midpoints = []
+    accuracies = []
+    counts = []
+
+    for i in range(len(bins) - 1):
+        mask = bin_indices == i
+        n = mask.sum()
+        if n == 0:
+            continue
+
+        bin_true = np.array(y_true)[mask]
+        bin_proba = y_pred_proba[mask]
+        bin_pred = (bin_proba >= 0.5).astype(int)
+        acc = (bin_pred == bin_true).mean()
+
+        midpoint = (bins[i] + bins[i + 1]) / 2
+        midpoints.append(midpoint)
+        accuracies.append(acc)
+        counts.append(n)
+
+    midpoints = np.array(midpoints)
+    accuracies = np.array(accuracies)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.plot(midpoints, accuracies, "o-", color="steelblue", lw=2, label="Model Accuracy")
+
+    # Reference line: expected accuracy for a perfectly calibrated model
+    ref_x = np.linspace(0, 1, 100)
+    ref_y = np.maximum(ref_x, 1 - ref_x)
+    ax.plot(ref_x, ref_y, "--", color="gray", lw=1.5, label="Perfect Calibration")
+
+    # Annotate sample counts
+    for x, y, n in zip(midpoints, accuracies, counts):
+        ax.annotate(f"n={n}", (x, y), textcoords="offset points",
+                    xytext=(0, 10), ha="center", fontsize=8, color="dimgray")
+
+    ax.set_xlabel("Predicted Probability (Home Win)", fontsize=12)
+    ax.set_ylabel("Accuracy", fontsize=12)
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0.4, 1.05])
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    return fig
+
+
+def plot_calibration_curve(
+    y_true,
+    y_pred_proba_uncalibrated: np.ndarray,
+    y_pred_proba_calibrated: np.ndarray,
+    calibration_method: str = "sigmoid",
+    n_bins: int = 10,
+    title: str = "Calibration Curve (Reliability Diagram)",
+    figsize: tuple = (12, 7),
+) -> plt.Figure:
+    """Plot calibration curves comparing uncalibrated vs calibrated probabilities."""
+    from src.ml.evaluation.metrics import compute_brier_score
+
+    fraction_pos_uncal, mean_pred_uncal = calibration_curve(
+        y_true, y_pred_proba_uncalibrated, n_bins=n_bins, strategy="uniform"
+    )
+    fraction_pos_cal, mean_pred_cal = calibration_curve(
+        y_true, y_pred_proba_calibrated, n_bins=n_bins, strategy="uniform"
+    )
+
+    brier_uncal = compute_brier_score(y_true, y_pred_proba_uncalibrated)
+    brier_cal = compute_brier_score(y_true, y_pred_proba_calibrated)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.plot(
+        [0, 1], [0, 1], "--", color="gray", lw=1.5, label="Perfectly Calibrated"
+    )
+    ax.plot(
+        mean_pred_uncal, fraction_pos_uncal, "o-",
+        color="steelblue", lw=2,
+        label=f"Uncalibrated (Brier={brier_uncal:.4f})",
+    )
+    ax.plot(
+        mean_pred_cal, fraction_pos_cal, "s-",
+        color="darkorange", lw=2,
+        label=f"Calibrated [{calibration_method}] (Brier={brier_cal:.4f})",
+    )
+
+    # Annotate bin counts for uncalibrated
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    for pred_val, frac_val in zip(mean_pred_uncal, fraction_pos_uncal):
+        bin_idx = np.clip(np.digitize(pred_val, bin_edges) - 1, 0, n_bins - 1)
+        mask = (y_pred_proba_uncalibrated >= bin_edges[bin_idx]) & (
+            y_pred_proba_uncalibrated < bin_edges[bin_idx + 1]
+        )
+        n = mask.sum()
+        ax.annotate(
+            f"n={n}", (pred_val, frac_val),
+            textcoords="offset points", xytext=(0, 10),
+            ha="center", fontsize=8, color="dimgray",
+        )
+
+    ax.set_xlabel("Mean Predicted Probability", fontsize=12)
+    ax.set_ylabel("Fraction of Positives", fontsize=12)
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_boruta_shap_results(
+    selector,
+    top_n: int = 30,
+    title: str = "Boruta-SHAP Feature Selection",
+    figsize: tuple = (12, 10),
+) -> plt.Figure:
+    """Plot Boruta-SHAP results as a color-coded horizontal bar chart.
+
+    Parameters
+    ----------
+    selector : BorutaShapSelector
+        Fitted selector with feature_importances_ and get_support().
+    top_n : int
+        Number of top features to display.
+    title : str
+        Plot title.
+    figsize : tuple
+        Figure size.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    support = selector.get_support()
+    importances = selector.feature_importances_
+
+    # Sort by importance descending, take top_n
+    sorted_features = sorted(importances, key=importances.get, reverse=True)[:top_n]
+
+    # Reverse for horizontal bar chart (top feature at top)
+    sorted_features = sorted_features[::-1]
+    values = [importances[f] for f in sorted_features]
+
+    color_map = {"confirmed": "#2ecc71", "rejected": "#e74c3c", "tentative": "#f1c40f"}
+    colors = [color_map.get(support.get(f, "tentative"), "#95a5a6") for f in sorted_features]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.barh(range(len(sorted_features)), values, color=colors)
+    ax.set_yticks(range(len(sorted_features)))
+    ax.set_yticklabels(sorted_features)
+    ax.set_xlabel("Mean |SHAP| Importance")
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.grid(True, alpha=0.3, axis="x")
+
+    # Max shadow threshold line (average across iterations)
+    if selector.max_shadow_importances_:
+        avg_shadow = np.mean(selector.max_shadow_importances_)
+        ax.axvline(x=avg_shadow, color="gray", linestyle="--", lw=1.5, label=f"Avg max shadow ({avg_shadow:.4f})")
+        ax.legend(fontsize=10)
+
+    # Legend patches
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor="#2ecc71", label="Confirmed"),
+        Patch(facecolor="#e74c3c", label="Rejected"),
+        Patch(facecolor="#f1c40f", label="Tentative"),
+    ]
+    ax.legend(handles=legend_elements, loc="lower right", fontsize=10)
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_shap_summary(
+    model,
+    X_transformed: np.ndarray,
+    feature_names: list,
+    title: str = "SHAP Feature Contribution",
+    top_n: int = 20,
+    max_samples: int = 500,
+    figsize: tuple = (12, 10),
+) -> plt.Figure:
+    """
+    Generate a SHAP beeswarm summary plot for tree-based models.
+
+    Parameters
+    ----------
+    model : tree-based estimator (RF, GB, XGB, LGBM)
+    X_transformed : np.ndarray
+        Preprocessed feature matrix (already passed through the preprocessor)
+    feature_names : list
+        Feature names corresponding to X_transformed columns
+    title : str
+        Plot title
+    top_n : int
+        Number of top features to display
+    max_samples : int
+        Max rows to use for SHAP computation (subsampled for performance)
+    figsize : tuple
+        Figure size
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    import shap
+
+    if hasattr(X_transformed, "values"):
+        X_transformed = X_transformed.values
+    X_transformed = np.asarray(X_transformed, dtype=np.float64)
+
+    # Subsample for performance
+    if X_transformed.shape[0] > max_samples:
+        rng = np.random.RandomState(42)
+        idx = rng.choice(X_transformed.shape[0], max_samples, replace=False)
+        X_transformed = X_transformed[idx]
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_transformed)
+
+    # For binary classification some models return list [neg_class, pos_class]
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+    # Newer SHAP returns 3D array (n_samples, n_features, n_classes) for tree ensembles
+    elif shap_values.ndim == 3:
+        shap_values = shap_values[:, :, 1]
+
+    # Clamp top_n to actual number of features
+    n_features = shap_values.shape[1]
+    top_n = min(top_n, n_features)
+
+    # Limit to top_n features by mean |SHAP|
+    mean_abs = np.abs(shap_values).mean(axis=0)
+    top_idx = np.argsort(mean_abs)[::-1][:top_n]
+    shap_values_top = shap_values[:, top_idx]
+    X_top = X_transformed[:, top_idx]
+    feature_names_top = [feature_names[i] for i in top_idx]
+
+    # Mean |SHAP| per top feature (sorted descending = top feature at y=0)
+    mean_abs_top = mean_abs[top_idx]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    plt.sca(ax)
+    shap.summary_plot(
+        shap_values_top,
+        X_top,
+        feature_names=feature_names_top,
+        show=False,
+        plot_size=None,
+    )
+
+    # Overlay mean |SHAP| annotations at the right edge of the plot
+    # SHAP beeswarm places the top feature at the highest y position (top_n - 1)
+    x_max = ax.get_xlim()[1]
+    for i, val in enumerate(mean_abs_top):
+        y_pos = top_n - 1 - i
+        ax.annotate(
+            f"avg |SHAP|={val:.4f}",
+            (x_max, y_pos),
+            fontsize=7.5,
+            va="center",
+            ha="right",
+            color="black",
+            fontweight="bold",
+        )
+
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+    plt.tight_layout()
     return fig

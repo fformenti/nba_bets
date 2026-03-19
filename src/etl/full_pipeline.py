@@ -5,6 +5,8 @@ This module provides a high-level interface to run the complete data processing 
 from raw data to final features table.
 """
 
+import argparse
+
 import pandas as pd
 from pathlib import Path
 
@@ -16,7 +18,6 @@ from src.config.paths import (
     TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
     REGULAR_SEASON_GAMES_FEATURES_PATH,
-    PROJECT_ROOT,
     INGESTED_GAMES_PATH,
     POSTPONED_GAMES_PATH,
 )
@@ -37,11 +38,12 @@ from src.ml.config.loader import load_experiment_config
 
 
 def run_full_pipeline(
-    raw_games_path: Path = None,
-    teams_history_path: Path = None,
-    output_path: Path = None,
-    current_season_start_year: int = None,
-    earliest_date: str = None,
+    config_path: str,
+    raw_games_path: Path | None = None,
+    teams_history_path: Path | None = None,
+    output_path: Path | None = None,
+    current_season_start_year: int | None = None,
+    earliest_date: str | None = None,
 ):
     """
     Run the complete data processing pipeline.
@@ -56,6 +58,8 @@ def run_full_pipeline(
 
     Parameters
     ----------
+    config_path : str
+        Path to experiment config YAML.
     raw_games_path : Path, optional
         Path to raw games CSV. If None, uses default from constants.
     teams_history_path : Path, optional
@@ -74,12 +78,12 @@ def run_full_pipeline(
     print("=" * 60)
 
     # Step 0: Load configuration
-    config_path = PROJECT_ROOT / "configs" / "my_experiment.yaml"
     config = load_experiment_config(config_path)
     filters_config = config.filters
     feature_engineering_config = config.feature_engineering
     earliest_date = filters_config.start_date
-    lags = feature_engineering_config.lags
+    record_lags = feature_engineering_config.record_lags
+    point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
 
     # Step 1: Load teams history table (create it if missing)
@@ -134,7 +138,9 @@ def run_full_pipeline(
 
     # Step 4: Create feature tables
     print("\n[Step 4/5] Creating feature tables...")
-    create_features_tables(games_with_conference, lags, location_lags)
+    create_features_tables(
+        games_with_conference, record_lags, point_differential_lags, location_lags
+    )
     print("✓ Created all feature tables")
 
     # Step 5: Merge features
@@ -162,9 +168,21 @@ def run_full_pipeline(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run the full data processing pipeline"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to experiment config YAML (e.g. configs/train/train_same.yaml)",
+    )
+    args = parser.parse_args()
+
     earliest_date = EARLIEST_GAME_DATE
     current_season_start_year = CURRENT_SEASON_START_YEAR
     run_full_pipeline(
+        config_path=args.config,
         raw_games_path=INGESTED_GAMES_UPDATED_HISTORY_PATH,
         earliest_date=earliest_date,
         current_season_start_year=current_season_start_year,

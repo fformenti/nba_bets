@@ -1,9 +1,13 @@
 """Pydantic schemas for experiment configuration."""
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
-from src.config.constants import EARLIEST_GAME_DATE
+from src.config.constants import (
+    DEFAULT_METADATA_COLUMNS,
+    EARLIEST_GAME_DATE,
+    ENRICHED_COLUMNS,
+)
 
 
 class DataConfig(BaseModel):
@@ -15,16 +19,25 @@ class DataConfig(BaseModel):
     drop_na: bool = True
 
 
+class WeightingConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    saturation_K: int = Field(
+        default=30,
+        description="Games-played saturation point for sample weights. "
+        "Observations where min(games_played_HT, games_played_VT) >= K get weight 1.0.",
+    )
+
+
 class FiltersConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     start_date: str | None = EARLIEST_GAME_DATE
-    minimum_games: int = 10
+    minimum_games_train: int = 15
     conference_filter: str = Field(
-        default="all",
-        description="Conference filter type: 'same' (same conference only), "
-        "'different' (different conferences only), or 'all' (all games). "
-        "Determines which conference features to create.",
+        default="same",
+        description="Conference filter type: 'same', 'different', or 'all'.",
     )
 
 
@@ -40,12 +53,28 @@ class SplittingConfig(BaseModel):
 class FeatureEngineeringConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    lags: list[int] = Field(default_factory=list)
+    record_lags: list[int] = Field(default_factory=list)
+    point_differential_lags: list[int] = Field(default_factory=list)
     location_lags: list[int] = Field(default_factory=list)
     distances_lags: list[int] = Field(default_factory=list)
-    metadata_columns: list[str] = Field(default_factory=list)
-    originally_enriched_columns: list[str] = Field(default_factory=list)
+    metadata_columns: list[str] = Field(
+        default_factory=lambda: DEFAULT_METADATA_COLUMNS
+    )
+    originally_enriched_columns: list[str] = Field(
+        default_factory=lambda: ENRICHED_COLUMNS
+    )
     exclude_columns: list[str] = Field(default_factory=list)
+
+
+class FeatureSelectionConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    method: str = "boruta_shap"
+    n_iterations: int = 20
+    significance_level: float = 0.05
+    include_tentative: bool = True
+    random_state: int = 42
 
 
 class PreprocessingConfig(BaseModel):
@@ -61,9 +90,14 @@ class HyperparameterTuningConfig(BaseModel):
 
     enabled: bool = False
     method: str = "random"
-    n_iter: int = 20
-    cv_folds: int = 3
+    n_iter: int = 50
+    cv_folds: int = 5
     scoring: str = "accuracy"
+    cv_strategy: str = Field(
+        default="timeseries",
+        description="CV strategy: 'timeseries' (TimeSeriesSplit) or 'kfold' (standard k-fold).",
+    )
+    param_grid: Optional[Dict[str, list]] = None
 
 
 class ModelConfig(BaseModel):
@@ -71,14 +105,11 @@ class ModelConfig(BaseModel):
 
     type: str = "classification"
     name: str = "random_forest"
-    register_model: bool = Field(
-        default=True,
-        description="Whether to register the model in MLflow Model Registry. "
-        "Set to False for experimental runs (use run-based URIs instead).",
-    )
     hyperparameter_tuning: HyperparameterTuningConfig = HyperparameterTuningConfig()
     random_forest: dict[str, Any] = Field(default_factory=dict)
     gradient_boosting: dict[str, Any] = Field(default_factory=dict)
+    xgboost: dict[str, Any] = Field(default_factory=dict)
+    lgbm: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationConfig(BaseModel):
@@ -96,17 +127,42 @@ class PathsConfig(BaseModel):
     save_local_models: bool = True
 
 
+class MLflowConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    experiment_name: str = "nba_bets_classification"
+    tracking_uri: str = "sqlite:///mlflow.db"
+    register_model: bool = Field(
+        default=True,
+        description="Whether to register the model in MLflow Model Registry. "
+        "Set to False for experimental runs (use run-based URIs instead).",
+    )
+
+
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
+    description: str | None = None
+    tags: dict[str, str] = Field(default_factory=dict)
     data: DataConfig = DataConfig()
     filters: FiltersConfig = FiltersConfig()
+    weighting: WeightingConfig = WeightingConfig()
     splitting: SplittingConfig = SplittingConfig()
     feature_engineering: FeatureEngineeringConfig = FeatureEngineeringConfig()
     preprocessing: PreprocessingConfig = PreprocessingConfig()
+    feature_selection: FeatureSelectionConfig = FeatureSelectionConfig()
     model: ModelConfig = ModelConfig()
     evaluation: EvaluationConfig = EvaluationConfig()
     paths: PathsConfig = PathsConfig()
+    mlflow: MLflowConfig = MLflowConfig()
+
+
+class PredictionPathsConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    input_dir: str = "data/raw/incremental/upcoming_games"
+    output: str = "data/predictions/upcoming_games_predictions.csv"
+    features: str = "data/processed/games_features.csv"
 
 
 class PredictionConfig(BaseModel):
@@ -115,24 +171,16 @@ class PredictionConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     data: DataConfig = DataConfig()
-    input_dir: str = "data/raw/incremental/upcoming_games"
-    output_path: str = "data/predictions/upcoming_games_predictions.csv"
-    features_path: str = "data/processed/games_features.csv"
-    feature_config_path: str = "configs/my_experiment.yaml"
+    paths: PredictionPathsConfig = PredictionPathsConfig()
+    feature_config_path: Optional[str] = None
 
-    model_uri: str = Field(
+    model_uris: dict[str, str] = Field(
         ...,
-        description="MLflow model URI (e.g., 'models:/nba_classification_random_forest/Production' or 'runs:/<run_id>/model')",
+        description="MLflow model URIs keyed by conference filter type, e.g. "
+        "{'same': 'models:/...', 'different': 'models:/...'}",
     )
 
-    tracking_uri: Optional[str] = None
-    experiment_name: str = "nba_bets_predictions"
+    mlflow: MLflowConfig = MLflowConfig(experiment_name="nba_bets_predictions")
 
-    conference_filter: str = Field(
-        default="different",
-        description="Filter games by conference matchup: different, same, or all. "
-        "Note: This is used for filtering only. Feature engineering uses "
-        "conference_filter from the experiment config.",
-    )
     allow_missing_features: bool = False
     max_files: Optional[int] = None

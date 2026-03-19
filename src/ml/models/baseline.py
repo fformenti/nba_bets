@@ -69,8 +69,8 @@ class RecordDifferenceBaseline(ThresholdBaseline):
     def __init__(self, feature_column: str = "record_L82_delta"):
         super().__init__(
             feature_column=feature_column,
-            name="best_record_baseline",
-            name_caption="Best Record Baseline",
+            name="record_baseline",
+            name_caption="Record Baseline",
         )
 
 

@@ -9,12 +9,14 @@ from sklearn.base import BaseEstimator
 from sklearn.model_selection import (
     GridSearchCV,
     RandomizedSearchCV,
+    TimeSeriesSplit,
     cross_validate,
 )
 
 from src.ml.evaluation.metrics import (
     compute_regression_metrics,
     compute_classification_metrics,
+    format_metrics_line,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,7 @@ class ModelTrainer:
         y_train: pd.Series,
         X_val: Optional[pd.DataFrame] = None,
         y_val: Optional[pd.Series] = None,
+        sample_weight: Optional[np.ndarray] = None,
     ) -> Dict[str, Any]:
         """
         Train the model.
@@ -66,6 +69,8 @@ class ModelTrainer:
             Validation features
         y_val : pd.Series, optional
             Validation target
+        sample_weight : np.ndarray, optional
+            Per-sample weights for training
 
         Returns
         -------
@@ -81,7 +86,10 @@ class ModelTrainer:
             raise ValueError("X_val and y_val must both be provided or both be None")
 
         logger.info(f"Training {self.task_type} model on {len(X_train)} samples")
-        self.model.fit(X_train, y_train)
+        fit_params: Dict[str, Any] = {}
+        if sample_weight is not None:
+            fit_params["model__sample_weight"] = sample_weight
+        self.model.fit(X_train, y_train, **fit_params)
         self.is_fitted = True
 
         # Evaluate on training set
@@ -92,12 +100,18 @@ class ModelTrainer:
 
         results = {"train": train_metrics}
 
+        train_line = format_metrics_line(train_metrics, prefix="train")
+        if train_line:
+            logger.info(f"Train:      {train_line}")
+
         # Evaluate on validation set if provided
         if X_val is not None and y_val is not None:
             val_pred = self.model.predict(X_val)
             val_metrics = self._compute_metrics(y_val, val_pred, X_val, prefix="val")
             results["val"] = val_metrics
-            logger.info(f"Validation metrics: {val_metrics}")
+            val_line = format_metrics_line(val_metrics, prefix="val")
+            if val_line:
+                logger.info(f"Validation: {val_line}")
 
         return results
 
@@ -164,6 +178,8 @@ class ModelTrainer:
         cv: int = 5,
         n_iter: int = 100,
         scoring: Optional[str] = None,
+        cv_strategy: str = "timeseries",
+        sample_weight: Optional[np.ndarray] = None,
     ) -> BaseEstimator:
         """
         Perform hyperparameter tuning.
@@ -184,6 +200,10 @@ class ModelTrainer:
             Number of iterations for random search
         scoring : str, optional
             Scoring metric. If None, uses default for task type.
+        cv_strategy : str, default='timeseries'
+            CV strategy: 'timeseries' (TimeSeriesSplit) or 'kfold' (standard k-fold).
+        sample_weight : np.ndarray, optional
+            Per-sample weights passed to fit via model__sample_weight.
 
         Returns
         -------
@@ -204,19 +224,21 @@ class ModelTrainer:
         if method not in ["grid", "random"]:
             raise ValueError(f"method must be 'grid' or 'random', got {method}")
 
+        cv_splitter = TimeSeriesSplit(n_splits=cv) if cv_strategy == "timeseries" else cv
+
         logger.info(
             f"Starting {method} search hyperparameter tuning: "
-            f"cv={cv}, scoring={scoring}, n_iter={n_iter if method == 'random' else 'N/A'}"
+            f"cv={cv} ({cv_strategy}), scoring={scoring}, n_iter={n_iter if method == 'random' else 'N/A'}"
         )
 
         if method == "grid":
             search = GridSearchCV(
                 self.model,
                 param_grid,
-                cv=cv,
+                cv=cv_splitter,
                 scoring=scoring,
                 n_jobs=-1,
-                random_state=self.random_state,
+                refit=False,
                 return_train_score=True,
             )
         else:
@@ -224,22 +246,31 @@ class ModelTrainer:
                 self.model,
                 param_grid,
                 n_iter=n_iter,
-                cv=cv,
+                cv=cv_splitter,
                 scoring=scoring,
                 n_jobs=-1,
                 random_state=self.random_state,
+                refit=False,
                 return_train_score=True,
             )
 
+        # HP selection: don't pass sample_weight so CV scores reflect
+        # unweighted performance (the weights affect training, not evaluation).
         search.fit(X_train, y_train)
-        self.model = search.best_estimator_
-        self.search_results_ = search  # Store search object for accessing best_params
-        self.is_fitted = True
+        self.search_results_ = search
 
         logger.info(
             f"Hyperparameter tuning completed. Best score: {search.best_score_:.4f}, "
             f"Best params: {search.best_params_}"
         )
+
+        # Manually refit with best params and sample weights
+        self.model.set_params(**search.best_params_)
+        fit_params: Dict[str, Any] = {}
+        if sample_weight is not None:
+            fit_params["model__sample_weight"] = sample_weight
+        self.model.fit(X_train, y_train, **fit_params)
+        self.is_fitted = True
 
         return self.model
 
@@ -279,7 +310,9 @@ class ModelTrainer:
         logger.info(f"Evaluating model on {len(X)} samples (prefix: {prefix})")
         y_pred = self.model.predict(X)
         metrics = self._compute_metrics(y, y_pred, X, prefix=prefix)
-        logger.info(f"Evaluation metrics ({prefix}): {metrics}")
+        line = format_metrics_line(metrics, prefix=prefix)
+        if line:
+            logger.info(f"{prefix.capitalize()}: {line}")
         return metrics
 
     def _compute_metrics(

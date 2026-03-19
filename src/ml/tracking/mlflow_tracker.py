@@ -7,6 +7,7 @@ including parameters, metrics, models, and artifacts.
 
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -19,6 +20,70 @@ from mlflow.models import infer_signature
 from mlflow.tracking import MlflowClient
 
 logger = logging.getLogger(__name__)
+
+
+def load_experiment_config_from_model_uri(
+    model_uri: str,
+    tracking_uri: str,
+    artifact_file: str = "experiment_config.yaml",
+) -> dict:
+    """Load the experiment config artifact from the MLflow run that produced a model.
+
+    This is the complement of ``MLflowTracker.log_config``: training logs the
+    config, and this function retrieves it at prediction time so that feature
+    engineering is guaranteed to match the model.
+
+    Parameters
+    ----------
+    model_uri : str
+        MLflow model URI, e.g. ``"models:/model_name/1"`` or
+        ``"runs:/<run_id>/model"``.
+    tracking_uri : str
+        MLflow tracking URI.
+    artifact_file : str
+        Name of the config artifact saved during training.
+
+    Returns
+    -------
+    dict
+        The experiment config as a dictionary.
+    """
+    import yaml
+
+    mlflow.set_tracking_uri(tracking_uri)
+    client = MlflowClient()
+
+    if model_uri.startswith("models:/"):
+        # Format: models:/model_name/version  or  models:/model_name/Stage
+        parts = model_uri.replace("models:/", "").rsplit("/", 1)
+        model_name, version_or_stage = parts[0], parts[1]
+        try:
+            version = int(version_or_stage)
+            mv = client.get_model_version(model_name, str(version))
+        except ValueError:
+            # Stage name like "Production"
+            versions = client.get_latest_versions(
+                model_name, stages=[version_or_stage]
+            )
+            if not versions:
+                raise ValueError(f"No model version found for {model_uri}")
+            mv = versions[0]
+        run_id = mv.run_id
+    elif model_uri.startswith("runs:/"):
+        run_id = model_uri.split("/")[1]
+    else:
+        raise ValueError(f"Unsupported model URI format: {model_uri}")
+
+    if run_id is None:
+        raise ValueError(f"No run_id found for model URI: {model_uri}")
+
+    downloaded = client.download_artifacts(run_id, artifact_file)
+    artifact_path = Path(downloaded)
+    if artifact_path.is_dir():
+        artifact_path = artifact_path / artifact_file
+
+    with open(artifact_path, "r") as f:
+        return yaml.safe_load(f)
 
 
 def setup_mlflow_experiment(
@@ -89,7 +154,7 @@ class MLflowTracker:
         self,
         experiment_name: str = "nba_bets",
         run_name: Optional[str] = None,
-        tracking_uri: Optional[str] = None,
+        tracking_uri: str = "sqlite:///mlflow.db",
         log_model: bool = True,
     ):
         """
@@ -101,8 +166,8 @@ class MLflowTracker:
             Name of the MLflow experiment
         run_name : str, optional
             Name for this specific run. If None, MLflow will auto-generate.
-        tracking_uri : str, optional
-            MLflow tracking URI. If None, uses default local file system.
+        tracking_uri : str, default='sqlite:///mlflow.db'
+            MLflow tracking URI.
         log_model : bool, default=True
             Whether to log models to MLflow
         """
@@ -114,8 +179,7 @@ class MLflowTracker:
 
     def __enter__(self):
         """Start MLflow run."""
-        if self.tracking_uri:
-            mlflow.set_tracking_uri(self.tracking_uri)
+        mlflow.set_tracking_uri(self.tracking_uri)
 
         setup_mlflow_experiment(self.experiment_name)
         self.active_run = mlflow.start_run(run_name=self.run_name)
@@ -160,6 +224,7 @@ class MLflowTracker:
         artifact_path: str = "model",
         registered_model_name: Optional[str] = None,
         input_example: Optional[Any] = None,
+        dataset_name: Optional[str] = None,
     ):
         """
         Log a model to MLflow.
@@ -174,6 +239,9 @@ class MLflowTracker:
             If provided, register the model with this name in the model registry
         input_example : Any, optional
             Example inputs used to infer model signature and log input example
+        dataset_name : str, optional
+            If provided, set as a 'dataset' tag on the registered model version.
+            Uses the same naming logic as the run's dataset (e.g. "YYYY-MM-DD to YYYY-MM-DD").
         """
         if not self._log_model_enabled:
             return
@@ -195,7 +263,7 @@ class MLflowTracker:
                 logger.warning(f"Could not infer MLflow signature: {e}")
 
         try:
-            mlflow.sklearn.log_model(
+            model_info = mlflow.sklearn.log_model(
                 sk_model=model,
                 name=artifact_path,
                 registered_model_name=registered_model_name,
@@ -204,6 +272,19 @@ class MLflowTracker:
                 input_example=input_example,
             )
             logger.info(f"Logged model to MLflow at {artifact_path}")
+
+            if dataset_name and registered_model_name and model_info.registered_model_version:
+                try:
+                    client = MlflowClient()
+                    client.set_model_version_tag(
+                        name=registered_model_name,
+                        version=model_info.registered_model_version,
+                        key="dataset",
+                        value=dataset_name,
+                    )
+                    logger.debug(f"Set dataset tag '{dataset_name}' on model version {model_info.registered_model_version}")
+                except Exception as e:
+                    logger.warning(f"Could not set dataset tag on model version: {e}")
         except Exception as e:
             logger.warning(f"Error logging model to MLflow: {e}")
 
@@ -235,28 +316,32 @@ class MLflowTracker:
         mlflow.log_artifacts(local_dir, artifact_path=artifact_path)
         logger.debug(f"Logged artifacts from directory: {local_dir}")
 
-    def log_config(self, config: Dict[str, Any], config_path: str = "config.yaml"):
+    def log_config(
+        self,
+        config: Dict[str, Any],
+        artifact_file: str = "experiment_config.yaml",
+    ):
         """
-        Log configuration as an artifact.
+        Log configuration as a YAML artifact.
+
+        The config is saved as a top-level artifact file so it can be
+        retrieved later via ``load_experiment_config_from_model_uri``.
 
         Parameters
         ----------
         config : dict
             Configuration dictionary
-        config_path : str, default='config.yaml'
-            Path to save config within artifacts
+        artifact_file : str, default='experiment_config.yaml'
+            Filename for the artifact
         """
         import yaml
         import tempfile
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump(config, f, default_flow_style=False)
-            temp_path = f.name
-
-        try:
-            self.log_artifact(temp_path, artifact_path=config_path)
-        finally:
-            Path(temp_path).unlink()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = Path(tmpdir) / artifact_file
+            with open(file_path, "w") as f:
+                yaml.dump(config, f, default_flow_style=False)
+            mlflow.log_artifact(str(file_path))
 
     def set_tags(self, tags: Dict[str, str]):
         """
@@ -269,6 +354,53 @@ class MLflowTracker:
         """
         mlflow.set_tags(tags)
         logger.debug(f"Set {len(tags)} tags on MLflow run")
+
+    def log_dataset(
+        self,
+        df: Any,
+        source: str,
+        name: str,
+        targets: Optional[str] = None,
+        context: str = "training",
+    ):
+        """
+        Log a pandas DataFrame as an MLflow dataset input (populates the Dataset column).
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The dataset to log
+        source : str
+            Path or URI of the data source
+        name : str
+            Dataset name shown in the MLflow UI (e.g. "1980-10-01 to 2025-01-15")
+        targets : str, optional
+            Name of the target column
+        context : str, default='training'
+            Context tag for the dataset (e.g. 'training', 'validation')
+        """
+        try:
+            import mlflow.data
+
+            dataset = mlflow.data.from_pandas(
+                df,
+                source=source,
+                name=name,
+                targets=targets,
+            )
+            mlflow.log_input(dataset, context=context)
+            logger.debug(f"Logged dataset '{name}' to MLflow")
+        except Exception as e:
+            logger.warning(f"Could not log dataset to MLflow: {e}")
+
+    @contextmanager
+    def child_run(self, run_name: str):
+        """Start a nested child run. All log_* calls inside target the child."""
+        mlflow.start_run(run_name=run_name, nested=True)
+        try:
+            yield self
+        finally:
+            mlflow.end_run()
 
     def get_run_id(self) -> Optional[str]:
         """

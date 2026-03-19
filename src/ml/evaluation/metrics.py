@@ -8,10 +8,8 @@ from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
     accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
     roc_auc_score,
+    brier_score_loss,
 )
 
 
@@ -51,6 +49,33 @@ def compute_regression_metrics(
     }
 
 
+def compute_brier_score(y_true: np.ndarray, y_pred_proba: np.ndarray) -> float:
+    """Compute Brier score (lower is better, 0 = perfect calibration)."""
+    return float(brier_score_loss(y_true, y_pred_proba))
+
+
+def compute_ece(y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10) -> float:
+    """Compute Expected Calibration Error (ECE).
+
+    Bins predictions into equal-width bins and computes the weighted average
+    of |mean(y_true) - mean(y_pred_proba)| per bin.
+    """
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    ece = 0.0
+    n_total = len(y_true)
+    for i in range(n_bins):
+        mask = (y_pred_proba > bin_edges[i]) & (y_pred_proba <= bin_edges[i + 1])
+        if i == 0:
+            mask = (y_pred_proba >= bin_edges[i]) & (y_pred_proba <= bin_edges[i + 1])
+        n_bin = mask.sum()
+        if n_bin == 0:
+            continue
+        avg_pred = y_pred_proba[mask].mean()
+        avg_true = np.array(y_true)[mask].mean()
+        ece += (n_bin / n_total) * abs(avg_true - avg_pred)
+    return float(ece)
+
+
 def compute_classification_metrics(
     y_true: pd.Series,
     y_pred: np.ndarray,
@@ -77,43 +102,102 @@ def compute_classification_metrics(
         Dictionary of metrics
     """
     metrics = {
-        "accuracy": accuracy_score(y_true, y_pred),
-        "precision": precision_score(y_true, y_pred, average=average, zero_division=0),
-        "recall": recall_score(y_true, y_pred, average=average, zero_division=0),
-        "f1": f1_score(y_true, y_pred, average=average, zero_division=0),
+        "accuracy": round(accuracy_score(y_true, y_pred), 4),
     }
 
-    # ROC AUC for binary classification
+    # ROC AUC, Brier score, and ECE for binary classification
     if len(np.unique(y_true)) == 2 and y_pred_proba is not None:
         try:
             if y_pred_proba.ndim > 1:
                 y_pred_proba = y_pred_proba[:, 1]
-            metrics["roc_auc"] = roc_auc_score(y_true, y_pred_proba)
+            metrics["roc_auc"] = round(roc_auc_score(y_true, y_pred_proba), 4)
+            metrics["brier_score"] = round(compute_brier_score(y_true, y_pred_proba), 4)
+            metrics["ece"] = round(compute_ece(y_true, y_pred_proba), 4)
         except Exception:
             pass
 
     return metrics
 
 
-def print_metrics_summary(metrics: Dict[str, float], prefix: str = ""):
+MODEL_DISPLAY_NAMES = {
+    "random_forest": "Random Forest",
+    "gradient_boosting": "Gradient Boosting",
+    "xgboost": "XGBoost",
+    "lgbm": "LightGBM",
+    "best_record_baseline": "Best Record Baseline",
+    "point_differential_baseline": "Point Differential Baseline",
+}
+
+CONFERENCE_DISPLAY_NAMES = {
+    "same": "Same Conference",
+    "different": "Different Conferences",
+    "all": "All Games",
+}
+
+
+def get_model_display_name(model_key: str) -> str:
+    """Return a human-readable display name for a model key."""
+    return MODEL_DISPLAY_NAMES.get(model_key, model_key)
+
+
+def get_conference_display_name(conference_filter: str) -> str:
+    """Return a human-readable display name for a conference filter."""
+    return CONFERENCE_DISPLAY_NAMES.get(conference_filter, conference_filter)
+
+
+def format_metrics_line(metrics: Dict[str, float], prefix: str = "") -> str:
     """
-    Print a formatted summary of metrics.
+    Format key metrics (accuracy and ROC AUC) as a single-line string with percentages.
 
     Parameters
     ----------
     metrics : dict
-        Dictionary of metrics
+        Dictionary of metrics (keys may be prefixed, e.g. 'test_accuracy')
     prefix : str, default=''
-        Prefix to add to metric names
+        Expected prefix in metric keys (e.g. 'test', 'val', 'train')
+
+    Returns
+    -------
+    str
+        Formatted string like "Accuracy: 65.23% | ROC AUC: 71.50%"
     """
-    print(f"\n{'=' * 50}")
-    print(f"Metrics Summary{' - ' + prefix if prefix else ''}")
-    print(f"{'=' * 50}")
+    acc_key = f"{prefix}_accuracy" if prefix else "accuracy"
+    auc_key = f"{prefix}_roc_auc" if prefix else "roc_auc"
 
-    for metric_name, value in metrics.items():
-        if isinstance(value, float):
-            print(f"{metric_name:20s}: {value:10.4f}")
-        else:
-            print(f"{metric_name:20s}: {value}")
+    parts = []
+    if acc_key in metrics:
+        parts.append(f"Accuracy: {metrics[acc_key] * 100:.2f}%")
+    if auc_key in metrics:
+        parts.append(f"ROC AUC: {metrics[auc_key] * 100:.2f}%")
 
-    print(f"{'=' * 50}\n")
+    return " | ".join(parts)
+
+
+def print_metrics_summary(
+    metrics: Dict[str, float],
+    model_name: str = "",
+    split: str = "",
+    conference_filter: str = "",
+) -> None:
+    """
+    Print a formatted summary of key metrics (accuracy and ROC AUC) as percentages.
+
+    Parameters
+    ----------
+    metrics : dict
+        Dictionary of metrics (keys may be prefixed, e.g. 'test_accuracy')
+    model_name : str, default=''
+        Model key name (e.g. 'random_forest')
+    split : str, default=''
+        Data split prefix in metric keys (e.g. 'test', 'val', 'train')
+    conference_filter : str, default=''
+        Conference filter key (e.g. 'same', 'different', 'all')
+    """
+    line = format_metrics_line(metrics, prefix=split)
+    if not line:
+        return
+
+    display_name = get_model_display_name(model_name) if model_name else "Model"
+    conf_label = f" ({get_conference_display_name(conference_filter)})" if conference_filter else ""
+    split_label = f" [{split.capitalize()}]" if split else ""
+    print(f"  {display_name}{conf_label}{split_label}: {line}")

@@ -8,8 +8,47 @@ LEAGUE_SCHEDULE_FILE = "LeagueSchedule25_26.csv"
 # Earliest date used for historical filtering (YYYY-MM-DD).
 EARLIEST_GAME_DATE = "1980-08-01"
 
+ENRICHED_COLUMNS = [
+    "win_bool",
+    "pts_diff",
+    "games_played_HT",
+    "games_played_VT",
+    "total_wins_HT",
+    "total_losses_HT",
+    "total_wins_VT",
+    "total_losses_VT",
+]
+
+DEFAULT_METADATA_COLUMNS = [
+    "gameId",
+    "winner",
+    "hometeamPrename",
+    "hometeamId",
+    "hometeamName",
+    "homeScore",
+    "awayteamName",
+    "awayteamPrename",
+    "awayteamId",
+    "awayScore",
+    "hometeamLocation",
+    "awayteamLocation",
+    "gameLocation",
+    "hometeamConference",
+    "awayteamConference",
+    "winnerteamConference",
+    "gameType",
+    "gameDateOnlyStr",
+    "season",
+    "overtimes",
+    "postponed",
+    "is_neutral_court_game",
+]
+
 # Current season start year (e.g., 2025 for 2025/26 season).
 CURRENT_SEASON_START_YEAR = 2025
+
+# Minimum games played threshold applied to the test set (fixed — never changes between experiments).
+MINIMUM_GAMES_TEST = 15
 
 # Neutral court game labels
 INTERNATIONAL_GAMES = [

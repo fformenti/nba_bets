@@ -10,13 +10,13 @@ from src.ml.config.schema import ExperimentConfig, PredictionConfig
 logger = logging.getLogger(__name__)
 
 
-def load_yaml_config(config_path: Path) -> Dict[str, Any]:
+def load_yaml_config(config_path: Path | str) -> Dict[str, Any]:
     """
     Load configuration from a YAML file.
 
     Parameters
     ----------
-    config_path : Path
+    config_path : Path | str
         Path to YAML configuration file
 
     Returns
@@ -58,13 +58,13 @@ def load_prediction_config(config_path: Path) -> PredictionConfig:
     return PredictionConfig(**raw_config)
 
 
-def load_experiment_config(config_path: Path) -> ExperimentConfig:
+def load_experiment_config(config_path: Path | str) -> ExperimentConfig:
     """
     Load configuration from a YAML file into a validated ExperimentConfig.
 
     Parameters
     ----------
-    config_path : Path
+    config_path : Path | str
         Path to YAML configuration file
 
     Returns

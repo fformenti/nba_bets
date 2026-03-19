@@ -11,6 +11,12 @@ from src.config.constants import LEAGUE_SCHEDULE_FILE
 script_dir = Path(__file__).parent
 PROJECT_ROOT = script_dir.parent.parent
 
+# ===== Config YAML (single source of truth for CLI defaults) =====
+CONFIGS_DIR = PROJECT_ROOT / "configs"
+CONFIGS_TRAIN_DIR = CONFIGS_DIR / "train"
+# Aligns with Makefile EXPERIMENT ?= train_same / make train
+DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH = CONFIGS_TRAIN_DIR / "train_same.yaml"
+
 # ===== Base data directories =====
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
@@ -31,6 +37,10 @@ LEAGUE_SCHEDULE_PATH = RAW_HISTORICAL_DIR / LEAGUE_SCHEDULE_FILE
 ALL_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistories.csv"
 # filter from file above filter for NBA teams
 NBA_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistoriesNBA.csv"
+# Conference CSV at historical root (incremental ingestion default; handmade copy: TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH)
+TEAMS_HISTORIES_CONFERENCE_NBA_CSV_PATH = (
+    RAW_HISTORICAL_DIR / "TeamsHistoriesConferenceNBA.csv"
+)
 
 # ===== Handmade =====
 # Conference added by hand using the NBA_TEAMS_HISTORY_PATH file
@@ -40,6 +50,7 @@ TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH = (
 
 # ===== Collected =====
 RAW_INCREMENTAL_DIR = RAW_DIR / "incremental"
+RAW_INCREMENTAL_ARCHIVE_DIR = RAW_INCREMENTAL_DIR / "archive"
 UPCOMING_GAMES_DIR = RAW_INCREMENTAL_DIR / "upcoming_games"
 UPCOMING_GAMES_RESULTS_DIR = RAW_INCREMENTAL_DIR / "upcoming_games_results"
 
@@ -81,7 +92,15 @@ EAST_WEST_RECORDS_AT_WEST_PATH = (
 )
 RESTED_DAYS_PATH = REGULAR_SEASON_FEATURES_DIR / "rested_days.csv"
 TEAMS_DISTANCES_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_distances.csv"
+LAST_SEASON_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_record.csv"
+LAST_SEASON_HOME_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_home_record.csv"
+LAST_SEASON_AWAY_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_away_record.csv"
 
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"
 POLYMARKET_DAILY_BETS_DIR = PREDICTIONS_DIR / "daily_bets"
+
+
+def project_relpath(path: Path) -> str:
+    """Path relative to project root as a POSIX string (for YAML/config defaults)."""
+    return path.relative_to(PROJECT_ROOT).as_posix()

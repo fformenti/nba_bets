@@ -1,3 +1,5 @@
+import argparse
+
 import pandas as pd
 
 
@@ -5,7 +7,6 @@ from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
     REGULAR_SEASON_GAMES_FEATURES_PATH,
-    PROJECT_ROOT,
 )
 
 
@@ -21,7 +22,20 @@ logger = get_logger(__name__)
 setup_logging(level="INFO")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Build feature tables from game data")
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to experiment config YAML (e.g. configs/train/train_same.yaml)",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     regular_season_games = pd.read_csv(
         REGULAR_SEASON_GAMES_PATH, parse_dates=["gameDate"], low_memory=False
     )
@@ -30,12 +44,12 @@ def main():
     )
 
     # Step 0: Load configuration
-    config_path = PROJECT_ROOT / "configs" / "my_experiment.yaml"
-    config = load_experiment_config(config_path)
+    config = load_experiment_config(args.config)
     filters_config = config.filters
     feature_engineering_config = config.feature_engineering
     earliest_date = filters_config.start_date
-    lags = feature_engineering_config.lags
+    record_lags = feature_engineering_config.record_lags
+    point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
     distances_lags = feature_engineering_config.distances_lags
 
@@ -49,7 +63,13 @@ def main():
 
     # Step 2: Create feature tables
     print("\n[Step 2/4] Creating feature tables...")
-    create_features_tables(games_with_conference, lags, location_lags, distances_lags)
+    create_features_tables(
+        games_with_conference,
+        record_lags,
+        point_differential_lags,
+        location_lags,
+        distances_lags,
+    )
     print("✓ Created all feature tables")
 
     # Step 3: Merge features

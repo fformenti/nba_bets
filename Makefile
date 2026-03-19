@@ -1,7 +1,7 @@
-.PHONY: teams-history etl incremental train get-upcoming-games
+.PHONY: teams-history etl incremental train train-all get-upcoming-games
 
-EXPERIMENT ?= my_experiment
-PREDICTION_CONFIG ?= predict_upcoming
+EXPERIMENT ?= train_same
+PREDICTION_CONFIG ?= predict_classifier
 
 teams-history:
 	uv run python -m src.etl.ingestion.teams_history
@@ -34,16 +34,16 @@ get-upcoming-games:
 	uv run python src/etl/collectors/upcoming_games.py
 
 predict-upcoming:
-	uv run python -m src.ml.scripts.predict_classifier --config configs/predict_upcoming.yaml
+	uv run python -m src.ml.scripts.predict_classifier --config configs/predict/$(PREDICTION_CONFIG).yaml
 
 make-features:
-	uv run python src/etl/make_features.py
+	uv run python -m src.etl.make_features --config configs/train/$(EXPERIMENT).yaml
 
 train:
-	uv run python -m src.ml.scripts.train_classifier --config configs/$(EXPERIMENT).yaml
+	uv run python -m src.ml.scripts.train_classifier --config configs/train/$(EXPERIMENT).yaml
 
-# predict:
-# 	uv run python -m src.ml.scripts.predict_classifier --config configs/$(PREDICTION_CONFIG).yaml
+train-all:
+	uv run python -m src.ml.scripts.run_experiments --config configs/train/*.yaml
 
 bet-polymarket:
 	uv run python src/ml/scripts/place_bets.py
@@ -69,7 +69,7 @@ full-rebuild:
 
 predict-upcoming-games:
 	make get-upcoming-games
-	make predict
+	make predict-upcoming
 
 process-results-pipeline:
 	make get-upcoming-games-results

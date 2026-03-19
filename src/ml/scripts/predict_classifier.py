@@ -20,8 +20,7 @@ from src.utils.logging_config import setup_logging, get_logger
 from src.config.paths import PROJECT_ROOT
 from src.etl.features.aggregator import create_features_tables, merge_features
 from src.ml.config.loader import load_experiment_config, load_prediction_config
-from src.ml.config.schema import ExperimentConfig, PredictionConfig
-
+from src.ml.config.schema import ExperimentConfig
 from src.ml.scripts.train_classifier import load_and_validate_data
 
 from src.ml.prediction.io import load_upcoming_games
@@ -30,26 +29,24 @@ from src.ml.features.engineering import (
     create_delta_features,
     apply_conference_features,
 )
-from src.ml.tracking.mlflow_tracker import MLflowTracker
+from src.ml.tracking.mlflow_tracker import (
+    MLflowTracker,
+    load_experiment_config_from_model_uri,
+)
 from src.etl.utils.common import get_nba_season
 
 logger = get_logger(__name__)
 
 
 def _load_model(
-    config: PredictionConfig,
+    model_uri: str,
+    tracking_uri: Optional[str] = None,
 ) -> Tuple[object, Optional[list[str]]]:
     """Load model from MLflow."""
-    if not config.model_uri:
-        raise ValueError(
-            "model_uri is required. Please specify an MLflow model URI "
-            "(e.g., 'models:/nba_classification_random_forest/Production' or 'runs:/<run_id>/model')"
-        )
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
 
-    if config.tracking_uri:
-        mlflow.set_tracking_uri(config.tracking_uri)
-
-    model = mlflow.sklearn.load_model(config.model_uri)
+    model = mlflow.sklearn.load_model(model_uri)
     feature_names = getattr(model, "feature_names_in_", None)
     return model, list(feature_names) if feature_names is not None else None
 
@@ -130,24 +127,6 @@ def _predict(
     return preds, proba
 
 
-def setup_mlflow_tracking(tracking_uri: Optional[str] = None) -> None:
-    """
-    Setup MLflow tracking URI.
-
-    Parameters
-    ----------
-    tracking_uri : str, optional
-        Custom tracking URI. If None, uses default SQLite database.
-    """
-    if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
-        logger.info(f"MLflow tracking URI set to: {tracking_uri}")
-    else:
-        mlflow_db_path = PROJECT_ROOT / "mlflow.db"
-        mlflow.set_tracking_uri(f"sqlite:///{mlflow_db_path}")
-        logger.info(f"MLflow tracking URI set to: sqlite:///{mlflow_db_path}")
-
-
 def fix_upcoming_games_cols(
     upcoming_games: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -170,9 +149,9 @@ def fix_upcoming_games_cols(
 
     df = upcoming_games.copy()
     if "gameDateOnlyStr" not in df.columns and "gameDate" in df.columns:
-        df["gameDateOnlyStr"] = pd.to_datetime(df["gameDate"], errors="coerce").dt.strftime(
-            "%Y-%m-%d"
-        )
+        df["gameDateOnlyStr"] = pd.to_datetime(
+            df["gameDate"], errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
     if "season" not in df.columns and "gameDate" in df.columns:
         df["season"] = pd.to_datetime(df["gameDate"], errors="coerce").apply(
             get_nba_season
@@ -261,12 +240,13 @@ def build_features_for_prediction(
 
     # Get feature engineering configuration
     feat_eng_config = experiment_config.feature_engineering
-    lags = feat_eng_config.lags
+    record_lags = feat_eng_config.record_lags
+    point_differential_lags = feat_eng_config.point_differential_lags
     location_lags = feat_eng_config.location_lags
     distances_lags = feat_eng_config.distances_lags
     # Create feature tables
     logger.info("Creating feature tables")
-    create_features_tables(historical_combined, lags, location_lags, distances_lags)
+    create_features_tables(historical_combined, record_lags, point_differential_lags, location_lags, distances_lags)
 
     # Merge features for upcoming games
     upcoming_with_features = merge_features(upcoming_games)
@@ -291,7 +271,8 @@ def build_features_for_prediction(
     logger.info("Creating delta features")
     upcoming_with_features = create_delta_features(
         upcoming_with_features,
-        lags=lags,
+        record_lags=record_lags,
+        point_differential_lags=point_differential_lags,
         location_lags=location_lags,
         distances_lags=distances_lags,
     )
@@ -352,7 +333,6 @@ def prepare_features_for_model(
 
 def main(
     config_path: Optional[Path] = None,
-    experiment_name: str = "nba_bets_predictions",
 ):
     """
     Main prediction function.
@@ -361,15 +341,13 @@ def main(
     ----------
     config_path : Path, optional
         Path to prediction configuration YAML file. If None, uses default configuration.
-    experiment_name : str, default='nba_bets_predictions'
-        MLflow experiment name for tracking
     """
     # Setup logging
     setup_logging(level="INFO")
 
     # Load prediction configuration
     if config_path is None:
-        config_path = PROJECT_ROOT / "configs" / "predict_upcoming.yaml"
+        config_path = PROJECT_ROOT / "configs" / "predict_classifier.yaml"
 
     if not config_path.exists():
         raise FileNotFoundError(f"Prediction config file not found: {config_path}")
@@ -377,56 +355,33 @@ def main(
     prediction_config = load_prediction_config(config_path)
     logger.info(f"Loaded prediction configuration from {config_path}")
 
-    # Setup MLflow tracking
-    setup_mlflow_tracking(prediction_config.tracking_uri)
-
-    # Load experiment configuration for feature engineering
-    feature_config_path = PROJECT_ROOT / prediction_config.feature_config_path
-    if not feature_config_path.exists():
-        raise FileNotFoundError(f"Feature config file not found: {feature_config_path}")
-
-    experiment_config = load_experiment_config(feature_config_path)
-    logger.info(f"Loaded experiment configuration from {feature_config_path}")
-
-    # Get conference filter from experiment config (should match training)
-    # This ensures feature engineering matches what was used during training
-    training_conference_filter = experiment_config.filters.conference_filter
-
-    # Warn if prediction config filter doesn't match experiment config filter
-    if prediction_config.conference_filter != training_conference_filter:
-        logger.warning(
-            f"Prediction conference_filter ('{prediction_config.conference_filter}') "
-            f"does not match training conference_filter ('{training_conference_filter}'). "
-            f"Using training filter for feature engineering consistency."
-        )
+    mlflow_config = prediction_config.mlflow
 
     # Start MLflow tracking
     with MLflowTracker(
-        experiment_name=experiment_name,
+        experiment_name=mlflow_config.experiment_name,
         run_name=config_path.stem if config_path else None,
-        tracking_uri=prediction_config.tracking_uri,
+        tracking_uri=mlflow_config.tracking_uri,
         log_model=False,
     ) as tracker:
         # Log configuration
         tracker.log_params(
             {
-                "model_uri": prediction_config.model_uri,
-                "input_dir": prediction_config.input_dir,
-                "output_path": prediction_config.output_path,
-                "features_path": prediction_config.features_path,
-                "feature_config_path": prediction_config.feature_config_path,
-                "conference_filter": prediction_config.conference_filter,
-                "training_conference_filter": training_conference_filter,
+                "model_uris": str(prediction_config.model_uris),
+                "input_dir": prediction_config.paths.input_dir,
+                "output_path": prediction_config.paths.output,
+                "features_path": prediction_config.paths.features,
                 "allow_missing_features": prediction_config.allow_missing_features,
             }
         )
+
         # Data loading
         data_config = prediction_config.data
         target_column = data_config.target_column
         date_column = data_config.date_column
 
         # Load upcoming games
-        input_dir = PROJECT_ROOT / prediction_config.input_dir
+        input_dir = PROJECT_ROOT / prediction_config.paths.input_dir
         logger.info(f"Loading upcoming games from {input_dir}")
         upcoming_games = load_upcoming_games(
             input_dir,
@@ -443,7 +398,7 @@ def main(
         upcoming_games = fix_upcoming_games_cols(upcoming_games)
 
         # Load historical features
-        features_path = PROJECT_ROOT / prediction_config.features_path
+        features_path = PROJECT_ROOT / prediction_config.paths.features
         logger.info(f"Loading historical features from {features_path}")
 
         historical_features = load_and_validate_data(
@@ -460,69 +415,102 @@ def main(
             ].copy()
             logger.info(f"Filtered historical features to seasons: {upcoming_seasons}")
 
-        # Build features using the same conference filter as training
-        upcoming_with_features = build_features_for_prediction(
-            upcoming_games=upcoming_games,
-            historical_features=historical_features,
-            experiment_config=experiment_config,
-            conference_filter=training_conference_filter,
-        )
+        # Route each game to the appropriate model
+        results_parts = []
+        for conference_filter in ["same", "different", "all"]:
+            if conference_filter not in prediction_config.model_uris:
+                logger.warning(f"No model URI for '{conference_filter}', skipping")
+                continue
 
-        if upcoming_with_features.empty:
-            logger.warning("No games remaining after feature building and filtering")
+            model_uri = prediction_config.model_uris[conference_filter]
+
+            # Load the experiment config that was used to train this model.
+            # Primary: from the MLflow run artifact (guaranteed to match the model).
+            # Fallback: from a local file via feature_config_path.
+            try:
+                config_dict = load_experiment_config_from_model_uri(
+                    model_uri=model_uri,
+                    tracking_uri=mlflow_config.tracking_uri,
+                )
+                iter_experiment_config = ExperimentConfig(**config_dict)
+                logger.info(
+                    f"Loaded experiment config from MLflow run for '{conference_filter}'"
+                )
+            except Exception as e:
+                if prediction_config.feature_config_path:
+                    logger.warning(
+                        f"Could not load config from MLflow ({e}); "
+                        f"falling back to {prediction_config.feature_config_path}"
+                    )
+                    fallback_path = PROJECT_ROOT / prediction_config.feature_config_path
+                    base_config = load_experiment_config(fallback_path)
+                    iter_experiment_config = base_config.model_copy(deep=True)
+                    iter_experiment_config.filters.conference_filter = conference_filter
+                else:
+                    raise
+
+            upcoming_with_features = build_features_for_prediction(
+                upcoming_games=upcoming_games,
+                historical_features=historical_features,
+                experiment_config=iter_experiment_config,
+                conference_filter=conference_filter,
+            )
+
+            if upcoming_with_features.empty:
+                logger.warning(
+                    f"No {conference_filter}-conference games found, skipping"
+                )
+                continue
+
+            data_config = iter_experiment_config.data
+            target_column = data_config.target_column
+            X = prepare_features_for_model(
+                df=upcoming_with_features,
+                experiment_config=iter_experiment_config,
+                target_column=target_column,
+            )
+
+            logger.info(
+                f"Loading model for '{conference_filter}' from MLflow: {model_uri}"
+            )
+            model, feature_names = _load_model(model_uri, mlflow_config.tracking_uri)
+
+            X_aligned = _align_features(
+                X,
+                feature_names,
+                allow_missing=prediction_config.allow_missing_features,
+            )
+
+            logger.info(
+                f"Making predictions for '{conference_filter}'-conference games"
+            )
+            predictions, probabilities = _predict(model, X_aligned)
+
+            metadata_columns = (
+                iter_experiment_config.feature_engineering.metadata_columns
+            )
+            part = upcoming_games.loc[
+                upcoming_with_features.index, metadata_columns
+            ].copy()
+            part["conference_filter"] = conference_filter
+            part["prediction"] = predictions
+            if probabilities is not None:
+                part["home_win_probability"] = probabilities
+
+            results_parts.append(part)
+
+        if not results_parts:
+            logger.warning("No predictions generated")
             return
 
-        # Prepare features for model
-        data_config = experiment_config.data
-        target_column = data_config.target_column
-        X = prepare_features_for_model(
-            df=upcoming_with_features,
-            experiment_config=experiment_config,
-            target_column=target_column,
-        )
-
-        # Load model
-        logger.info(f"Loading model from MLflow: {prediction_config.model_uri}")
-        model, feature_names = _load_model(prediction_config)
-
-        # Check for missing values before alignment
-        missing_before = X.isna().sum()
-        if missing_before.sum() > 0:
-            columns_with_missing_before = missing_before[missing_before > 0]
-            logger.info(
-                f"Missing values in features before alignment:\n{columns_with_missing_before.to_dict()}"
-            )
-            rows_with_missing_before = X.isna().any(axis=1).sum()
-            logger.info(
-                f"Rows with missing values before alignment: {rows_with_missing_before} out of {len(X)}"
-            )
-
-        # Align features to match model expectations
-        logger.info("Aligning features to model requirements")
-        X_aligned = _align_features(
-            X,
-            feature_names,
-            allow_missing=prediction_config.allow_missing_features,
-        )
-
-        # Make predictions
-        logger.info("Making predictions")
-        predictions, probabilities = _predict(model, X_aligned)
-
-        # Prepare output
-        metadata_columns = experiment_config.feature_engineering.metadata_columns
-        output = upcoming_games[metadata_columns].copy()
-        output["prediction"] = predictions
-
-        if probabilities is not None:
-            output["home_win_probability"] = probabilities
+        output = pd.concat(results_parts).sort_values("gameDate")
 
         # Save predictions (append if file exists, otherwise write with header)
-        output_path = PROJECT_ROOT / prediction_config.output_path
+        output_path = PROJECT_ROOT / prediction_config.paths.output
         output_path.parent.mkdir(parents=True, exist_ok=True)
         write_header = not output_path.exists()
         output.to_csv(output_path, index=False, mode="a", header=write_header)
-        logger.info(f"Saved predictions to {output_path}")
+        logger.info(f"Saved {len(output)} predictions to {output_path}")
 
         # Log metrics and artifacts
         tracker.log_params({"n_games": len(output)})
