@@ -3,10 +3,14 @@
 ```
 nba_bets/
 ├── configs/                                    # YAML configuration files
-│   ├── my_experiment.yaml                      # Training config (ExperimentConfig)
-│   ├── predict_upcoming.yaml                   # Prediction config (PredictionConfig)
-│   ├── incremental_ingestion.yaml              # Incremental ingestion config
-│   └── train_classification_example.yaml       # Example training config
+│   ├── ingestion/
+│   │   └── incremental_ingestion.yaml          # Incremental ingestion config
+│   ├── train/
+│   │   ├── train_all.yaml                      # Training config: all features
+│   │   ├── train_different.yaml                # Training config: different splits
+│   │   └── train_same.yaml                     # Training config: same splits
+│   └── predict/
+│       └── predict_classifier.yaml             # Prediction config
 │
 ├── data/                                       # All data (gitignored)
 │   ├── raw/
@@ -25,18 +29,14 @@ nba_bets/
 │   └── predictions/
 │       └── daily_bets/                         # Prediction outputs
 │
-├── docs/
-│   ├── MLFLOW_NAMING_GUIDE.md
-│   └── CONFERENCE_FILTER_IMPLEMENTATION.md
-│
 ├── src/
 │   ├── config/
-│   │   ├── paths.py                            # All data path constants (import from here)
+│   │   ├── paths.py                            # All data path constants
 │   │   ├── constants.py                        # Dates, team maps, neutral court labels
 │   │   └── aws.py                              # AWS config
 │   │
 │   ├── data_creation/
-│   │   └── polymarket_teams_abrev.py           # Build team abbreviation mapping for Polymarket
+│   │   └── polymarket_teams_abrev.py           # Team abbreviation mapping for Polymarket
 │   │
 │   ├── etl/
 │   │   ├── ingestion/
@@ -48,15 +48,16 @@ nba_bets/
 │   │   │       ├── agents.py                   # OpenAI agents for data fetching
 │   │   │       ├── pipeline.py                 # Incremental ingestion orchestrator
 │   │   │       ├── schema.py                   # Pydantic schemas for incremental data
-│   │   │       ├── config.py
-│   │   │       └── io.py
+│   │   │       ├── config.py                   # Incremental ingestion configuration
+│   │   │       └── io.py                       # I/O helpers for incremental data
 │   │   │
 │   │   ├── collectors/
 │   │   │   ├── upcoming_games.py               # Fetch upcoming games from schedule
 │   │   │   ├── upcoming_games_results.py       # Fetch results for played games
 │   │   │   └── fetch_game/
 │   │   │       ├── get_teams_locations.py      # Fetch team GPS coordinates
-│   │   │       └── make_distances_table.py     # Build team-to-team distance table
+│   │   │       ├── make_distances_table.py     # Build team-to-team distance table
+│   │   │       └── find_distances.ipynb        # Notebook: distance exploration
 │   │   │
 │   │   ├── features/
 │   │   │   ├── aggregator.py                   # create_features_tables() + merge_features()
@@ -64,21 +65,23 @@ nba_bets/
 │   │   │   ├── point_differential.py           # Rolling point differential
 │   │   │   ├── east_vs_west.py                 # Conference win/loss records
 │   │   │   ├── rest_days.py                    # Days since last game
-│   │   │   └── distances.py                    # Rolling travel distance
+│   │   │   ├── distances.py                    # Rolling travel distance
+│   │   │   └── last_season_record.py           # Last season's win percentage record
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games
 │   │   │
 │   │   ├── utils/
-│   │   │   └── common.py
+│   │   │   └── common.py                       # Shared ETL utility functions
 │   │   │
-│   │   ├── make_features.py                    # Entry point: build + merge all feature tables
-│   │   ├── process_ingested_games.py           # Entry point: transform ingested → processed
+│   │   ├── make_features.py                    # Entry point: build + merge all features
+│   │   ├── process_ingested_games.py           # Entry point: ingested → processed
 │   │   └── full_pipeline.py                    # High-level pipeline orchestrator
 │   │
 │   ├── ml/
+│   │   ├── README.md                           # ML module documentation
 │   │   ├── config/
-│   │   │   ├── schema.py                       # ExperimentConfig, PredictionConfig (Pydantic)
+│   │   │   ├── schema.py                       # ExperimentConfig and Pydantic schemas
 │   │   │   └── loader.py                       # Load YAML into config objects
 │   │   │
 │   │   ├── datasets/
@@ -86,40 +89,51 @@ nba_bets/
 │   │   │   └── splitters.py                    # Temporal / random / stratified splits
 │   │   │
 │   │   ├── features/
-│   │   │   ├── engineering.py                  # create_delta_features(), apply_conference_features()
-│   │   │   └── preprocessing.py                # Scaling, imputation, outlier handling
+│   │   │   ├── engineering.py                  # Delta features, conference features
+│   │   │   ├── preprocessing.py                # Scaling, imputation, outlier handling
+│   │   │   └── selection.py                    # Boruta-SHAP feature selection
 │   │   │
 │   │   ├── models/
-│   │   │   ├── trainer.py                      # ModelTrainer (train, evaluate, cross-validate)
+│   │   │   ├── trainer.py                      # ModelTrainer (train, evaluate, CV)
 │   │   │   ├── registry.py                     # ModelRegistry (save/load sklearn models)
 │   │   │   └── baseline.py                     # Naive baseline models
 │   │   │
+│   │   ├── training/                           # Training orchestration
+│   │   │   ├── data_prep.py                    # Data preparation helpers
+│   │   │   ├── experiment.py                   # Experiment definition and execution
+│   │   │   ├── model_factory.py                # Build models from config
+│   │   │   └── runners.py                      # High-level training runners
+│   │   │
 │   │   ├── evaluation/
 │   │   │   ├── metrics.py                      # Classification metrics
-│   │   │   └── visualization.py                # Confusion matrix, ROC, feature importance
+│   │   │   ├── visualization.py                # Confusion matrix, ROC, feature importance
+│   │   │   └── analysis.py                     # Prediction error pattern analysis
 │   │   │
 │   │   ├── tracking/
-│   │   │   └── mlflow_tracker.py               # MLflowTracker (log params, metrics, model)
+│   │   │   ├── mlflow_tracker.py               # MLflowTracker (log params, metrics, model)
+│   │   │   ├── delete_experiment.py            # Delete MLflow experiments by name
+│   │   │   └── delete_model.py                 # Delete MLflow registered models
 │   │   │
 │   │   ├── prediction/
-│   │   │   ├── pipeline.py                     # End-to-end prediction pipeline
-│   │   │   ├── feature_builder.py              # Build features for upcoming games
-│   │   │   ├── config.py                       # Prediction config helpers
 │   │   │   └── io.py                           # Load upcoming games DataFrames
 │   │   │
-│   │   └── scripts/                            # Entry points (called by Makefile)
-│   │       ├── train_classifier.py             # Train model from YAML config
-│   │       ├── predict_classifier.py           # Predict upcoming games from YAML config
-│   │       ├── predict_upcoming.py             # Wrapper for predict_classifier
-│   │       └── place_bets.py                   # Place bets via Polymarket API
+│   │   ├── scripts/                            # Entry points (called by Makefile)
+│   │   │   ├── train_classifier.py             # Train model from YAML config
+│   │   │   ├── predict_classifier.py           # Predict upcoming games from config
+│   │   │   ├── predict_upcoming.py             # Wrapper for predict_classifier
+│   │   │   ├── run_experiments.py              # Run multiple experiments in batch
+│   │   │   └── place_bets.py                   # Place bets via Polymarket API
+│   │   │
+│   │   └── utils/
+│   │       └── validation.py                   # Data validation utilities
 │   │
 │   └── utils/
 │       └── logging_config.py                   # Shared logging setup
 │
 ├── sandbox/                                    # Notebooks for exploration
-├── outputs/                                    # Training artifacts (plots, etc.)
+├── mlruns/                                     # MLflow run tracking data
+├── mlflow.db                                   # MLflow backend database
 ├── Makefile
 ├── pyproject.toml
-├── CLAUDE.md
-└── PROJECT_STRUCTURE.md
+└── CLAUDE.md
 ```

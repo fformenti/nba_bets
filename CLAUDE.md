@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-For a full file tree with descriptions, see [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md).
+For a full file tree with descriptions, see [PROJECT_STRUCTURE.md](./.claude/docs/PROJECT_STRUCTURE.md).
 
 ## Package Manager
 
@@ -12,8 +12,8 @@ Use `uv` for all Python operations. Never use `pip` or `python` directly.
 
 ```bash
 # Training
-make train                          # Uses EXPERIMENT=my_experiment by default
-make train EXPERIMENT=my_experiment # Explicit experiment name
+make train                          # Uses EXPERIMENT=train_classifier by default
+make train EXPERIMENT=train_classifier # Explicit experiment name
 
 # ETL / Data pipelines
 make ingest-raw-games               # Parse raw NBA Games.csv into ingested format
@@ -37,11 +37,12 @@ make teams-locations                # Fetch team location coordinates
 make make-distances-table           # Build travel distance table
 ```
 
-Run individual modules directly:
+Run train/predict modules with any experiment config (see `configs/train/` and `configs/predict/`):
 ```bash
-uv run python -m src.ml.scripts.train_classifier --config configs/my_experiment.yaml
-uv run python -m src.ml.scripts.predict_classifier --config configs/predict_upcoming.yaml
+uv run python -m src.ml.scripts.train_classifier --config <configs/train/your_experiment.yaml>
+uv run python -m src.ml.scripts.predict_classifier --config <configs/predict/your_predict.yaml>
 ```
+Use the YAML that matches the model and data split you are testing (e.g. `train_same.yaml`, `train_different.yaml`).
 
 ## Architecture Overview
 
@@ -66,63 +67,15 @@ After games played:
   [process-results-pipeline]   → rebuild features
 ```
 
-### Key Directories
+## Context Efficiency
 
-See [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for the full annotated file tree.
+Do not re-read files that are already in the conversation context. After reading or editing a file, use the content already available rather than calling the Read tool again.
 
-- `configs/` — YAML configs for experiments (`ExperimentConfig`) and predictions (`PredictionConfig`)
-- `src/config/paths.py` — all data path constants (always import from here, never hardcode paths)
-- `src/etl/` — Data pipeline: `ingestion/`, `collectors/`, `features/`, `transformation/`
-- `src/ml/` — ML pipeline: `config/schema.py`, `scripts/`, `models/`, `features/`, `tracking/`, `prediction/`
-- `sandbox/`- directory for playing around a testing code. Ignore it
+### PROJECT_STRUCTURE.md Maintenance
 
-### ML Pipeline
+When you create, delete, or move files under `src/` or `configs/`, update `.claude/docs/PROJECT_STRUCTURE.md` to reflect the change. A Stop hook will remind you if drift is detected.
 
-**Training** (`src/ml/scripts/train_classifier.py`):
-1. Load config (`ExperimentConfig` from YAML)
-2. Load `games_features.csv`, filter by date & conference_filter
-3. Apply conference features (`apply_conference_features`) based on `conference_filter`
-4. Create delta features (home − away for each lag)
-5. Temporal split → preprocess (scale + impute) → train sklearn model
-6. Log everything to MLflow (`nba_bets_classification` experiment)
-7. Register model as `nba_classification_{model_type}_{conference_filter}`
-
-**Prediction** (`src/ml/scripts/predict_classifier.py`):
-- Mirrors training feature engineering exactly (same config-driven logic)
-- Loads model from MLflow registry via `model_uri` in prediction YAML
-- Aligns prediction features to match training feature columns
-
-### Conference Filter
-
-Three modes (set in config): `"all"` | `"same"` | `"different"`
-- Determines which games are included and which conference-based features are added
-- Must be consistent between training config and prediction config
-- MLflow model names include the filter suffix (e.g., `_all`, `_same`, `_different`)
-
-### Configuration Schema
-
-`src/ml/config/schema.py` defines `ExperimentConfig` and `PredictionConfig` (Pydantic models).
-
-Key `ExperimentConfig` fields:
-- `data.conference_filter` — filters games and adds appropriate features
-- `features.lags`, `features.location_lags`, `features.distances_lags` — temporal lags for features
-- `model.type` — `"random_forest"` or `"gradient_boosting"`
-- `splitting.method` — `"temporal"` (default), `"random"`, or `"stratified"`
-
-### MLflow
-
-- Tracking: local `mlflow.db` + `mlruns/` directory
-- Experiment: `nba_bets_classification`
-- Run name format: `{config_name}-{timestamp}`
-- Model registry: `nba_classification_{model_type}_{conference_filter}`
-- See `docs/MLFLOW_NAMING_GUIDE.md` for naming conventions
-
-### Path Constants
-
-All file paths are in `src/config/paths.py`. Always import paths from there rather than constructing strings manually. Key paths: `REGULAR_SEASON_GAMES_FEATURES_PATH`, `UPCOMING_GAMES_DIR`, `UPCOMING_GAMES_PREDICTIONS_PATH`.
-
-### Claude Code
-I will be asking you to create claude code skills, agents, sub agents, mcp servers, slash commands, rules and agent teams. Make sure you optimize all of these components in a way that it uses the minimal amount of space of context window.
+Format: use the existing tree-drawing style with `├──`/`└──` connectors and `# description` annotations. Keep descriptions concise (under 60 chars). Only document tracked source files — ignore `data/`, `sandbox/`, `mlruns/`, `__pycache__/`.
 
 ### Code Refactor and Code Creation
 You are a Python expert very knowledgeable in the field of Data Science and Data Engineering
