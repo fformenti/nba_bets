@@ -449,6 +449,7 @@ def train_single_model(
                     output_dir = Path(paths_config.outputs)
                     output_dir.mkdir(parents=True, exist_ok=True)
                     cv_path = output_dir / "cv_results" / f"{model_name}.csv"
+                    cv_path.parent.mkdir(parents=True, exist_ok=True)
                     cv_results_df.to_csv(cv_path, index=False)
                     tracker.log_artifact(str(cv_path), artifact_path="tuning")
                 else:
