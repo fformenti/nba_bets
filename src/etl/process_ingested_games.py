@@ -15,10 +15,9 @@ setup_logging(level="INFO")
 def filter_regular_season_games(games) -> DataFrame:
     """Filter games to only include regular season games."""
     # Changes were made to the raw games season 2025/26 has a different patttern from previous years
-    not_gametype_regular_season = ["Playoffs", "Preseason", "Play-in Tournament"]
-    games = games.loc[~games["gameType"].isin(not_gametype_regular_season)]
-    gamelabel_preseason = ["Preseason"]
-    games = games.loc[~games["gameType"].isin(gamelabel_preseason)]
+    not_regular_season = ["Playoffs", "Preseason", "Play-in Tournament"]
+    games = games.loc[~games["gameType"].isin(not_regular_season)]
+    games = games.loc[~games["gameLabel"].isin(not_regular_season)]
     games = games.drop(columns=["gameSubLabel", "seriesGameNumber"]).copy()
 
     return games
