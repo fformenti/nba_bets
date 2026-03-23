@@ -85,6 +85,11 @@ def create_delta_features(
         created_features.append(delta_col)
         features_used_for_deltas.extend([home_col, away_col])
 
+    # Delta between days at home and days on road
+    df["days_at_home_delta"] = df["days_at_home"] + df["days_on_road"]
+    created_features.append("days_at_home_delta")
+    features_used_for_deltas.extend(["days_at_home", "days_on_road"])
+
     logger.info(f"Created {len(created_features)} delta features")
     df.drop(columns=features_used_for_deltas, inplace=True)
     logger.info(f"Dropped {len(features_used_for_deltas)} features used for deltas")
