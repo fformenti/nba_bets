@@ -171,7 +171,6 @@ def train_single_model(
     )
     df = apply_conference_features(df, conference_filter)
 
-    split_method = split_config.method
     test_size = split_config.test_size
     val_size = split_config.val_size
     random_state = split_config.random_state
