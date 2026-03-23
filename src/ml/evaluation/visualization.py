@@ -611,6 +611,7 @@ def plot_shap_summary(
         feature_names=feature_names_top,
         show=False,
         plot_size=None,
+        cmap=plt.cm.viridis,
     )
 
     # Overlay mean |SHAP| annotations at the right edge of the plot
