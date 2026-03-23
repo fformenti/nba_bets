@@ -2,10 +2,11 @@
 name: ml-pipeline
 description: >
   Project-specific ML pipeline expertise for the NBA bets project. Trigger on tasks
-  involving: training scripts, prediction scripts, adding models, feature engineering
-  configs, experiment setup, model evaluation, data preparation, code organization,
-  or any part of the training/prediction lifecycle. Does NOT cover MLflow tracking
-  details (use mlflow skill) or raw sklearn API questions (use sklearn skill).
+  involving: training scripts, prediction scripts, adding models, experiment setup,
+  model evaluation, data preparation, code organization, or any part of the
+  training/prediction lifecycle. Does NOT cover MLflow tracking details (use mlflow
+  skill), raw sklearn API questions (use sklearn skill), or feature engineering and
+  data leakage (use data-analyst skill).
 ---
 
 # ML Pipeline
@@ -104,5 +105,5 @@ Follow this module boundary contract:
 
 Detailed reference content lives in `references/`:
 - **`references/config-schema.md`** — Full config YAML examples with all fields. Read when creating or modifying configs.
-- **`references/feature-engineering.md`** — Existing feature types, lag values, new feature proposals. Read when designing features.
-- **`references/data-leakage.md`** — Leakage risk matrix and verification checklist. Read when reviewing features for correctness.
+
+For feature engineering and data leakage detection, use the **data-analyst** skill.

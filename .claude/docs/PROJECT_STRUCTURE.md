@@ -147,10 +147,38 @@ nba_bets/
 │       ├── feature_selection/
 │       └── visualizations/
 │
+├── .claude/                                    # Claude Code configuration
+│   ├── docs/
+│   │   └── PROJECT_STRUCTURE.md                # This file
+│   ├── experts/
+│   │   ├── software-dev.md                     # Software dev expert persona
+│   │   └── data-scientist.md                   # Data scientist expert persona
+│   ├── hooks/
+│   │   └── check-structure-drift.sh            # Stop hook: detects file tree drift
+│   ├── skills/
+│   │   ├── data-analyst/
+│   │   │   ├── SKILL.md                        # Data analyst skill definition
+│   │   │   └── references/                     # Quality, outliers, audit, features, leakage
+│   │   ├── ml-pipeline/
+│   │   │   ├── SKILL.md                        # ML pipeline skill definition
+│   │   │   └── references/                     # Config schema
+│   │   ├── mlflow/
+│   │   │   ├── SKILL.md                        # MLflow skill definition
+│   │   │   └── references/                     # Naming and registry conventions
+│   │   ├── simplify/
+│   │   │   ├── SKILL.md                        # Simplify skill definition
+│   │   │   └── references/                     # Pythonic style references
+│   │   └── sklearn/
+│   │       ├── SKILL.md                        # Sklearn skill definition
+│   │       └── references/                     # Pipelines, preprocessing, transformers
+│   ├── settings.json                           # Claude Code project settings
+│   └── settings.local.json                     # Local overrides (gitignored)
+│
 ├── sandbox/                                    # Notebooks for exploration
 ├── mlruns/                                     # MLflow run tracking data
 ├── mlflow.db                                   # MLflow backend database
 ├── Makefile
 ├── pyproject.toml
+├── .python-version
 └── CLAUDE.md
 ```
