@@ -144,6 +144,10 @@ def make_rested_days_table_season(
         ["teamId", (rested_days["at_road_indicator"] == 0).cumsum()]
     )["at_road_indicator"].transform("cumsum")
 
+    # Fix covid games outliers. If days_at_home or days_on_road is greater than 30, set it to 1.
+    rested_days.loc[rested_days["days_at_home"] > 30, "days_at_home"] = 1
+    rested_days.loc[rested_days["days_on_road"] > 30, "days_on_road"] = 1
+
     rested_days = rested_days.drop(
         columns=["gameDate", "home_game", "away_game", "rest"]
     )
