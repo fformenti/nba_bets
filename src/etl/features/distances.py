@@ -92,7 +92,7 @@ def make_teams_distances_table_season(
         upcoming ones. When None, uses REGULAR_SEASON_GAMES_PATH.
     """
     distances = pd.read_csv(LOCATIONS_DISTANCES_PATH)
-    aux_distances = distances.rename(columns={"city1": "city2", "city2": "city1"})
+    aux_distances = distances.rename(columns={"from": "to", "to": "from"})
     distances = pd.concat([distances, aux_distances]).reset_index(drop=True)
 
     teams_game_dates = make_teams_games_dates(games)
@@ -102,6 +102,10 @@ def make_teams_distances_table_season(
         teams_game_dates_season = teams_game_dates[
             teams_game_dates["season"] == season
         ].sort_values(["teamId", "gameDate"])
+
+        teams_game_dates_season = teams_game_dates_season.drop_duplicates(
+            subset=["teamId", "gameDateOnlyStr"], keep="first"
+        )
 
         # games_season = games.loc[games["season"] == season].copy()
         season_start = teams_game_dates_season["gameDate"].min()
