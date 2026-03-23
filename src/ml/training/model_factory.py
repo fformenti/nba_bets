@@ -129,7 +129,7 @@ def create_model(
             k if k.startswith("model__") else f"model__{k}": v
             for k, v in config_param_grid.items()
         }
-        logger.info(f"Using config-defined param grid: {param_grid}")
+        # logger.info(f"Using config-defined param grid: {param_grid}")
 
     logger.info(f"Created {model_name} model")
     return model, param_grid
