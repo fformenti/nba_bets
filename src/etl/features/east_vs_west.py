@@ -1,3 +1,5 @@
+import pandas as pd
+
 from src.etl.utils.common import get_season_date_range
 
 
@@ -60,6 +62,16 @@ def make_east_west_record(games, location=None):
         lambda x: 1 if x == "West" else 0
     )
 
+    east_west_record["east_wins_at_east"] = (
+        (east_west_record["winnerteamConference"] == "East")
+        & (east_west_record["hometeamConference"] == "East")
+    ).astype(int)
+
+    east_west_record["east_wins_at_west"] = (
+        (east_west_record["winnerteamConference"] == "East")
+        & (east_west_record["hometeamConference"] == "West")
+    ).astype(int)
+
     east_west_record_by_date = (
         east_west_record.groupby(["season", "gameDateOnlyStr"])
         .agg(
@@ -67,6 +79,8 @@ def make_east_west_record(games, location=None):
             west_wins_date=("west_wins", "sum"),
             games_played_date_at_east=("east_games", "sum"),
             games_played_date_at_west=("west_games", "sum"),
+            east_wins_date_at_east=("east_wins_at_east", "sum"),
+            east_wins_date_at_west=("east_wins_at_west", "sum"),
         )
         .reset_index()
     )
@@ -81,6 +95,8 @@ def make_east_west_record(games, location=None):
                 "west_wins_date",
                 "games_played_date_at_east",
                 "games_played_date_at_west",
+                "east_wins_date_at_east",
+                "east_wins_date_at_west",
             ]
         ],
         on="gameDateOnlyStr",
@@ -126,12 +142,30 @@ def make_east_west_record(games, location=None):
         .fillna(0)
     )
 
+    east_west_record_by_date["east_wins_at_east"] = (
+        east_west_record_by_date.groupby("season")["east_wins_date_at_east"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
+
+    east_west_record_by_date["east_wins_at_west"] = (
+        east_west_record_by_date.groupby("season")["east_wins_date_at_west"]
+        .cumsum()
+        .groupby(east_west_record_by_date["season"])
+        .shift(1)
+        .fillna(0)
+    )
+
     east_west_record_by_date.drop(
         columns=[
             "east_wins_date",
             "west_wins_date",
             "games_played_date_at_east",
             "games_played_date_at_west",
+            "east_wins_date_at_east",
+            "east_wins_date_at_west",
         ],
         inplace=True,
     )
@@ -149,28 +183,31 @@ def make_east_west_record(games, location=None):
     ).fillna(0.0)
 
     if location is None:
+        safe_gp_east = east_west_record_by_date["games_played_at_east"].replace(0, float("nan"))
+        safe_gp_west = east_west_record_by_date["games_played_at_west"].replace(0, float("nan"))
+
+        east_wr_at_east = east_west_record_by_date["east_wins_at_east"] / safe_gp_east
+        east_wr_at_west = east_west_record_by_date["east_wins_at_west"] / safe_gp_west
+
         east_west_record_by_date["east_record_adjusted"] = (
-            east_west_record_by_date.apply(
-                lambda x: (
-                    (x["east_record"] / x["games_played_at_east"])
-                    * (x["games_played_east_vs_west"] / 2.0)
-                    if x["games_played_at_east"] != 0
-                    else 0.0
-                ),
-                axis=1,
-            )
+            pd.DataFrame({"at_east": east_wr_at_east, "at_west": east_wr_at_west})
+            .mean(axis=1)
+            .fillna(0.0)
         )
 
+        west_wr_at_east = (
+            east_west_record_by_date["games_played_at_east"]
+            - east_west_record_by_date["east_wins_at_east"]
+        ) / safe_gp_east
+        west_wr_at_west = (
+            east_west_record_by_date["games_played_at_west"]
+            - east_west_record_by_date["east_wins_at_west"]
+        ) / safe_gp_west
+
         east_west_record_by_date["west_record_adjusted"] = (
-            east_west_record_by_date.apply(
-                lambda x: (
-                    (x["west_record"] / x["games_played_at_west"])
-                    * (x["games_played_east_vs_west"] / 2.0)
-                    if x["games_played_at_west"] != 0
-                    else 0.0
-                ),
-                axis=1,
-            )
+            pd.DataFrame({"at_east": west_wr_at_east, "at_west": west_wr_at_west})
+            .mean(axis=1)
+            .fillna(0.0)
         )
 
     return east_west_record_by_date[return_cols]
