@@ -12,7 +12,7 @@ data:
   drop_na: true
 
 filters:
-  start_date: "1980-08-01"
+  start_date: "1995-08-01"
   conference_filter: "same"
   minimum_games_train: 15
 
@@ -79,6 +79,8 @@ feature_engineering:
     - "conference_diff_east_pct"
     - "games_played_east_vs_west"
     - "distance"
+    - "days_at_home"
+    - "days_on_road"
 
 preprocessing:
   scaling_method: "standard"  # 'standard', 'robust', or 'minmax'
@@ -90,7 +92,7 @@ feature_selection:
   method: "boruta_shap"
   n_iterations: 20
   significance_level: 0.05
-  include_tentative: true
+  include_tentative: false
   random_state: 42
 
 model:
