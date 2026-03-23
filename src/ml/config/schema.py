@@ -1,6 +1,6 @@
 """Pydantic schemas for experiment configuration."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from src.config.constants import (
@@ -100,11 +100,14 @@ class HyperparameterTuningConfig(BaseModel):
     param_grid: Optional[Dict[str, list]] = None
 
 
+ModelName = Literal["random_forest", "gradient_boosting", "xgboost", "lgbm"]
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     type: str = "classification"
-    name: str = "random_forest"
+    name: ModelName = "random_forest"
     hyperparameter_tuning: HyperparameterTuningConfig = HyperparameterTuningConfig()
     random_forest: dict[str, Any] = Field(default_factory=dict)
     gradient_boosting: dict[str, Any] = Field(default_factory=dict)
