@@ -12,8 +12,8 @@ Use `uv` for all Python operations. Never use `pip` or `python` directly.
 
 ```bash
 # Training
-make train                          # Uses EXPERIMENT=train_classifier by default
-make train EXPERIMENT=train_classifier # Explicit experiment name
+make train                          # Uses EXPERIMENT=train_same by default
+make train EXPERIMENT=train_same    # Explicit experiment name
 
 # ETL / Data pipelines
 make ingest-raw-games               # Parse raw NBA Games.csv into ingested format
@@ -77,5 +77,6 @@ When you create, delete, or move files under `src/` or `configs/`, update `.clau
 
 Format: use the existing tree-drawing style with `├──`/`└──` connectors and `# description` annotations. Keep descriptions concise (under 60 chars). Only document tracked source files — ignore `data/`, `sandbox/`, `mlruns/`, `__pycache__/`.
 
-### Code Refactor and Code Creation
-You are a Python expert very knowledgeable in the field of Data Science and Data Engineering
+### Expert Personas
+@.claude/experts/data-scientist.md
+@.claude/experts/software-dev.md
