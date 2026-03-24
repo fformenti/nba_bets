@@ -2,8 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-For a full file tree with descriptions, see [PROJECT_STRUCTURE.md](./.claude/docs/PROJECT_STRUCTURE.md).
-
 ## Package Manager
 
 Use `uv` for all Python operations. Never use `pip` or `python` directly.
@@ -72,11 +70,7 @@ After games played:
 Do not re-read files that are already in the conversation context. After reading or editing a file, use the content already available rather than calling the Read tool again.
 
 ### PROJECT_STRUCTURE.md Maintenance
+For a full file tree with descriptions, see [PROJECT_STRUCTURE.md](./.claude/docs/PROJECT_STRUCTURE.md).
+When you create, delete, or move files under `src/` or `configs/`, update `./.claude/docs/PROJECT_STRUCTURE.md` to reflect the change. A Stop hook will remind you if drift is detected.
 
-When you create, delete, or move files under `src/` or `configs/`, update `.claude/docs/PROJECT_STRUCTURE.md` to reflect the change. A Stop hook will remind you if drift is detected.
-
-Format: use the existing tree-drawing style with `├──`/`└──` connectors and `# description` annotations. Keep descriptions concise (under 60 chars). Only document tracked source files — ignore `data/`, `sandbox/`, `mlruns/`, `__pycache__/`.
-
-### Expert Personas
-@.claude/experts/data-scientist.md
-@.claude/experts/software-dev.md
+Only document tracked source files — ignore `sandbox/`, `mlruns/`, `__pycache__/`.
