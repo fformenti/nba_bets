@@ -19,6 +19,7 @@ from src.config.paths import (
     LAST_SEASON_HOME_RECORD_PATH,
     LAST_SEASON_AWAY_RECORD_PATH,
     TEAMS_STREAKS_PATH,
+    TEAMS_SOS_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -43,10 +44,11 @@ from src.etl.features.last_season_record import (
     create_last_season_away_record,
 )
 from src.etl.features.streaks import calculate_streak
+from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
 
 
 def create_features_tables(
-    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[]
+    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[]
 ):
     """
     Create all feature tables from games DataFrame.
@@ -107,6 +109,11 @@ def create_features_tables(
 
     teams_streaks = calculate_streak(games)
     teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
+
+    if sos_lags:
+        teams_sos = calculate_strength_of_schedule(games, lags=sos_lags)
+        teams_sos.to_csv(TEAMS_SOS_PATH, index=False)
+
     return
 
 
@@ -221,6 +228,12 @@ def merge_features(games):
 
     games = join_games_and_teams_feature(games, teams_streaks, "hometeamId", "HT")
     games = join_games_and_teams_feature(games, teams_streaks, "awayteamId", "VT")
+
+    # Strength of Schedule
+    if TEAMS_SOS_PATH.exists():
+        teams_sos = pd.read_csv(TEAMS_SOS_PATH)
+        games = join_games_and_teams_feature(games, teams_sos, "hometeamId", "HT")
+        games = join_games_and_teams_feature(games, teams_sos, "awayteamId", "VT")
 
     games = games.drop(
         columns=[

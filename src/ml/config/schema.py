@@ -76,6 +76,7 @@ class FeatureEngineeringConfig(BaseModel):
     point_differential_lags: list[int] = Field(default_factory=list)
     location_lags: list[int] = Field(default_factory=list)
     distances_lags: list[int] = Field(default_factory=list)
+    sos_lags: list[int] = Field(default_factory=list)
     momentum_pairs: list[MomentumPairConfig] = Field(
         default_factory=list,
         description="Pairs of (feature, short_lag, long_lag) to replace with a momentum delta feature.",

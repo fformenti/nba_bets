@@ -50,6 +50,7 @@ def main():
     point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
     distances_lags = feature_engineering_config.distances_lags
+    sos_lags = feature_engineering_config.sos_lags
 
     # Step 1: Add neutral court game flag and conference information
     print("\n[Step 1/4] Adding neutral court game flag and conference information...")
@@ -67,6 +68,7 @@ def main():
         point_differential_lags,
         location_lags,
         distances_lags,
+        sos_lags,
     )
     print("✓ Created all feature tables")
 

@@ -244,9 +244,10 @@ def build_features_for_prediction(
     point_differential_lags = feat_eng_config.point_differential_lags
     location_lags = feat_eng_config.location_lags
     distances_lags = feat_eng_config.distances_lags
+    sos_lags = feat_eng_config.sos_lags
     # Create feature tables
     logger.info("Creating feature tables")
-    create_features_tables(historical_combined, record_lags, point_differential_lags, location_lags, distances_lags)
+    create_features_tables(historical_combined, record_lags, point_differential_lags, location_lags, distances_lags, sos_lags)
 
     # Merge features for upcoming games
     upcoming_with_features = merge_features(upcoming_games)
@@ -275,6 +276,7 @@ def build_features_for_prediction(
         point_differential_lags=point_differential_lags,
         location_lags=location_lags,
         distances_lags=distances_lags,
+        sos_lags=sos_lags,
     )
 
     # Apply conference-specific features based on filter type

@@ -87,6 +87,7 @@ def train_single_model(
     point_differential_lags = feat_eng_config.point_differential_lags
     location_lags = feat_eng_config.location_lags
     distances_lags = feat_eng_config.distances_lags
+    sos_lags = feat_eng_config.sos_lags
     metadata_columns = feat_eng_config.metadata_columns
     originally_enriched_columns = feat_eng_config.originally_enriched_columns
 
@@ -179,7 +180,7 @@ def train_single_model(
     )
 
     df = create_delta_features(
-        df, record_lags, point_differential_lags, location_lags, distances_lags
+        df, record_lags, point_differential_lags, location_lags, distances_lags, sos_lags
     )
     df = apply_conference_features(df, conference_filter)
     if config.feature_engineering.momentum_pairs:

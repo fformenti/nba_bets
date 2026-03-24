@@ -20,6 +20,7 @@ def create_delta_features(
     point_differential_lags: List[int],
     location_lags,
     distances_lags,
+    sos_lags: List[int] = [],
 ) -> pd.DataFrame:
     """
     Create delta features (home - away) for specified feature pairs.
@@ -46,6 +47,7 @@ def create_delta_features(
     rested_days_features = ["rested_days"]
     last_season_record_features = ["last_season_record"]
     streak_features = ["streak"]
+    sos_features = ["sos_L" + str(lag) for lag in sos_lags]
     feature_names = (
         record_features
         + pts_diff_features
@@ -53,6 +55,7 @@ def create_delta_features(
         + rested_days_features
         + last_season_record_features
         + streak_features
+        + sos_features
     )
 
     df = df.copy()

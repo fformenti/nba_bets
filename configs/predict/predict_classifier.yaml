@@ -14,7 +14,7 @@ data:
 model_uris:
   same: "runs:/e169231167b341eab4f8ab6b3e5f82f7/nba_gradient_boosting_same"
   different: "runs:/cd041d98e9c6457b919ffbd64a78f607/nba_gradient_boosting_different"
-  all: "runs:/fdb362311c30484ca202c7a608845996/nba_xgboost_all"
+  all: "runs:/12410bf7c0dd4023974984a1a7a519c3/nba_xgboost_all"
 
 mlflow:
   experiment_name: "nba_bets_predictions"

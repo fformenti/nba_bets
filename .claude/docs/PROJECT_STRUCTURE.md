@@ -67,7 +67,8 @@ nba_bets/
 │   │   │   ├── rest_days.py                    # Days since last game
 │   │   │   ├── distances.py                    # Rolling travel distance
 │   │   │   ├── last_season_record.py           # Last season's win percentage record
-│   │   │   └── streaks.py                      # Consecutive win/loss streak per team
+│   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
+│   │   │   └── strength_of_schedule.py         # Rolling strength of schedule
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games
