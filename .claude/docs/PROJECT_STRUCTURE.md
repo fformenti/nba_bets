@@ -66,7 +66,8 @@ nba_bets/
 │   │   │   ├── east_vs_west.py                 # Conference win/loss records
 │   │   │   ├── rest_days.py                    # Days since last game
 │   │   │   ├── distances.py                    # Rolling travel distance
-│   │   │   └── last_season_record.py           # Last season's win percentage record
+│   │   │   ├── last_season_record.py           # Last season's win percentage record
+│   │   │   └── streaks.py                      # Consecutive win/loss streak per team
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games
@@ -127,10 +128,15 @@ nba_bets/
 │   │   └── utils/
 │   │       └── validation.py                   # Data validation utilities
 │   │
+│   ├── eda/
+│   │   └── home_win_ratio_by_season.py         # Home win ratio bar chart by season
+│   │
 │   └── utils/
 │       └── logging_config.py                   # Shared logging setup
 │
 ├── outputs/                                    # Training artifacts (gitignored)
+│   ├── enriched_games/
+│   │   └── viz/                                # EDA visualizations on enriched games
 │   ├── all/                                    # Outputs for train_all experiment
 │   │   ├── tables/                             # CV result tables
 │   │   ├── analysis/                           # Error analysis outputs

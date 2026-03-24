@@ -45,12 +45,14 @@ def create_delta_features(
     distances_features = ["distance_L" + str(lag) for lag in distances_lags]
     rested_days_features = ["rested_days"]
     last_season_record_features = ["last_season_record"]
+    streak_features = ["streak"]
     feature_names = (
         record_features
         + pts_diff_features
         + distances_features
         + rested_days_features
         + last_season_record_features
+        + streak_features
     )
 
     df = df.copy()
@@ -93,6 +95,42 @@ def create_delta_features(
     logger.info(f"Created {len(created_features)} delta features")
     df.drop(columns=features_used_for_deltas, inplace=True)
     logger.info(f"Dropped {len(features_used_for_deltas)} features used for deltas")
+    return df
+
+
+def create_momentum_features(
+    df: pd.DataFrame,
+    momentum_pairs: List[List[int]],
+) -> pd.DataFrame:
+    """
+    Replace correlated lag-delta pairs with a single momentum feature.
+
+    For each [short_lag, long_lag] pair, computes:
+        pts_diff_momentum_L{short}_L{long}_delta = pts_diff_avg_L{short}_delta - pts_diff_avg_L{long}_delta
+
+    Both source delta columns are dropped.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with delta features already created
+    momentum_pairs : list of [short_lag, long_lag]
+        Each pair defines a momentum feature replacing the two correlated lag deltas
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with momentum features added and source lag deltas dropped
+    """
+    df = df.copy()
+    for pair in momentum_pairs:
+        feature, short_lag, long_lag = pair.feature, pair.short, pair.long
+        short_col = f"{feature}_L{short_lag}_delta"
+        long_col = f"{feature}_L{long_lag}_delta"
+        momentum_col = f"{feature}_momentum_L{short_lag}_L{long_lag}_delta"
+        df[momentum_col] = df[short_col] - df[long_col]
+        df.drop(columns=[short_col, long_col], inplace=True)
+        logger.info(f"Created {momentum_col}, dropped {short_col} and {long_col}")
     return df
 
 

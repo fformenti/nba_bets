@@ -13,7 +13,7 @@ from src.config.paths import (
 from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
 
-from src.etl.utils.common import filter_games_by_date, add_neutral_court_game_flag
+from src.etl.utils.common import add_neutral_court_game_flag
 from src.ml.config.loader import load_experiment_config
 
 from src.utils.logging_config import get_logger, setup_logging
@@ -45,9 +45,7 @@ def main():
 
     # Step 0: Load configuration
     config = load_experiment_config(args.config)
-    filters_config = config.filters
     feature_engineering_config = config.feature_engineering
-    earliest_date = filters_config.start_date
     record_lags = feature_engineering_config.record_lags
     point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
@@ -73,14 +71,8 @@ def main():
     print("✓ Created all feature tables")
 
     # Step 3: Merge features
-    print("\n[Step 3/4] Merging features into final table...")
+    print("\n[Step 3/3] Merging features into final table...")
     final_features = merge_features(games_with_conference)
-
-    # Step 4: Filter by date if provided
-    if earliest_date is not None:
-        print(f"\n[Step 4/4] Filtering games by earliest date ({earliest_date})...")
-        final_features = filter_games_by_date(final_features, earliest_date)
-        print(f"✓ Filtered to {len(final_features)} games")
 
     final_features.to_csv(REGULAR_SEASON_GAMES_FEATURES_PATH, index=False)
     print(f"✓ Created final features table with {len(final_features)} rows")

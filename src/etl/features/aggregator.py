@@ -18,6 +18,7 @@ from src.config.paths import (
     LAST_SEASON_RECORD_PATH,
     LAST_SEASON_HOME_RECORD_PATH,
     LAST_SEASON_AWAY_RECORD_PATH,
+    TEAMS_STREAKS_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -41,6 +42,7 @@ from src.etl.features.last_season_record import (
     create_last_season_home_record,
     create_last_season_away_record,
 )
+from src.etl.features.streaks import calculate_streak
 
 
 def create_features_tables(
@@ -102,6 +104,9 @@ def create_features_tables(
 
     last_season_away_record = create_last_season_away_record(games)
     last_season_away_record.to_csv(LAST_SEASON_AWAY_RECORD_PATH, index=False)
+
+    teams_streaks = calculate_streak(games)
+    teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
     return
 
 
@@ -138,6 +143,7 @@ def merge_features(games):
     last_season_record = pd.read_csv(LAST_SEASON_RECORD_PATH)
     last_season_home_record = pd.read_csv(LAST_SEASON_HOME_RECORD_PATH)
     last_season_away_record = pd.read_csv(LAST_SEASON_AWAY_RECORD_PATH)
+    teams_streaks = pd.read_csv(TEAMS_STREAKS_PATH)
 
     # Records
     # teams_records = teams_records.drop(columns=["gameDate", "season", "win_bool"])
@@ -212,6 +218,9 @@ def merge_features(games):
         left_on=["season", "awayteamId"],
         right_on=["season", "teamId"],
     ).drop(columns=["teamId"])
+
+    games = join_games_and_teams_feature(games, teams_streaks, "hometeamId", "HT")
+    games = join_games_and_teams_feature(games, teams_streaks, "awayteamId", "VT")
 
     games = games.drop(
         columns=[

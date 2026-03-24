@@ -95,10 +95,16 @@ TEAMS_DISTANCES_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_distances.csv"
 LAST_SEASON_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_record.csv"
 LAST_SEASON_HOME_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_home_record.csv"
 LAST_SEASON_AWAY_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_away_record.csv"
+TEAMS_STREAKS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_streaks.csv"
 
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"
 POLYMARKET_DAILY_BETS_DIR = PREDICTIONS_DIR / "daily_bets"
+
+# ===== Outputs =====
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+ENRICHED_GAMES_VIZ_DIR = OUTPUTS_DIR / "enriched_games" / "viz"
+HOME_WIN_RATIO_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_by_season.png"
 
 
 def project_relpath(path: Path) -> str:

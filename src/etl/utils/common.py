@@ -198,40 +198,6 @@ def get_nba_season(game_date):
         return f"{year - 1}/{year % 100:02d}"
 
 
-def filter_games_by_date(games: pd.DataFrame, min_date: str) -> pd.DataFrame:
-    """
-    Filter games DataFrame to include only games on or after the specified date.
-
-    Parameters
-    ----------
-    games : pd.DataFrame
-        Games DataFrame with a 'gameDate' column
-    min_date : str
-        Minimum date to filter games (format: "YYYY-MM-DD").
-        Only games on or after this date will be included.
-
-    Returns
-    -------
-    pd.DataFrame
-        Filtered games DataFrame
-
-    Raises
-    ------
-    ValueError
-        If 'gameDate' column is not present in the DataFrame
-    """
-    if "gameDate" not in games.columns:
-        raise ValueError("DataFrame must contain 'gameDate' column")
-
-    min_date_dt = pd.to_datetime(min_date)
-    initial_count = len(games)
-    filtered_games = games[games["gameDate"] >= min_date_dt].copy()
-    filtered_count = len(filtered_games)
-
-    print(f"Filtered games: {initial_count} -> {filtered_count} (min_date: {min_date})")
-
-    return filtered_games
-
 
 def add_neutral_court_game_flag(
     df: pd.DataFrame,

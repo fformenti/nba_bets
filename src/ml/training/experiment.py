@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.config.constants import MINIMUM_GAMES_TEST
 from src.config.paths import REGULAR_SEASON_GAMES_FEATURES_PATH
 from src.ml.config.schema import ExperimentConfig
 from src.ml.datasets.splitters import temporal_split
@@ -33,6 +32,7 @@ from src.ml.features.selection import run_feature_selection
 from src.ml.features.engineering import (
     apply_conference_features,
     create_delta_features,
+    create_momentum_features,
     identify_feature_types,
 )
 from src.ml.features.preprocessing import create_preprocessing_pipeline
@@ -91,12 +91,15 @@ def train_single_model(
     originally_enriched_columns = feat_eng_config.originally_enriched_columns
 
     minimum_games_train = filters_config.minimum_games_train
+    minimum_games_test = filters_config.minimum_games_test
     conference_filter = filters_config.conference_filter
 
     if conference_filter not in ["same", "different", "all"]:
         raise ValueError(
             f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
         )
+
+    min_season = filters_config.min_season
 
     tracker.log_params(
         {
@@ -105,11 +108,14 @@ def train_single_model(
             "test_size": split_config.test_size,
             "val_size": split_config.val_size,
             "minimum_games_train": minimum_games_train,
-            "minimum_games_test": MINIMUM_GAMES_TEST,
+            "minimum_games_test": minimum_games_test,
             "conference_filter": conference_filter,
+            "min_season": min_season,
             "scaling_method": config.preprocessing.scaling_method,
             "sample_weighting_enabled": weighting_config.enabled,
             "sample_weighting_K": weighting_config.saturation_K,
+            "season_decay_enabled": weighting_config.season_decay_enabled,
+            "season_decay_lambda": weighting_config.season_decay_lambda,
         }
     )
     tracker.set_tags(
@@ -129,6 +135,12 @@ def train_single_model(
         data_path=data_path, target_column=target_column, date_column=date_column
     )
 
+    if min_season is not None:
+        if "season" not in games_enriched.columns:
+            raise ValueError("DataFrame must contain 'season' column for min_season filtering")
+        games_enriched = games_enriched[games_enriched["season"] >= min_season].copy()
+        logger.info(f"Filtered to {len(games_enriched)} games (min_season: {min_season})")
+
     if conference_filter == "different":
         games_enriched = games_enriched[
             games_enriched["hometeamConference"] != games_enriched["awayteamConference"]
@@ -143,7 +155,7 @@ def train_single_model(
         logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
 
     games_enriched = filter_minimum_games_played(
-        cast(pd.DataFrame, games_enriched), MINIMUM_GAMES_TEST
+        cast(pd.DataFrame, games_enriched), minimum_games_test
     )
 
     date_range_name = None
@@ -170,6 +182,8 @@ def train_single_model(
         df, record_lags, point_differential_lags, location_lags, distances_lags
     )
     df = apply_conference_features(df, conference_filter)
+    if config.feature_engineering.momentum_pairs:
+        df = create_momentum_features(df, config.feature_engineering.momentum_pairs)
 
     test_size = split_config.test_size
     val_size = split_config.val_size
@@ -189,7 +203,7 @@ def train_single_model(
     X_val = X_val.drop(columns=[date_column])
     X_test = X_test.drop(columns=[date_column])
 
-    if minimum_games_train > MINIMUM_GAMES_TEST:
+    if minimum_games_train > minimum_games_test:
         train_gp = games_enriched.loc[X_train.index]
         train_mask = (train_gp["games_played_HT"] > minimum_games_train) & (
             train_gp["games_played_VT"] > minimum_games_train
@@ -228,15 +242,39 @@ def train_single_model(
         )
         train_sample_weight = np.clip(min_gp_train / float(K), 0.0, 1.0)
         logger.info(
-            f"Sample weighting enabled (K={K}): "
-            f"min_weight={train_sample_weight.min():.2f}, "
-            f"mean_weight={train_sample_weight.mean():.2f}, "
-            f"pct_full_weight={(train_sample_weight == 1.0).mean() * 100:.1f}%"
+            f"Within-season weighting (K={K}): "
+            f"min={train_sample_weight.min():.2f}, "
+            f"mean={train_sample_weight.mean():.2f}, "
+            f"pct_full={(train_sample_weight == 1.0).mean() * 100:.1f}%"
+        )
+
+    if weighting_config.season_decay_enabled:
+        lam = weighting_config.season_decay_lambda
+        train_seasons = metadata.loc[X_train.index, "season"]
+        season_order = sorted(train_seasons.unique())
+        season_to_idx = {s: i for i, s in enumerate(season_order)}
+        max_idx = len(season_order) - 1
+        season_indices = train_seasons.map(season_to_idx).to_numpy(dtype=np.float64)
+        cross_season_weight = np.exp(-lam * (max_idx - season_indices))
+        if train_sample_weight is None:
+            train_sample_weight = cross_season_weight
+        else:
+            train_sample_weight = train_sample_weight * cross_season_weight
+        logger.info(
+            f"Cross-season decay (lambda={lam}): "
+            f"min={cross_season_weight.min():.3f}, "
+            f"mean={cross_season_weight.mean():.3f}, "
+            f"oldest={season_order[0]}, newest={season_order[-1]}"
         )
 
     logger.info(
         f"Features BEFORE selection ({len(X_train.columns)}): {sorted(X_train.columns.tolist())}"
     )
+
+    # Keep full feature set for baselines (independent of feature selection)
+    X_train_baseline = X_train
+    X_val_baseline = X_val
+    X_test_baseline = X_test
 
     # --- Feature Selection (Boruta-SHAP) ---
     boruta_selector = None
@@ -323,12 +361,12 @@ def train_single_model(
     models_to_train = {}
 
     logger.info(f"\n{'=' * 60}")
-    logger.info("Training Baseline Model")
+    logger.info("Record Difference Baseline")
     logger.info(f"{'=' * 60}")
 
     baseline_model = RecordDifferenceBaseline()
     models_to_train[baseline_model.name] = train_baseline_model(
-        baseline_model, X_train, y_train, X_val, y_val, X_test, y_test
+        baseline_model, X_train_baseline, y_train, X_val_baseline, y_val, X_test_baseline, y_test
     )
 
     if baseline_model.name in models_to_train and models_to_train[baseline_model.name]:
@@ -338,34 +376,29 @@ def train_single_model(
             tracker.set_tags({"model_type": "baseline"})
 
     try:
+        logger.info(f"\n{'=' * 60}")
+        logger.info("Point Differential Baseline")
+        logger.info(f"{'=' * 60}")
+
         baseline_model = PointDifferentialBaseline(
             feature_column="pts_diff_avg_L82_delta"
         )
-        baseline_model.fit(X_train, y_train)
+        baseline_model.fit(X_train_baseline, y_train)
 
         baseline_trainer = ModelTrainer(
             model=baseline_model, task_type="classification", random_state=random_state
         )
         baseline_trainer.is_fitted = True
 
-        baseline_train_metrics = baseline_trainer.evaluate(X_train, y_train)
-        baseline_val_metrics = baseline_trainer.evaluate(X_val, y_val)
-        baseline_test_metrics = baseline_trainer.evaluate(X_test, y_test)
+        baseline_test_metrics = baseline_trainer.evaluate(X_test_baseline, y_test)
 
         models_to_train[baseline_model.name] = {
             "pipeline": baseline_model,
             "trainer": baseline_trainer,
-            "training_results": {
-                "train": baseline_train_metrics,
-                "val": baseline_val_metrics,
-            },
+            "training_results": {},
             "test_metrics": baseline_test_metrics,
         }
 
-        conf_label = get_conference_display_name(conference_filter)
-        logger.info(
-            f"{baseline_model.name_caption} ({conf_label}) [Test]: {format_metrics_line(baseline_test_metrics, prefix='test')}"
-        )
         with tracker.child_run(baseline_model.name):
             tracker.log_metrics(baseline_test_metrics)
             tracker.set_tags({"model_type": "baseline"})

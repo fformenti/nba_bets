@@ -307,7 +307,7 @@ class ModelTrainer:
                 "Model must be trained before evaluation. Call train() first."
             )
 
-        logger.info(f"Evaluating model on {len(X)} samples (prefix: {prefix})")
+        logger.debug(f"Evaluating model on {len(X)} samples (prefix: {prefix})")
         y_pred = self.model.predict(X)
         metrics = self._compute_metrics(y, y_pred, X, prefix=prefix)
         line = format_metrics_line(metrics, prefix=prefix)

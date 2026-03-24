@@ -29,7 +29,7 @@ class ThresholdBaseline(BaseEstimator, ClassifierMixin):
                 f"Available columns: {list(X.columns)}"
             )
         self.is_fitted = True
-        logger.info(f"Baseline model fitted using feature: {self.feature_column}")
+        logger.debug(f"Baseline model fitted using feature: {self.feature_column}")
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:

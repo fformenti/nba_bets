@@ -5,7 +5,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 
-from src.ml.evaluation.metrics import format_metrics_line, get_model_display_name
 from src.ml.models.trainer import ModelTrainer
 from src.utils.logging_config import get_logger
 
@@ -30,18 +29,12 @@ def train_baseline_model(
         baseline_trainer = ModelTrainer(model=baseline_model, task_type="classification")
         baseline_trainer.is_fitted = True
 
-        baseline_train_metrics = baseline_trainer.evaluate(X_train, y_train)
-        baseline_val_metrics = baseline_trainer.evaluate(X_val, y_val)
         baseline_test_metrics = baseline_trainer.evaluate(X_test, y_test)
-        logger.info(f"{baseline_model.name_caption} [Test]: {format_metrics_line(baseline_test_metrics, prefix='test')}")
 
         return {
             "pipeline": baseline_model,
             "trainer": baseline_trainer,
-            "training_results": {
-                "train": baseline_train_metrics,
-                "val": baseline_val_metrics,
-            },
+            "training_results": {},
             "test_metrics": baseline_test_metrics,
         }
     except Exception as e:

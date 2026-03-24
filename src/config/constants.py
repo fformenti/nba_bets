@@ -5,8 +5,6 @@ Project-wide constants for reusable defaults.
 # League schedule file
 LEAGUE_SCHEDULE_FILE = "LeagueSchedule25_26.csv"
 
-# Earliest date used for historical filtering (YYYY-MM-DD).
-EARLIEST_GAME_DATE = "1980-08-01"
 
 ENRICHED_COLUMNS = [
     "win_bool",
@@ -46,9 +44,6 @@ DEFAULT_METADATA_COLUMNS = [
 
 # Current season start year (e.g., 2025 for 2025/26 season).
 CURRENT_SEASON_START_YEAR = 2025
-
-# Minimum games played threshold applied to the test set (fixed — never changes between experiments).
-MINIMUM_GAMES_TEST = 15
 
 # Neutral court game labels
 INTERNATIONAL_GAMES = [

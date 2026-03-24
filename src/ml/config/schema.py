@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from src.config.constants import (
     DEFAULT_METADATA_COLUMNS,
-    EARLIEST_GAME_DATE,
     ENRICHED_COLUMNS,
 )
 
@@ -28,13 +27,23 @@ class WeightingConfig(BaseModel):
         description="Games-played saturation point for sample weights. "
         "Observations where min(games_played_HT, games_played_VT) >= K get weight 1.0.",
     )
+    season_decay_enabled: bool = Field(
+        default=False,
+        description="Enable exponential decay weighting by season to downweight older seasons.",
+    )
+    season_decay_lambda: float = Field(
+        default=0.1,
+        description="Decay rate for cross-season weighting. Higher = faster decay. "
+        "Weight = exp(-lambda * seasons_ago).",
+    )
 
 
 class FiltersConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    start_date: str | None = EARLIEST_GAME_DATE
+    min_season: str | None = None
     minimum_games_train: int = 15
+    minimum_games_test: int = 15
     conference_filter: str = Field(
         default="same",
         description="Conference filter type: 'same', 'different', or 'all'.",
@@ -50,6 +59,16 @@ class SplittingConfig(BaseModel):
     random_state: int = 42
 
 
+class MomentumPairConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    feature: str = Field(
+        description="Feature prefix used in delta column names, e.g. 'pts_diff_avg' or 'record'."
+    )
+    short: int = Field(description="Short window lag.")
+    long: int = Field(description="Long window lag.")
+
+
 class FeatureEngineeringConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -57,6 +76,10 @@ class FeatureEngineeringConfig(BaseModel):
     point_differential_lags: list[int] = Field(default_factory=list)
     location_lags: list[int] = Field(default_factory=list)
     distances_lags: list[int] = Field(default_factory=list)
+    momentum_pairs: list[MomentumPairConfig] = Field(
+        default_factory=list,
+        description="Pairs of (feature, short_lag, long_lag) to replace with a momentum delta feature.",
+    )
     metadata_columns: list[str] = Field(
         default_factory=lambda: DEFAULT_METADATA_COLUMNS
     )
