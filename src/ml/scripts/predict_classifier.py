@@ -251,6 +251,7 @@ def build_features_for_prediction(
         feat_eng_config.distances_lags,
         feat_eng_config.sos_lags,
         sos_adj_alpha=feat_eng_config.sos_adj_alpha,
+        sos_adj_location_lags=feat_eng_config.features.sos_adj_record.location_lags,
     )
 
     # Merge features for upcoming games
@@ -325,8 +326,18 @@ def prepare_features_for_model(
         available = [c for c in feature_columns if c in df.columns]
         missing_features = [c for c in feature_columns if c not in df.columns]
         if missing_features:
+            formatted_missing = "\n".join(
+                f"  - MISSING FEATURE: {feature}" for feature in missing_features
+            )
             logger.warning(
-                f"Expected feature columns not found in data: {missing_features}"
+                "\n"
+                + "!" * 90
+                + "\n"
+                + "!!! CRITICAL WARNING: EXPECTED FEATURE COLUMNS WERE NOT FOUND IN DATA !!!\n"
+                + "This will likely degrade model quality and should be investigated immediately.\n"
+                + formatted_missing
+                + "\n"
+                + "!" * 90
             )
         X = df[available]
     else:

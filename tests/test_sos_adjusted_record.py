@@ -246,6 +246,68 @@ class TestLagMatching:
 # Season boundary test
 # ---------------------------------------------------------------------------
 
+class TestLocationRecords:
+    """Test SOS adjustment applied to home-only and away-only records."""
+
+    def test_sos_adjusted_home_record(self, worked_example_games):
+        """SOS adjustment applied to home-only records produces correct columns."""
+        home_records = calculate_home_record(worked_example_games, lags=[10])
+        sos_df = calculate_strength_of_schedule(
+            worked_example_games, lags=[10], min_opponents=1,
+        )
+        result = calculate_sos_adjusted_record(
+            records_df=home_records,
+            sos_df=sos_df,
+            record_lags=[10],
+            sos_lags=[10],
+            alpha=1.0,
+        )
+        assert "sos_adj_record_L10" in result.columns
+        assert len(result) > 0
+
+    def test_sos_adjusted_away_record(self, worked_example_games):
+        """SOS adjustment applied to away-only records produces correct columns."""
+        away_records = calculate_away_record(worked_example_games, lags=[10])
+        sos_df = calculate_strength_of_schedule(
+            worked_example_games, lags=[10], min_opponents=1,
+        )
+        result = calculate_sos_adjusted_record(
+            records_df=away_records,
+            sos_df=sos_df,
+            record_lags=[10],
+            sos_lags=[10],
+            alpha=1.0,
+        )
+        assert "sos_adj_record_L10" in result.columns
+        assert len(result) > 0
+
+    def test_home_and_away_cover_different_team_game_pairs(self, worked_example_games):
+        """Home and away adjusted records cover different (teamId, gameId) pairs."""
+        home_records = calculate_home_record(worked_example_games, lags=[10])
+        away_records = calculate_away_record(worked_example_games, lags=[10])
+        sos_df = calculate_strength_of_schedule(
+            worked_example_games, lags=[10], min_opponents=1,
+        )
+        home_adj = calculate_sos_adjusted_record(
+            records_df=home_records, sos_df=sos_df,
+            record_lags=[10], sos_lags=[10], alpha=1.0,
+        )
+        away_adj = calculate_sos_adjusted_record(
+            records_df=away_records, sos_df=sos_df,
+            record_lags=[10], sos_lags=[10], alpha=1.0,
+        )
+        assert len(home_adj) > 0
+        assert len(away_adj) > 0
+        # Home and away records cover different (team, game) pairs
+        home_pairs = set(zip(home_adj["teamId"], home_adj["gameId"]))
+        away_pairs = set(zip(away_adj["teamId"], away_adj["gameId"]))
+        assert home_pairs.isdisjoint(away_pairs)
+
+
+# ---------------------------------------------------------------------------
+# Season boundary test
+# ---------------------------------------------------------------------------
+
 def test_season_reset():
     """SOS-adjusted record resets at season boundaries."""
     games = pd.DataFrame(

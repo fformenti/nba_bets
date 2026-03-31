@@ -79,6 +79,7 @@ def run_full_pipeline(
     distances_lags = feature_engineering_config.distances_lags
     sos_lags = feature_engineering_config.sos_lags
     sos_adj_alpha = feature_engineering_config.sos_adj_alpha
+    sos_adj_location_lags = feature_engineering_config.features.sos_adj_record.location_lags
 
     # Step 1: Load teams history table (create it if missing)
     print("\n[Step 1/5] Loading teams history table...")
@@ -135,6 +136,7 @@ def run_full_pipeline(
     create_features_tables(
         games_with_conference, record_lags, point_differential_lags, location_lags,
         distances_lags, sos_lags, sos_adj_alpha=sos_adj_alpha,
+        sos_adj_location_lags=sos_adj_location_lags,
     )
     print("✓ Created all feature tables")
 

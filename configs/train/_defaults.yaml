@@ -57,12 +57,12 @@ feature_engineering:
   features:
     record:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [10, 41]
+      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: true
     point_differential:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [10, 20, 41]
+      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: true
 
@@ -72,6 +72,8 @@ feature_engineering:
       delta: false
       enabled: false
     sos_adj_record:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: false    # opt-in per experiment; declare lags explicitly when enabling
     distance:
@@ -108,7 +110,7 @@ preprocessing:
 
 model:
   type: "classification"
-  name: "random_forest"
+  name: "nba_games_classifier"
   train_models:
     - random_forest
     - gradient_boosting

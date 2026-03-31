@@ -130,7 +130,8 @@ nba_bets/
 │   │   │   └── place_bets.py                   # Place bets via Polymarket API
 │   │   │
 │   │   └── utils/
-│   │       └── validation.py                   # Data validation utilities
+│   │       ├── validation.py                   # Data validation utilities
+│   │       └── shap.py                         # SHAP output compatibility helpers
 │   │
 │   ├── eda/
 │   │   └── home_win_ratio_by_season.py         # Home win ratio bar chart by season

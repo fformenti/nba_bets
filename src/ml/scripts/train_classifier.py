@@ -3,13 +3,47 @@ from pathlib import Path
 from typing import Optional
 
 from src.config.paths import DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH, PROJECT_ROOT
-from src.ml.config.loader import load_experiment_config
+from src.ml.config.loader import load_experiment_config, load_yaml_config
 from src.ml.tracking.mlflow_tracker import MLflowTracker
 from src.ml.training.experiment import generate_run_name, train_single_model
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
 setup_logging(level="INFO")
+
+
+def _log_feature_configs_from_yaml(config_path: Path, tracker: MLflowTracker) -> None:
+    """Log feature-related params by reading train + features YAML files."""
+    train_yaml = load_yaml_config(config_path)
+    features_yaml_path = (config_path.parent / "../features.yaml").resolve()
+    features_yaml = load_yaml_config(features_yaml_path)
+
+    include_tentative = (
+        train_yaml.get("feature_selection", {}) or {}
+    ).get("include_tentative")
+    sos_adj_alpha = (features_yaml.get("feature_engineering", {}) or {}).get(
+        "sos_adj_alpha"
+    )
+
+    params = {}
+    if include_tentative is not None:
+        params["feature_selection_include_tentative"] = include_tentative
+    if sos_adj_alpha is not None:
+        params["feature_engineering_sos_adj_alpha"] = sos_adj_alpha
+    if params:
+        tracker.log_params(params)
+
+    tracker.log_dict(
+        {
+            "train_config_path": str(config_path),
+            "features_config_path": str(features_yaml_path),
+            "feature_selection": train_yaml.get("feature_selection", {}),
+            "feature_engineering": {
+                "sos_adj_alpha": sos_adj_alpha,
+            },
+        },
+        artifact_file="feature_tracking/feature_config_snapshot.json",
+    )
 
 
 def main(
@@ -35,6 +69,7 @@ def main(
         tracking_uri=config.mlflow.tracking_uri,
     ) as tracker:
         tracker.log_config(config.model_dump())
+        _log_feature_configs_from_yaml(config_path, tracker)
         result = train_single_model(
             config=config,
             config_path=config_path,

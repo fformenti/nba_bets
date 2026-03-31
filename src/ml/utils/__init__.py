@@ -7,6 +7,7 @@ from .validation import (
     check_for_missing_values,
     validate_split_sizes,
 )
+from .shap import extract_binary_shap_values
 
 __all__ = [
     "validate_data_shapes",
@@ -14,4 +15,5 @@ __all__ = [
     "validate_feature_types",
     "check_for_missing_values",
     "validate_split_sizes",
+    "extract_binary_shap_values",
 ]

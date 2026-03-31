@@ -21,6 +21,8 @@ from src.config.paths import (
     TEAMS_STREAKS_PATH,
     TEAMS_SOS_PATH,
     TEAMS_SOS_ADJ_RECORD_PATH,
+    TEAMS_SOS_ADJ_HOME_RECORD_PATH,
+    TEAMS_SOS_ADJ_AWAY_RECORD_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -50,7 +52,7 @@ from src.etl.features.sos_adjusted_record import calculate_sos_adjusted_record
 
 
 def create_features_tables(
-    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[], sos_adj_alpha: float = 1.0
+    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[], sos_adj_alpha: float = 1.0, sos_adj_location_lags=[]
 ):
     """
     Create all feature tables from games DataFrame.
@@ -113,18 +115,45 @@ def create_features_tables(
     teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
 
     if sos_lags:
-        teams_sos = calculate_strength_of_schedule(games, lags=sos_lags, min_opponents=1)
-        teams_sos.to_csv(TEAMS_SOS_PATH, index=False)
+        # Compute SOS at union of sos_lags and sos_adj_location_lags
+        # so SOS values are available at location lag windows for adjustment.
+        all_sos_lags = sorted(set(sos_lags) | set(sos_adj_location_lags))
+        teams_sos_full = calculate_strength_of_schedule(games, lags=all_sos_lags, min_opponents=1)
+
+        # Save only the declared sos_lags to avoid leaking location-only lags
+        sos_save_cols = ["gameId", "season", "teamId", "gameDate"] + [
+            f"sos_L{lag}" for lag in sos_lags
+        ]
+        teams_sos_full[sos_save_cols].to_csv(TEAMS_SOS_PATH, index=False)
 
         if record_lags:
             teams_sos_adj_record = calculate_sos_adjusted_record(
                 records_df=teams_record,
-                sos_df=teams_sos,
+                sos_df=teams_sos_full,
                 record_lags=record_lags,
-                sos_lags=sos_lags,
+                sos_lags=all_sos_lags,
                 alpha=sos_adj_alpha,
             )
             teams_sos_adj_record.to_csv(TEAMS_SOS_ADJ_RECORD_PATH, index=False)
+
+        if sos_adj_location_lags:
+            teams_sos_adj_home = calculate_sos_adjusted_record(
+                records_df=home_records,
+                sos_df=teams_sos_full,
+                record_lags=sos_adj_location_lags,
+                sos_lags=all_sos_lags,
+                alpha=sos_adj_alpha,
+            )
+            teams_sos_adj_home.to_csv(TEAMS_SOS_ADJ_HOME_RECORD_PATH, index=False)
+
+            teams_sos_adj_away = calculate_sos_adjusted_record(
+                records_df=away_records,
+                sos_df=teams_sos_full,
+                record_lags=sos_adj_location_lags,
+                sos_lags=all_sos_lags,
+                alpha=sos_adj_alpha,
+            )
+            teams_sos_adj_away.to_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH, index=False)
 
     return
 
@@ -252,6 +281,15 @@ def merge_features(games):
         teams_sos_adj_record = pd.read_csv(TEAMS_SOS_ADJ_RECORD_PATH)
         games = join_games_and_teams_feature(games, teams_sos_adj_record, "hometeamId", "HT")
         games = join_games_and_teams_feature(games, teams_sos_adj_record, "awayteamId", "VT")
+
+    # SOS-Adjusted Location Records
+    if TEAMS_SOS_ADJ_HOME_RECORD_PATH.exists():
+        teams_sos_adj_home_record = pd.read_csv(TEAMS_SOS_ADJ_HOME_RECORD_PATH)
+        games = join_games_and_teams_feature(games, teams_sos_adj_home_record, "hometeamId", "HT_at_home")
+
+    if TEAMS_SOS_ADJ_AWAY_RECORD_PATH.exists():
+        teams_sos_adj_away_record = pd.read_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH)
+        games = join_games_and_teams_feature(games, teams_sos_adj_away_record, "awayteamId", "VT_on_road")
 
     games = games.drop(
         columns=[

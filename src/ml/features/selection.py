@@ -15,6 +15,7 @@ from lightgbm import LGBMClassifier
 from scipy.stats import binomtest
 
 from src.ml.config.schema import FeatureSelectionConfig
+from src.ml.utils.shap import extract_binary_shap_values
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -95,13 +96,7 @@ class BorutaShapSelector:
             estimator.fit(X_extended, y)
 
             explainer = shap.TreeExplainer(estimator)
-            shap_values = explainer.shap_values(X_extended)
-
-            # Handle binary classification output formats
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
-            elif shap_values.ndim == 3:
-                shap_values = shap_values[:, :, 1]
+            shap_values = extract_binary_shap_values(explainer, X_extended)
 
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
 

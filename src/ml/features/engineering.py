@@ -30,7 +30,7 @@ FEATURE_GROUP_PREFIXES = {
 }
 
 # Groups that have HT_at_home / VT_on_road location variants
-LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record"}
+LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record", "sos_adj_record"}
 
 
 def create_delta_features(

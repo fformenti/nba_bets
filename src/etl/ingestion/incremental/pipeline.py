@@ -135,6 +135,7 @@ def run_incremental_pipeline(
     distances_lags = feature_config.distances_lags
     sos_lags = feature_config.sos_lags
     sos_adj_alpha = feature_config.sos_adj_alpha
+    sos_adj_location_lags = feature_config.features.sos_adj_record.location_lags
 
     teams_history = load_teams_history_table()
     games_with_conference = add_conference(regular_season_games, teams_history)
@@ -146,6 +147,7 @@ def run_incremental_pipeline(
         distances_lags=distances_lags,
         sos_lags=sos_lags,
         sos_adj_alpha=sos_adj_alpha,
+        sos_adj_location_lags=sos_adj_location_lags,
     )
     final_features = merge_features(games_with_conference)
     final_features.to_csv(REGULAR_SEASON_GAMES_FEATURES_PATH, index=False)

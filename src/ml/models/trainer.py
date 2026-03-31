@@ -224,7 +224,9 @@ class ModelTrainer:
         if method not in ["grid", "random"]:
             raise ValueError(f"method must be 'grid' or 'random', got {method}")
 
-        cv_splitter = TimeSeriesSplit(n_splits=cv) if cv_strategy == "timeseries" else cv
+        cv_splitter = (
+            TimeSeriesSplit(n_splits=cv) if cv_strategy == "timeseries" else cv
+        )
 
         logger.info(
             f"Starting {method} search hyperparameter tuning: "
@@ -259,10 +261,10 @@ class ModelTrainer:
         search.fit(X_train, y_train)
         self.search_results_ = search
 
-        logger.info(
-            f"Hyperparameter tuning completed. Best score: {search.best_score_:.4f}, "
-            f"Best params: {search.best_params_}"
-        )
+        # logger.info(
+        #     f"Hyperparameter tuning completed. Best score: {search.best_score_:.4f}, "
+        #     f"Best params: {search.best_params_}"
+        # )
 
         # Manually refit with best params and sample weights
         self.model.set_params(**search.best_params_)

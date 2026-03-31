@@ -9,6 +9,8 @@ from sklearn.base import BaseEstimator
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
+from src.ml.utils.shap import extract_binary_shap_values
+
 # Set style
 sns.set_style("whitegrid")
 plt.rcParams["figure.figsize"] = (10, 6)
@@ -580,14 +582,7 @@ def plot_shap_summary(
         X_transformed = X_transformed[idx]
 
     explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_transformed)
-
-    # For binary classification some models return list [neg_class, pos_class]
-    if isinstance(shap_values, list):
-        shap_values = shap_values[1]
-    # Newer SHAP returns 3D array (n_samples, n_features, n_classes) for tree ensembles
-    elif shap_values.ndim == 3:
-        shap_values = shap_values[:, :, 1]
+    shap_values = extract_binary_shap_values(explainer, X_transformed)
 
     # Clamp top_n to actual number of features
     n_features = shap_values.shape[1]

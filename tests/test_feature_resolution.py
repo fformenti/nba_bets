@@ -122,14 +122,14 @@ class TestResolveFeatureColumns:
         assert "sos_adj_record_L1_delta" not in cols
         assert "sos_adj_record_L82_delta" not in cols
 
-    def test_sos_adj_record_no_location_variants(self):
-        """sos_adj_record never produces at_location_delta columns."""
+    def test_sos_adj_record_location_variants(self):
+        """sos_adj_record produces at_location_delta columns when location_lags set."""
         cfg = FeaturesMapConfig(
             record=_make_disabled(),
             point_differential=_make_disabled(),
             sos=_make_disabled(),
             sos_adj_record=FeatureGroupConfig(
-                enabled=True, lags=[13], location_lags=[13], delta=True
+                enabled=True, lags=[13], location_lags=[10, 41], delta=True
             ),
             distance=_make_disabled(),
             rested_days=_make_disabled(),
@@ -139,7 +139,8 @@ class TestResolveFeatureColumns:
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert "sos_adj_record_L13_delta" in cols
-        assert "sos_adj_record_L13_at_location_delta" not in cols
+        assert "sos_adj_record_L10_at_location_delta" in cols
+        assert "sos_adj_record_L41_at_location_delta" in cols
 
     def test_conference_same_no_extra_columns(self):
         cfg = _record_only(lags=[10])
@@ -285,6 +286,32 @@ class TestCreateDeltaResilience:
         assert "sos_adj_record_L13_delta" in result.columns
         assert "sos_adj_record_L13_HT" not in result.columns
         assert "sos_adj_record_L13_VT" not in result.columns
+
+    def test_sos_adj_record_location_delta_creation(self):
+        """create_delta_features creates sos_adj_record location deltas."""
+        cfg = FeaturesMapConfig(
+            record=_make_disabled(),
+            point_differential=_make_disabled(),
+            sos=_make_disabled(),
+            sos_adj_record=FeatureGroupConfig(
+                enabled=True, lags=[13], location_lags=[10], delta=True
+            ),
+            distance=_make_disabled(),
+            rested_days=_make_disabled(),
+            streak=_make_disabled(),
+            last_season_record=_make_disabled(),
+            home_and_road=_make_disabled(),
+        )
+        df = pd.DataFrame({
+            "sos_adj_record_L13_HT": [0.6, 0.5],
+            "sos_adj_record_L13_VT": [0.4, 0.7],
+            "sos_adj_record_L10_HT_at_home": [0.7, 0.55],
+            "sos_adj_record_L10_VT_on_road": [0.3, 0.6],
+        })
+        result = create_delta_features(df, cfg)
+        assert "sos_adj_record_L13_delta" in result.columns
+        assert "sos_adj_record_L10_at_location_delta" in result.columns
+        assert list(result["sos_adj_record_L10_at_location_delta"]) == pytest.approx([0.4, -0.05])
 
 
 # ── selection_mode default ───────────────────────────────────────────────────

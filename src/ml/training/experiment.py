@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.config.paths import REGULAR_SEASON_GAMES_FEATURES_PATH
+from src.config.paths import CONFIGS_TRAIN_DIR, REGULAR_SEASON_GAMES_FEATURES_PATH
+from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.datasets.splitters import temporal_split
 from sklearn.calibration import CalibratedClassifierCV
@@ -47,6 +48,58 @@ from .runners import train_baseline_model, train_model_with_config
 logger = get_logger(__name__)
 
 
+def _extract_explicit_model_param_keys(
+    config_path: Optional[Path],
+) -> dict[str, set[str]]:
+    """Read `_defaults.yaml` and return explicit top-level param keys per model."""
+    defaults_path = (
+        (config_path.parent / "_defaults.yaml")
+        if config_path is not None
+        else (CONFIGS_TRAIN_DIR / "_defaults.yaml")
+    )
+    try:
+        raw_config = load_yaml_config(defaults_path)
+    except Exception as exc:
+        logger.warning(
+            "Could not read %s for explicit model param logging: %s",
+            defaults_path,
+            exc,
+        )
+        return {}
+    model_block = raw_config.get("model", {}) if isinstance(raw_config, dict) else {}
+    if not isinstance(model_block, dict):
+        return {}
+
+    excluded_model_keys = {"type", "name", "train_models", "hyperparameter_tuning"}
+    explicit_keys_by_model: dict[str, set[str]] = {}
+    for model_name, model_entry in model_block.items():
+        if model_name in excluded_model_keys or not isinstance(model_entry, dict):
+            continue
+        explicit_keys_by_model[model_name] = {
+            key for key in model_entry.keys() if key != "hyperparameter_tuning"
+        }
+
+    return explicit_keys_by_model
+
+
+def _get_explicit_model_params_for_logging(
+    model_name: str,
+    model_config: dict[str, Any],
+    explicit_param_keys_by_model: dict[str, set[str]],
+) -> dict[str, str]:
+    """Filter model params to only keys explicitly declared in `_defaults.yaml`."""
+    configured_model_params = model_config.get(model_name, {})
+    if not isinstance(configured_model_params, dict):
+        return {}
+
+    allowed_keys = explicit_param_keys_by_model.get(model_name, set())
+    return {
+        key: str(configured_model_params[key])
+        for key in allowed_keys
+        if key in configured_model_params
+    }
+
+
 def generate_run_name(
     config_path: Optional[Path] = None,
     model_name: Optional[str] = None,
@@ -68,6 +121,7 @@ def train_single_model(
     data_config = config.data
     split_config = config.splitting
     model_config = config.model.model_dump()
+    explicit_param_keys_by_model = _extract_explicit_model_param_keys(config_path)
     eval_config = config.evaluation
     paths_config = config.paths
     feat_eng_config = config.feature_engineering
@@ -115,6 +169,9 @@ def train_single_model(
             "sample_weighting_K": weighting_config.saturation_K,
             "season_decay_enabled": weighting_config.season_decay_enabled,
             "season_decay_lambda": weighting_config.season_decay_lambda,
+            "feature_selection_enabled": config.feature_selection.enabled,
+            "feature_selection_include_tentative": config.feature_selection.include_tentative,
+            "feature_engineering_sos_adj_alpha": feat_eng_config.sos_adj_alpha,
         }
     )
     tracker.set_tags(
@@ -208,8 +265,18 @@ def train_single_model(
         available = [c for c in keep_cols if c in df.columns]
         missing_features = [c for c in feature_columns if c not in df.columns]
         if missing_features:
+            formatted_missing = "\n".join(
+                f"  - MISSING FEATURE: {feature}" for feature in missing_features
+            )
             logger.warning(
-                f"Expected feature columns not found in data: {missing_features}"
+                "\n"
+                + "!" * 90
+                + "\n"
+                + "!!! CRITICAL WARNING: EXPECTED FEATURE COLUMNS WERE NOT FOUND IN DATA !!!\n"
+                + "This will likely degrade model quality and should be investigated immediately.\n"
+                + formatted_missing
+                + "\n"
+                + "!" * 90
             )
         X = df[available]
     else:
@@ -355,6 +422,10 @@ def train_single_model(
             "n_features": len(X_train.columns),
         }
     )
+    tracker.log_dict(
+        {"features_used": sorted(X_train.columns.tolist())},
+        artifact_file="feature_tracking/features_used.json",
+    )
 
     feature_types = identify_feature_types(X_train, exclude_columns=[])
     numerical_features = feature_types["numerical"]
@@ -449,12 +520,13 @@ def train_single_model(
                 tracker.log_metrics(test_metrics)
                 tracker.set_tags({"model_type": model_name})
 
-                if hasattr(trainer.model, "named_steps"):
-                    model_obj = trainer.model.named_steps.get("model")
-                    if model_obj and hasattr(model_obj, "get_params"):
-                        tracker.log_params(
-                            {k: str(v) for k, v in model_obj.get_params().items()}
-                        )
+                explicit_model_params = _get_explicit_model_params_for_logging(
+                    model_name=model_name,
+                    model_config=model_config,
+                    explicit_param_keys_by_model=explicit_param_keys_by_model,
+                )
+                if explicit_model_params:
+                    tracker.log_params(explicit_model_params)
 
                 # Log grid search metadata if tuning was performed
                 grid_search_info = training_results.get("grid_search")
@@ -577,13 +649,13 @@ def train_single_model(
             logger.info(
                 f"Season phase accuracy:\n{phase_metrics.to_string(index=False)}"
             )
-    best_config_params = {
-        k: v
-        for k, v in model_config.get(best_model_name, {}).items()
-        if k != "hyperparameter_tuning"
-    }
+    best_config_params = _get_explicit_model_params_for_logging(
+        model_name=best_model_name,
+        model_config=model_config,
+        explicit_param_keys_by_model=explicit_param_keys_by_model,
+    )
     if best_config_params:
-        tracker.log_params({k: str(v) for k, v in best_config_params.items()})
+        tracker.log_params(best_config_params)
 
     best_pipeline = best_model_data["pipeline"]
 

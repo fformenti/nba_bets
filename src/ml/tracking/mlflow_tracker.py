@@ -316,6 +316,20 @@ class MLflowTracker:
         mlflow.log_artifacts(local_dir, artifact_path=artifact_path)
         logger.debug(f"Logged artifacts from directory: {local_dir}")
 
+    def log_dict(self, dictionary: Dict[str, Any], artifact_file: str):
+        """
+        Log a dictionary as a JSON/YAML artifact.
+
+        Parameters
+        ----------
+        dictionary : dict
+            Dictionary payload to persist
+        artifact_file : str
+            Artifact-relative file path, e.g. "feature_tracking/features_used.json"
+        """
+        mlflow.log_dict(dictionary, artifact_file)
+        logger.debug(f"Logged dictionary artifact: {artifact_file}")
+
     def log_config(
         self,
         config: Dict[str, Any],
