@@ -102,6 +102,9 @@ class FeaturesMapConfig(BaseModel):
     rested_days: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     streak: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    gds: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
     home_and_road: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False)
     )
@@ -118,6 +121,10 @@ class FeatureEngineeringConfig(BaseModel):
     sos_adj_alpha: float = Field(
         default=1.0,
         description="Exponent for SOS-adjusted record: adj = raw * (sos / league_avg_sos) ^ alpha.",
+    )
+    gds_beta: float = Field(
+        default=0.10,
+        description="Home/away adjustment factor for Game Difficulty Score.",
     )
     features: FeaturesMapConfig = Field(default_factory=FeaturesMapConfig)
     momentum_pairs: list[MomentumPairConfig] = Field(
@@ -197,6 +204,14 @@ class FeatureEngineeringConfig(BaseModel):
     @property
     def sos_lags(self) -> list[int]:
         return self.features.sos.lags
+
+    @property
+    def gds_lags(self) -> list[int]:
+        return self.features.gds.lags
+
+    @property
+    def gds_location_lags(self) -> list[int]:
+        return self.features.gds.location_lags
 
 
 class FeatureSelectionConfig(BaseModel):

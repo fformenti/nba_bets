@@ -52,6 +52,9 @@ def main():
     sos_lags = feature_engineering_config.sos_lags
     sos_adj_alpha = feature_engineering_config.sos_adj_alpha
     sos_adj_location_lags = feature_engineering_config.features.sos_adj_record.location_lags
+    gds_lags = feature_engineering_config.gds_lags
+    gds_location_lags = feature_engineering_config.gds_location_lags
+    gds_beta = feature_engineering_config.gds_beta
 
     # Step 1: Add neutral court game flag and conference information
     print("\n[Step 1/4] Adding neutral court game flag and conference information...")
@@ -72,6 +75,9 @@ def main():
         sos_lags,
         sos_adj_alpha=sos_adj_alpha,
         sos_adj_location_lags=sos_adj_location_lags,
+        gds_lags=gds_lags,
+        gds_location_lags=gds_location_lags,
+        gds_beta=gds_beta,
     )
     print("✓ Created all feature tables")
 

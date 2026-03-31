@@ -23,6 +23,7 @@ FEATURE_GROUP_PREFIXES = {
     "point_differential": lambda lags: [f"pts_diff_avg_L{lag}" for lag in lags],
     "sos": lambda lags: [f"sos_L{lag}" for lag in lags],
     "sos_adj_record": lambda lags: [f"sos_adj_record_L{lag}" for lag in lags],
+    "gds": lambda lags: [f"gds_L{lag}" for lag in lags],
     "distance": lambda lags: [f"distance_L{lag}" for lag in lags],
     "rested_days": lambda _: ["rested_days"],
     "streak": lambda _: ["streak"],
@@ -30,7 +31,7 @@ FEATURE_GROUP_PREFIXES = {
 }
 
 # Groups that have HT_at_home / VT_on_road location variants
-LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record", "sos_adj_record"}
+LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record", "sos_adj_record", "gds"}
 
 
 def create_delta_features(

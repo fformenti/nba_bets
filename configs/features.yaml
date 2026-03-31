@@ -12,6 +12,7 @@
 
 feature_engineering:
   sos_adj_alpha: 1.0
+  gds_beta: 0.10
 
   features:
     record:
@@ -29,6 +30,11 @@ feature_engineering:
       enabled: true
 
     sos_adj_record:
+      location_lags: [5, 10, 20, 41]
+      enabled: true
+
+    gds:
+      lags: [3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
       enabled: true
 

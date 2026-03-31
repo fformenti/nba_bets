@@ -23,6 +23,9 @@ from src.config.paths import (
     TEAMS_SOS_ADJ_RECORD_PATH,
     TEAMS_SOS_ADJ_HOME_RECORD_PATH,
     TEAMS_SOS_ADJ_AWAY_RECORD_PATH,
+    TEAMS_GDS_PATH,
+    TEAMS_GDS_HOME_PATH,
+    TEAMS_GDS_AWAY_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -49,10 +52,15 @@ from src.etl.features.last_season_record import (
 from src.etl.features.streaks import calculate_streak
 from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
 from src.etl.features.sos_adjusted_record import calculate_sos_adjusted_record
+from src.etl.features.game_difficulty_score import (
+    calculate_game_difficulty_score,
+    calculate_home_gds,
+    calculate_away_gds,
+)
 
 
 def create_features_tables(
-    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[], sos_adj_alpha: float = 1.0, sos_adj_location_lags=[]
+    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[], sos_adj_alpha: float = 1.0, sos_adj_location_lags=[], gds_lags=[], gds_location_lags=[], gds_beta: float = 0.10,
 ):
     """
     Create all feature tables from games DataFrame.
@@ -114,6 +122,8 @@ def create_features_tables(
     teams_streaks = calculate_streak(games)
     teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
 
+    teams_sos_adj_record = None
+
     if sos_lags:
         # Compute SOS at union of sos_lags and sos_adj_location_lags
         # so SOS values are available at location lag windows for adjustment.
@@ -154,6 +164,39 @@ def create_features_tables(
                 alpha=sos_adj_alpha,
             )
             teams_sos_adj_away.to_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH, index=False)
+
+    if gds_lags:
+        # Use sos_adj_record if it was computed above, else empty DF (triggers fallback)
+        sos_adj_for_gds = (
+            teams_sos_adj_record
+            if teams_sos_adj_record is not None
+            else pd.DataFrame(columns=["gameId", "season", "teamId", "gameDate"])
+        )
+
+        teams_gds = calculate_game_difficulty_score(
+            games=games,
+            sos_adj_record_df=sos_adj_for_gds,
+            lags=gds_lags,
+            beta=gds_beta,
+        )
+        teams_gds.to_csv(TEAMS_GDS_PATH, index=False)
+
+        if gds_location_lags:
+            teams_gds_home = calculate_home_gds(
+                games=games,
+                sos_adj_record_df=sos_adj_for_gds,
+                location_lags=gds_location_lags,
+                beta=gds_beta,
+            )
+            teams_gds_home.to_csv(TEAMS_GDS_HOME_PATH, index=False)
+
+            teams_gds_away = calculate_away_gds(
+                games=games,
+                sos_adj_record_df=sos_adj_for_gds,
+                location_lags=gds_location_lags,
+                beta=gds_beta,
+            )
+            teams_gds_away.to_csv(TEAMS_GDS_AWAY_PATH, index=False)
 
     return
 
@@ -290,6 +333,20 @@ def merge_features(games):
     if TEAMS_SOS_ADJ_AWAY_RECORD_PATH.exists():
         teams_sos_adj_away_record = pd.read_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH)
         games = join_games_and_teams_feature(games, teams_sos_adj_away_record, "awayteamId", "VT_on_road")
+
+    # Game Difficulty Score
+    if TEAMS_GDS_PATH.exists():
+        teams_gds = pd.read_csv(TEAMS_GDS_PATH)
+        games = join_games_and_teams_feature(games, teams_gds, "hometeamId", "HT")
+        games = join_games_and_teams_feature(games, teams_gds, "awayteamId", "VT")
+
+    if TEAMS_GDS_HOME_PATH.exists():
+        teams_gds_home = pd.read_csv(TEAMS_GDS_HOME_PATH)
+        games = join_games_and_teams_feature(games, teams_gds_home, "hometeamId", "HT_at_home")
+
+    if TEAMS_GDS_AWAY_PATH.exists():
+        teams_gds_away = pd.read_csv(TEAMS_GDS_AWAY_PATH)
+        games = join_games_and_teams_feature(games, teams_gds_away, "awayteamId", "VT_on_road")
 
     games = games.drop(
         columns=[

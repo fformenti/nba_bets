@@ -71,7 +71,8 @@ nba_bets/
 │   │   │   ├── last_season_record.py           # Last season's win percentage record
 │   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
 │   │   │   ├── strength_of_schedule.py         # Rolling strength of schedule
-│   │   │   └── sos_adjusted_record.py          # SOS-adjusted winning percentage
+│   │   │   ├── sos_adjusted_record.py          # SOS-adjusted winning percentage
+│   │   │   └── game_difficulty_score.py        # Per-game quality score (outcome × opponent strength × location)
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games
