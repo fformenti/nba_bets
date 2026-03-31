@@ -16,6 +16,7 @@ CONFIGS_DIR = PROJECT_ROOT / "configs"
 CONFIGS_TRAIN_DIR = CONFIGS_DIR / "train"
 # Aligns with Makefile EXPERIMENT ?= train_same / make train
 DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH = CONFIGS_TRAIN_DIR / "train_same.yaml"
+DEFAULT_FEATURES_CONFIG_PATH = CONFIGS_DIR / "features.yaml"
 
 # ===== Base data directories =====
 DATA_DIR = PROJECT_ROOT / "data"
@@ -97,6 +98,7 @@ LAST_SEASON_HOME_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_home_r
 LAST_SEASON_AWAY_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_away_record.csv"
 TEAMS_STREAKS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_streaks.csv"
 TEAMS_SOS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos.csv"
+TEAMS_SOS_ADJ_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos_adj_record.csv"
 
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"

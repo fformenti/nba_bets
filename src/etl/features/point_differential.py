@@ -58,7 +58,7 @@ def calculate_pts_diff(games, lags=[]):
             games.groupby(["teamId", "season"])["pts_diff_L1"]
             .rolling(window=lag, min_periods=1)
             .mean()
-            .round(2)
+            .round(4)
             .reset_index(level=[0, 1], drop=True)
         ).fillna(0.0)
         avg_pts_diff_lags_cols.append(f"pts_diff_avg_L{lag}")

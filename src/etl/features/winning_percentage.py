@@ -47,7 +47,7 @@ def calculate_record(games, lags=[]):
             games.groupby(["teamId", "season"])["win_bool_l1"]
             .rolling(window=lag, min_periods=1)
             .mean()
-            .round(2)
+            .round(4)
             .reset_index(level=[0, 1], drop=True)
         )
         record_lags_cols.append(f"record_L{lag}")

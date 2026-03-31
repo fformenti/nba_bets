@@ -3,12 +3,14 @@
 ```
 nba_bets/
 ├── configs/                                    # YAML configuration files
+│   ├── features.yaml                           # ETL feature params (lags, location_lags, alpha); ML delta/drop in train/_defaults.yaml
 │   ├── ingestion/
 │   │   └── incremental_ingestion.yaml          # Incremental ingestion config
 │   ├── train/
-│   │   ├── train_all.yaml                      # Training config: all features
-│   │   ├── train_different.yaml                # Training config: different splits
-│   │   └── train_same.yaml                     # Training config: same splits
+│   │   ├── _defaults.yaml                      # Shared training defaults (model, preprocessing, etc.)
+│   │   ├── train_all.yaml                      # Training overrides: all games
+│   │   ├── train_different.yaml                # Training overrides: cross-conference
+│   │   └── train_same.yaml                     # Training overrides: same conference
 │   └── predict/
 │       └── predict_classifier.yaml             # Prediction config
 │
@@ -68,7 +70,8 @@ nba_bets/
 │   │   │   ├── distances.py                    # Rolling travel distance
 │   │   │   ├── last_season_record.py           # Last season's win percentage record
 │   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
-│   │   │   └── strength_of_schedule.py         # Rolling strength of schedule
+│   │   │   ├── strength_of_schedule.py         # Rolling strength of schedule
+│   │   │   └── sos_adjusted_record.py          # SOS-adjusted winning percentage
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games
@@ -139,21 +142,24 @@ nba_bets/
 │   ├── enriched_games/
 │   │   └── viz/                                # EDA visualizations on enriched games
 │   ├── all/                                    # Outputs for train_all experiment
-│   │   ├── tables/                             # CV result tables
+│   │   ├── tables/                             # Tables for plotting
 │   │   ├── analysis/                           # Error analysis outputs
+│   │   ├── cv_results/                         # Cross Validation results
 │   │   ├── feature_selection/                  # Boruta-SHAP outputs
 │   │   └── visualizations/                     # Plots (ROC, confusion matrix, etc.)
 │   ├── different/                              # Outputs for train_different experiment
 │   │   ├── tables/
 │   │   ├── analysis/
+│   │   ├── cv_results/                         
 │   │   ├── feature_selection/
 │   │   └── visualizations/
 │   └── same/                                   # Outputs for train_same experiment
-│       ├── tables/
-│       ├── analysis/
-│       ├── feature_selection/
-│       └── visualizations/
-│
+│   │   ├── tables/
+│   │   ├── analysis/
+│   │   ├── cv_results/                         
+│   │   ├── feature_selection/
+│   │   └── visualizations/
+|
 ├── .claude/                                    # Claude Code configuration
 │   ├── docs/
 │   │   └── PROJECT_STRUCTURE.md                # This file
@@ -181,6 +187,7 @@ nba_bets/
 │   ├── settings.json                           # Claude Code project settings
 │   └── settings.local.json                     # Local overrides (gitignored)
 │
+├── tests/                                      # Tests
 ├── sandbox/                                    # Notebooks for exploration
 ├── mlruns/                                     # MLflow run tracking data
 ├── mlflow.db                                   # MLflow backend database

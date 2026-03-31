@@ -20,6 +20,7 @@ from src.config.paths import (
     LAST_SEASON_AWAY_RECORD_PATH,
     TEAMS_STREAKS_PATH,
     TEAMS_SOS_PATH,
+    TEAMS_SOS_ADJ_RECORD_PATH,
 )
 
 from src.etl.features.winning_percentage import (
@@ -45,10 +46,11 @@ from src.etl.features.last_season_record import (
 )
 from src.etl.features.streaks import calculate_streak
 from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
+from src.etl.features.sos_adjusted_record import calculate_sos_adjusted_record
 
 
 def create_features_tables(
-    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[]
+    games: pd.DataFrame, record_lags=[], point_differential_lags=[], location_lags=[], distances_lags=[], sos_lags=[], sos_adj_alpha: float = 1.0
 ):
     """
     Create all feature tables from games DataFrame.
@@ -111,8 +113,18 @@ def create_features_tables(
     teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
 
     if sos_lags:
-        teams_sos = calculate_strength_of_schedule(games, lags=sos_lags)
+        teams_sos = calculate_strength_of_schedule(games, lags=sos_lags, min_opponents=1)
         teams_sos.to_csv(TEAMS_SOS_PATH, index=False)
+
+        if record_lags:
+            teams_sos_adj_record = calculate_sos_adjusted_record(
+                records_df=teams_record,
+                sos_df=teams_sos,
+                record_lags=record_lags,
+                sos_lags=sos_lags,
+                alpha=sos_adj_alpha,
+            )
+            teams_sos_adj_record.to_csv(TEAMS_SOS_ADJ_RECORD_PATH, index=False)
 
     return
 
@@ -235,6 +247,12 @@ def merge_features(games):
         games = join_games_and_teams_feature(games, teams_sos, "hometeamId", "HT")
         games = join_games_and_teams_feature(games, teams_sos, "awayteamId", "VT")
 
+    # SOS-Adjusted Record
+    if TEAMS_SOS_ADJ_RECORD_PATH.exists():
+        teams_sos_adj_record = pd.read_csv(TEAMS_SOS_ADJ_RECORD_PATH)
+        games = join_games_and_teams_feature(games, teams_sos_adj_record, "hometeamId", "HT")
+        games = join_games_and_teams_feature(games, teams_sos_adj_record, "awayteamId", "VT")
+
     games = games.drop(
         columns=[
             "attendance",
@@ -285,6 +303,9 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
         left_on=["gameDateOnlyStr", join_column],
         right_on=["gameDateOnlyStr", "teamId"],
     ).drop(columns=["teamId"])
+
+    fill_cols = [c for c in ["rested_days", "days_at_home", "days_on_road"] if c in games.columns]
+    games[fill_cols] = games[fill_cols].fillna(0).astype(int)
 
     return games.rename(
         columns={

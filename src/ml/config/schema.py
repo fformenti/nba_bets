@@ -1,11 +1,18 @@
 """Pydantic schemas for experiment configuration."""
 
 from typing import Any, Dict, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from src.config.constants import (
     DEFAULT_METADATA_COLUMNS,
-    ENRICHED_COLUMNS,
+    INTERMEDIATE_COLUMNS,
+)
+
+_DEFAULT_CLASSIFIER_MODEL_NAMES: tuple[str, ...] = (
+    "random_forest",
+    "gradient_boosting",
+    "xgboost",
+    "lgbm",
 )
 
 
@@ -69,14 +76,50 @@ class MomentumPairConfig(BaseModel):
     long: int = Field(description="Long window lag.")
 
 
+class FeatureGroupConfig(BaseModel):
+    """Configuration for a single feature group."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    lags: list[int] = Field(default_factory=list)
+    location_lags: list[int] = Field(default_factory=list)
+    delta: bool = True
+    enabled: bool = True
+
+
+class FeaturesMapConfig(BaseModel):
+    """Map of all feature groups with their delta/drop/enabled settings."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    point_differential: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    sos: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(delta=False)
+    )
+    sos_adj_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    distance: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    rested_days: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    streak: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    home_and_road: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(delta=False)
+    )
+
+
 class FeatureEngineeringConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    record_lags: list[int] = Field(default_factory=list)
-    point_differential_lags: list[int] = Field(default_factory=list)
-    location_lags: list[int] = Field(default_factory=list)
-    distances_lags: list[int] = Field(default_factory=list)
-    sos_lags: list[int] = Field(default_factory=list)
+    selection_mode: Literal["inclusion", "exclusion"] = Field(
+        default="exclusion",
+        description="'inclusion': only declared features are kept. "
+        "'exclusion': metadata/intermediate columns are dropped (legacy).",
+    )
+    sos_adj_alpha: float = Field(
+        default=1.0,
+        description="Exponent for SOS-adjusted record: adj = raw * (sos / league_avg_sos) ^ alpha.",
+    )
+    features: FeaturesMapConfig = Field(default_factory=FeaturesMapConfig)
     momentum_pairs: list[MomentumPairConfig] = Field(
         default_factory=list,
         description="Pairs of (feature, short_lag, long_lag) to replace with a momentum delta feature.",
@@ -84,10 +127,76 @@ class FeatureEngineeringConfig(BaseModel):
     metadata_columns: list[str] = Field(
         default_factory=lambda: DEFAULT_METADATA_COLUMNS
     )
-    originally_enriched_columns: list[str] = Field(
-        default_factory=lambda: ENRICHED_COLUMNS
+    intermediate_columns: list[str] = Field(
+        default_factory=lambda: INTERMEDIATE_COLUMNS
     )
     exclude_columns: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_flat_lags(cls, data: Any) -> Any:
+        """Migrate old flat-field configs to the new grouped features structure.
+
+        Old MLflow artifacts may have:
+            record_lags: [1,3,5,...]
+            point_differential_lags: [...]
+        instead of the new ``features:`` map. This validator converts them.
+        """
+        if not isinstance(data, dict):
+            return data
+        # Only migrate if 'features' is absent and old flat fields are present
+        if "features" in data:
+            return data
+
+        flat_field_map = {
+            "record_lags": ("record", "lags"),
+            "point_differential_lags": ("point_differential", "lags"),
+            "location_lags": ("record", "location_lags"),
+            "distances_lags": ("distance", "lags"),
+            "sos_lags": ("sos", "lags"),
+        }
+
+        features: dict = {}
+        migrated = False
+        for old_key, (group, field) in flat_field_map.items():
+            if old_key in data:
+                features.setdefault(group, {})[field] = data.pop(old_key)
+                migrated = True
+
+        # Copy location_lags to point_differential as well (they shared it)
+        if "record" in features and "location_lags" in features["record"]:
+            features.setdefault("point_differential", {})["location_lags"] = features[
+                "record"
+            ]["location_lags"]
+
+        if migrated:
+            data["features"] = features
+            # Migrate originally_enriched_columns → intermediate_columns
+            if "originally_enriched_columns" in data:
+                data.pop("originally_enriched_columns")
+
+        return data
+
+    # Backward-compatible property accessors for ETL code
+    @property
+    def record_lags(self) -> list[int]:
+        return self.features.record.lags
+
+    @property
+    def point_differential_lags(self) -> list[int]:
+        return self.features.point_differential.lags
+
+    @property
+    def location_lags(self) -> list[int]:
+        return self.features.record.location_lags
+
+    @property
+    def distances_lags(self) -> list[int]:
+        return self.features.distance.lags
+
+    @property
+    def sos_lags(self) -> list[int]:
+        return self.features.sos.lags
 
 
 class FeatureSelectionConfig(BaseModel):
@@ -124,14 +233,14 @@ class HyperparameterTuningConfig(BaseModel):
     param_grid: Optional[Dict[str, list]] = None
 
 
-ModelName = Literal["random_forest", "gradient_boosting", "xgboost", "lgbm"]
-
-
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-
     type: str = "classification"
-    name: ModelName = "random_forest"
+    name: str = "nba_bets_classifier"
+    train_models: list[str] = Field(
+        default_factory=lambda: list(_DEFAULT_CLASSIFIER_MODEL_NAMES),
+        description="Classifier models to train after baselines in multi-model runs.",
+    )
     hyperparameter_tuning: HyperparameterTuningConfig = HyperparameterTuningConfig()
     random_forest: dict[str, Any] = Field(default_factory=dict)
     gradient_boosting: dict[str, Any] = Field(default_factory=dict)
@@ -164,6 +273,13 @@ class MLflowConfig(BaseModel):
         description="Whether to register the model in MLflow Model Registry. "
         "Set to False for experimental runs (use run-based URIs instead).",
     )
+
+
+class FeaturesConfig(BaseModel):
+    """Thin wrapper used by ETL scripts that only need feature engineering params."""
+
+    model_config = ConfigDict(extra="ignore")
+    feature_engineering: FeatureEngineeringConfig = FeatureEngineeringConfig()
 
 
 class ExperimentConfig(BaseModel):

@@ -142,7 +142,7 @@ def _compute_sos_columns(
                         opp_win_pcts.append(opp_pcts[idx])
 
                 if len(opp_win_pcts) >= min_opponents:
-                    col_values[i] = np.mean(opp_win_pcts)
+                    col_values[i] = round(np.mean(opp_win_pcts), 4)
 
             sos_columns[f"sos_L{lag}"].extend(col_values)
 

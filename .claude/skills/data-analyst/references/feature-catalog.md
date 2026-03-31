@@ -81,9 +81,9 @@ Computes `home - away` differences. The raw home/away columns are dropped after 
 - `last_season_record_delta`
 
 **Location-specific deltas:**
-- `record_L{lag}_delta_at_location` (for each lag in `features.location_lags`)
-- `pts_diff_avg_L{lag}_delta_at_location` (for each lag in `features.location_lags`)
-- `last_season_record_delta_at_location`
+- `record_L{lag}_at_location_delta` (for each lag in `features.location_lags`)
+- `pts_diff_avg_L{lag}_at_location_delta` (for each lag in `features.location_lags`)
+- `last_season_record_at_location_delta`
 
 **Special case:**
 - `days_at_home_delta` = `days_at_home + days_on_road` (sum, not difference)

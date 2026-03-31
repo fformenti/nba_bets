@@ -5,6 +5,8 @@ from typing import List, Optional
 
 import pandas as pd
 
+from src.ml.config.schema import FeaturesMapConfig, MomentumPairConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,91 +15,107 @@ AWAY_SUFFIX = "VT"
 HOME_AT_HOME_SUFFIX = f"{HOME_SUFFIX}_at_home"
 AWAY_ON_ROAD_SUFFIX = f"{AWAY_SUFFIX}_on_road"
 
+# Column prefix mapping for each feature group.
+# Each entry: (group_name, prefix_fn, has_location_variant)
+# prefix_fn takes lags and returns list of column base names.
+FEATURE_GROUP_PREFIXES = {
+    "record": lambda lags: [f"record_L{lag}" for lag in lags],
+    "point_differential": lambda lags: [f"pts_diff_avg_L{lag}" for lag in lags],
+    "sos": lambda lags: [f"sos_L{lag}" for lag in lags],
+    "sos_adj_record": lambda lags: [f"sos_adj_record_L{lag}" for lag in lags],
+    "distance": lambda lags: [f"distance_L{lag}" for lag in lags],
+    "rested_days": lambda _: ["rested_days"],
+    "streak": lambda _: ["streak"],
+    "last_season_record": lambda _: ["last_season_record"],
+}
+
+# Groups that have HT_at_home / VT_on_road location variants
+LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record"}
+
 
 def create_delta_features(
     df: pd.DataFrame,
-    record_lags: List[int],
-    point_differential_lags: List[int],
-    location_lags,
-    distances_lags,
-    sos_lags: List[int] = [],
+    features_config: FeaturesMapConfig,
 ) -> pd.DataFrame:
     """
-    Create delta features (home - away) for specified feature pairs.
+    Create delta features (home - away) based on feature group configuration.
+
+    For each enabled feature group with ``delta=True``, creates
+    ``{prefix}_delta = {prefix}_HT - {prefix}_VT``.  Source HT/VT columns
+    are always dropped after delta creation.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Input DataFrame with home and away features
-    record_lags : list
-        List of lags to create record delta features for
-    point_differential_lags : list
-        List of lags to create point differential delta features for
+        Input DataFrame with home and away features.
+    features_config : FeaturesMapConfig
+        Feature group configuration controlling lags, deltas, and drops.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with delta features added
+        DataFrame with delta features added and originals dropped.
     """
-    record_features = ["record" + "_L" + str(lag) for lag in record_lags]
-    pts_diff_features = [
-        "pts_diff_avg" + "_L" + str(lag) for lag in point_differential_lags
-    ]
-    distances_features = ["distance_L" + str(lag) for lag in distances_lags]
-    rested_days_features = ["rested_days"]
-    last_season_record_features = ["last_season_record"]
-    streak_features = ["streak"]
-    sos_features = ["sos_L" + str(lag) for lag in sos_lags]
-    feature_names = (
-        record_features
-        + pts_diff_features
-        + distances_features
-        + rested_days_features
-        + last_season_record_features
-        + streak_features
-        + sos_features
-    )
-
     df = df.copy()
-    created_features = []
-    features_used_for_deltas = []
-    # General features lag features
-    for feature in feature_names:
-        home_col = f"{feature}_{HOME_SUFFIX}"
-        away_col = f"{feature}_{AWAY_SUFFIX}"
+    created_features: list[str] = []
+    columns_to_drop: list[str] = []
 
-        delta_col = f"{feature}_delta"
-        df[delta_col] = df[home_col] - df[away_col]
-        created_features.append(delta_col)
-        features_used_for_deltas.extend([home_col, away_col])
+    for group_name, prefix_fn in FEATURE_GROUP_PREFIXES.items():
+        group_config = getattr(features_config, group_name)
+        prefixes = prefix_fn(group_config.lags)
 
-    # Location specific features lag features
-    location_record_features = ["record" + "_L" + str(lag) for lag in location_lags]
-    location_pts_diff_features = [
-        "pts_diff_avg" + "_L" + str(lag) for lag in location_lags
-    ]
-    feature_names = (
-        location_record_features
-        + location_pts_diff_features
-        + last_season_record_features
-    )
-    for feature in feature_names:
-        home_col = f"{feature}_{HOME_AT_HOME_SUFFIX}"
-        away_col = f"{feature}_{AWAY_ON_ROAD_SUFFIX}"
+        if not group_config.enabled:
+            for prefix in prefixes:
+                columns_to_drop.extend([f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"])
+            if group_name in LOCATION_VARIANT_GROUPS:
+                loc_prefixes = prefix_fn(group_config.location_lags)
+                for prefix in loc_prefixes:
+                    columns_to_drop.extend(
+                        [f"{prefix}_{HOME_AT_HOME_SUFFIX}", f"{prefix}_{AWAY_ON_ROAD_SUFFIX}"]
+                    )
+            continue
 
-        delta_col = f"{feature}_delta_at_location"
-        df[delta_col] = df[home_col] - df[away_col]
-        created_features.append(delta_col)
-        features_used_for_deltas.extend([home_col, away_col])
+        if group_config.delta:
+            for prefix in prefixes:
+                home_col = f"{prefix}_{HOME_SUFFIX}"
+                away_col = f"{prefix}_{AWAY_SUFFIX}"
+                if home_col not in df.columns or away_col not in df.columns:
+                    logger.debug(f"Skipping delta for {prefix}: columns not found")
+                    continue
+                df[f"{prefix}_delta"] = df[home_col] - df[away_col]
+                created_features.append(f"{prefix}_delta")
+                columns_to_drop.extend([home_col, away_col])
 
-    # Delta between days at home and days on road
-    df["days_at_home_delta"] = df["days_at_home"] + df["days_on_road"]
-    created_features.append("days_at_home_delta")
-    features_used_for_deltas.extend(["days_at_home", "days_on_road"])
+            if group_name in LOCATION_VARIANT_GROUPS:
+                loc_prefixes = prefix_fn(group_config.location_lags)
+                for prefix in loc_prefixes:
+                    home_col = f"{prefix}_{HOME_AT_HOME_SUFFIX}"
+                    away_col = f"{prefix}_{AWAY_ON_ROAD_SUFFIX}"
+                    if home_col not in df.columns or away_col not in df.columns:
+                        logger.debug(f"Skipping location delta for {prefix}: columns not found")
+                        continue
+                    df[f"{prefix}_at_location_delta"] = df[home_col] - df[away_col]
+                    created_features.append(f"{prefix}_at_location_delta")
+                    columns_to_drop.extend([home_col, away_col])
+        # delta=False + enabled=True → raw HT/VT survive, nothing to drop
+
+    # home_and_road: special case — delta is a SUM, not a difference
+    home_road_config = features_config.home_and_road
+    if not home_road_config.enabled:
+        columns_to_drop.extend(["days_at_home", "days_on_road"])
+    elif home_road_config.delta:
+        df["days_at_home_delta"] = df["days_at_home"] + df["days_on_road"]
+        created_features.append("days_at_home_delta")
+        columns_to_drop.extend(["days_at_home", "days_on_road"])
+    # else: delta=False → raw survive
+
+    # Drop columns
+    cols_to_drop = [c for c in columns_to_drop if c in df.columns]
+    if cols_to_drop:
+        df.drop(columns=cols_to_drop, inplace=True)
+        logger.info(f"Dropped {len(cols_to_drop)} columns after delta creation")
 
     logger.info(f"Created {len(created_features)} delta features")
-    df.drop(columns=features_used_for_deltas, inplace=True)
-    logger.info(f"Dropped {len(features_used_for_deltas)} features used for deltas")
     return df
 
 
@@ -325,6 +343,89 @@ def apply_conference_features(
         df = create_conference_delta(df)
 
     return df
+
+
+def resolve_feature_columns(
+    features_config: FeaturesMapConfig,
+    conference_filter: str,
+    momentum_pairs: Optional[List[MomentumPairConfig]] = None,
+) -> list[str]:
+    """
+    Compute the list of feature columns expected after delta creation and conference
+    feature engineering, based on the feature group configuration.
+
+    Used in inclusion mode to select exactly the declared features from the DataFrame.
+    Returns column names in a deterministic order. Columns that are expected but not
+    present in the DataFrame will be flagged by the caller.
+
+    Parameters
+    ----------
+    features_config : FeaturesMapConfig
+        Feature group configuration.
+    conference_filter : str
+        Conference filter type: 'same', 'different', or 'all'.
+    momentum_pairs : list of MomentumPairConfig, optional
+        Momentum pairs that replace two delta columns with one momentum column.
+
+    Returns
+    -------
+    list[str]
+        Ordered list of expected feature column names.
+    """
+    columns: list[str] = []
+
+    for group_name, prefix_fn in FEATURE_GROUP_PREFIXES.items():
+        group_config = getattr(features_config, group_name)
+
+        if not group_config.enabled:
+            continue
+
+        prefixes = prefix_fn(group_config.lags)
+
+        if group_config.delta:
+            for prefix in prefixes:
+                columns.append(f"{prefix}_delta")
+            if group_name in LOCATION_VARIANT_GROUPS:
+                loc_prefixes = prefix_fn(group_config.location_lags)
+                for prefix in loc_prefixes:
+                    columns.append(f"{prefix}_at_location_delta")
+        else:
+            # delta=False + enabled=True → raw HT/VT survive
+            for prefix in prefixes:
+                columns.extend([f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"])
+
+    # home_and_road special case
+    home_road_config = features_config.home_and_road
+    if home_road_config.enabled:
+        if home_road_config.delta:
+            columns.append("days_at_home_delta")
+        else:
+            columns.extend(["days_at_home", "days_on_road"])
+
+    # Conference features (created dynamically by apply_conference_features)
+    if conference_filter == "different":
+        columns.extend(
+            [
+                "home_conference_vs_away_conference_record",
+                "games_played_at_home_conference",
+            ]
+        )
+    elif conference_filter == "all":
+        columns.append("conference_diff_home_advantage_pct")
+
+    # Momentum pairs: replace two source deltas with one momentum column
+    if momentum_pairs:
+        for pair in momentum_pairs:
+            short_col = f"{pair.feature}_L{pair.short}_delta"
+            long_col = f"{pair.feature}_L{pair.long}_delta"
+            momentum_col = f"{pair.feature}_momentum_L{pair.short}_L{pair.long}_delta"
+            if short_col in columns:
+                columns.remove(short_col)
+            if long_col in columns:
+                columns.remove(long_col)
+            columns.append(momentum_col)
+
+    return columns
 
 
 def identify_feature_types(

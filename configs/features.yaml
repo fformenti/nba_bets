@@ -1,0 +1,53 @@
+# Feature engineering parameters — single source of truth for ETL lags.
+# Used by: ETL (make_features), incremental ingestion, ML training (lags/alpha merge).
+# Training configs include this file via _include, then configs/train/_defaults.yaml.
+#
+# Delta (home − away) and drop_after_delta are ML-only; define them in
+# configs/train/_defaults.yaml under feature_engineering.features.
+#
+# Each feature group controls:
+#   lags:             which rolling windows to compute (ETL + ML)
+#   location_lags:    which lags also get home/road variants (ETL + ML)
+#   enabled:          whether to keep this feature group for training (ML only; ETL always computes all)
+
+feature_engineering:
+  sos_adj_alpha: 1.0
+
+  features:
+    record:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      location_lags: [10, 41]
+      enabled: true
+
+    point_differential:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      location_lags: [10, 41]
+      enabled: true
+
+    sos:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      enabled: true
+
+    sos_adj_record:
+      # ETL computes columns for all intersection(record.lags, sos.lags) lags.
+      # ML training configs declare their own explicit lags independently.
+      enabled: true
+
+    distance:
+      lags: [1, 3, 7, 14]
+      enabled: true
+
+    rested_days:
+      enabled: true
+
+    streak:
+      enabled: true
+
+    last_season_record:
+      location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
+      enabled: true
+
+    home_and_road:
+      # Special: days_at_home (home team) and days_on_road (away team)
+      # These are raw per-team columns, NOT HT/VT suffixed
+      enabled: true

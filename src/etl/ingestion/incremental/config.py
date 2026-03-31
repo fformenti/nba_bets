@@ -7,7 +7,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from src.config.paths import (
-    DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH,
+    DEFAULT_FEATURES_CONFIG_PATH,
     project_relpath,
     RAW_GAMES_PATH,
     RAW_INCREMENTAL_ARCHIVE_DIR,
@@ -25,7 +25,7 @@ class IncrementalIngestionConfig(BaseModel):
     raw_games_path: str = project_relpath(RAW_GAMES_PATH)
     processed_games_path: str = project_relpath(REGULAR_SEASON_GAMES_PATH)
     teams_history_path: str = project_relpath(TEAMS_HISTORIES_CONFERENCE_NBA_CSV_PATH)
-    feature_config_path: str = project_relpath(DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH)
+    feature_config_path: str = project_relpath(DEFAULT_FEATURES_CONFIG_PATH)
     current_season_year: int = 2024
     update_features: bool = True
     max_files: Optional[int] = None

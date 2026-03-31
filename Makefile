@@ -1,6 +1,6 @@
 .PHONY: teams-history etl incremental train train-all get-upcoming-games
 
-EXPERIMENT ?= train_same
+TRAIN_CONFIG ?= train_same
 PREDICTION_CONFIG ?= predict_classifier
 
 teams-history:
@@ -37,10 +37,10 @@ predict-upcoming:
 	uv run python -m src.ml.scripts.predict_classifier --config configs/predict/$(PREDICTION_CONFIG).yaml
 
 make-features:
-	uv run python -m src.etl.make_features --config configs/train/$(EXPERIMENT).yaml
+	uv run python -m src.etl.make_features --config configs/features.yaml
 
 train:
-	uv run python -m src.ml.scripts.train_classifier --config configs/train/$(EXPERIMENT).yaml
+	uv run python -m src.ml.scripts.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml
 
 train-all:
 	uv run python -m src.ml.scripts.run_experiments --config configs/train/*.yaml

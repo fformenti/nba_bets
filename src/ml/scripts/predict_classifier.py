@@ -28,6 +28,7 @@ from src.ml.prediction.io import load_upcoming_games
 from src.ml.features.engineering import (
     create_delta_features,
     apply_conference_features,
+    resolve_feature_columns,
 )
 from src.ml.tracking.mlflow_tracker import (
     MLflowTracker,
@@ -240,14 +241,17 @@ def build_features_for_prediction(
 
     # Get feature engineering configuration
     feat_eng_config = experiment_config.feature_engineering
-    record_lags = feat_eng_config.record_lags
-    point_differential_lags = feat_eng_config.point_differential_lags
-    location_lags = feat_eng_config.location_lags
-    distances_lags = feat_eng_config.distances_lags
-    sos_lags = feat_eng_config.sos_lags
-    # Create feature tables
+    # Create feature tables (uses backward-compatible property accessors)
     logger.info("Creating feature tables")
-    create_features_tables(historical_combined, record_lags, point_differential_lags, location_lags, distances_lags, sos_lags)
+    create_features_tables(
+        historical_combined,
+        feat_eng_config.record_lags,
+        feat_eng_config.point_differential_lags,
+        feat_eng_config.location_lags,
+        feat_eng_config.distances_lags,
+        feat_eng_config.sos_lags,
+        sos_adj_alpha=feat_eng_config.sos_adj_alpha,
+    )
 
     # Merge features for upcoming games
     upcoming_with_features = merge_features(upcoming_games)
@@ -272,11 +276,7 @@ def build_features_for_prediction(
     logger.info("Creating delta features")
     upcoming_with_features = create_delta_features(
         upcoming_with_features,
-        record_lags=record_lags,
-        point_differential_lags=point_differential_lags,
-        location_lags=location_lags,
-        distances_lags=distances_lags,
-        sos_lags=sos_lags,
+        feat_eng_config.features,
     )
 
     # Apply conference-specific features based on filter type
@@ -292,9 +292,13 @@ def prepare_features_for_model(
     df: pd.DataFrame,
     experiment_config: ExperimentConfig,
     target_column: str,
+    conference_filter: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Prepare features DataFrame by excluding metadata and target columns.
+    Prepare features DataFrame for model prediction.
+
+    In inclusion mode, only columns declared in the experiment config are kept.
+    In exclusion mode (legacy), metadata and intermediate columns are dropped.
 
     Parameters
     ----------
@@ -304,6 +308,9 @@ def prepare_features_for_model(
         Experiment configuration
     target_column : str
         Target column name
+    conference_filter : str, optional
+        Conference filter used to resolve conference feature columns. Falls back
+        to experiment_config.filters.conference_filter when not provided.
 
     Returns
     -------
@@ -311,23 +318,30 @@ def prepare_features_for_model(
         Features DataFrame ready for model prediction
     """
     feat_eng_config = experiment_config.feature_engineering
-    metadata_columns = feat_eng_config.metadata_columns
-    originally_enriched_columns = feat_eng_config.originally_enriched_columns
-    exclude_columns = feat_eng_config.exclude_columns
 
-    # Combine all columns to exclude
-    columns_to_exclude = (
-        metadata_columns
-        + originally_enriched_columns
-        + [target_column]
-        + (exclude_columns or [])
-    )
-
-    # Drop excluded columns
-    X = df.drop(columns=[col for col in columns_to_exclude if col in df.columns])
+    if feat_eng_config.selection_mode == "inclusion":
+        cf = conference_filter or experiment_config.filters.conference_filter
+        feature_columns = resolve_feature_columns(feat_eng_config.features, cf)
+        available = [c for c in feature_columns if c in df.columns]
+        missing_features = [c for c in feature_columns if c not in df.columns]
+        if missing_features:
+            logger.warning(
+                f"Expected feature columns not found in data: {missing_features}"
+            )
+        X = df[available]
+    else:
+        metadata_columns = feat_eng_config.metadata_columns
+        intermediate_columns = feat_eng_config.intermediate_columns
+        exclude_columns = feat_eng_config.exclude_columns
+        columns_to_exclude = (
+            metadata_columns
+            + intermediate_columns
+            + [target_column]
+            + (exclude_columns or [])
+        )
+        X = df.drop(columns=[col for col in columns_to_exclude if col in df.columns])
 
     logger.info(f"Prepared {len(X.columns)} features for model prediction")
-    logger.info(f"List of features {X.columns} features for model prediction")
     logger.debug(f"Feature columns: {list(X.columns)}")
 
     return X
@@ -470,6 +484,7 @@ def main(
                 df=upcoming_with_features,
                 experiment_config=iter_experiment_config,
                 target_column=target_column,
+                conference_filter=conference_filter,
             )
 
             logger.info(

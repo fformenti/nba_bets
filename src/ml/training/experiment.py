@@ -32,13 +32,12 @@ from src.ml.features.selection import run_feature_selection
 from src.ml.features.engineering import (
     apply_conference_features,
     create_delta_features,
-    create_momentum_features,
     identify_feature_types,
+    resolve_feature_columns,
 )
 from src.ml.features.preprocessing import create_preprocessing_pipeline
-from src.ml.models.baseline import PointDifferentialBaseline, RecordDifferenceBaseline
+from src.ml.models.baseline import RecordDifferenceBaseline
 from src.ml.models.registry import ModelRegistry
-from src.ml.models.trainer import ModelTrainer
 from src.utils.logging_config import get_logger
 
 from .data_prep import filter_minimum_games_played, load_and_validate_data, prepare_data
@@ -83,17 +82,16 @@ def train_single_model(
     target_column = data_config.target_column
     date_column = data_config.date_column
 
-    record_lags = feat_eng_config.record_lags
-    point_differential_lags = feat_eng_config.point_differential_lags
-    location_lags = feat_eng_config.location_lags
-    distances_lags = feat_eng_config.distances_lags
-    sos_lags = feat_eng_config.sos_lags
     metadata_columns = feat_eng_config.metadata_columns
-    originally_enriched_columns = feat_eng_config.originally_enriched_columns
+    intermediate_columns = feat_eng_config.intermediate_columns
 
     minimum_games_train = filters_config.minimum_games_train
     minimum_games_test = filters_config.minimum_games_test
     conference_filter = filters_config.conference_filter
+
+    test_size = split_config.test_size
+    val_size = split_config.val_size
+    random_state = split_config.random_state
 
     if conference_filter not in ["same", "different", "all"]:
         raise ValueError(
@@ -106,8 +104,8 @@ def train_single_model(
         {
             "target_column": target_column,
             "split_method": split_config.method,
-            "test_size": split_config.test_size,
-            "val_size": split_config.val_size,
+            "test_size": test_size,
+            "val_size": val_size,
             "minimum_games_train": minimum_games_train,
             "minimum_games_test": minimum_games_test,
             "conference_filter": conference_filter,
@@ -138,9 +136,13 @@ def train_single_model(
 
     if min_season is not None:
         if "season" not in games_enriched.columns:
-            raise ValueError("DataFrame must contain 'season' column for min_season filtering")
+            raise ValueError(
+                "DataFrame must contain 'season' column for min_season filtering"
+            )
         games_enriched = games_enriched[games_enriched["season"] >= min_season].copy()
-        logger.info(f"Filtered to {len(games_enriched)} games (min_season: {min_season})")
+        logger.info(
+            f"Filtered to {len(games_enriched)} games (min_season: {min_season})"
+        )
 
     if conference_filter == "different":
         games_enriched = games_enriched[
@@ -179,21 +181,41 @@ def train_single_model(
         metadata_columns=metadata_columns,
     )
 
-    df = create_delta_features(
-        df, record_lags, point_differential_lags, location_lags, distances_lags, sos_lags
+    # Special Dataframe for baseline models
+    _, _, X_test_baseline, _, _, y_test_baseline = temporal_split(
+        df, y, date_column=date_column, test_size=test_size, val_size=val_size
     )
+    X_test_baseline["record_L82_delta"] = (
+        X_test_baseline["record_L82_HT"] - X_test_baseline["record_L82_VT"]
+    )
+    X_test_baseline["pts_diff_avg_L82_delta"] = (
+        X_test_baseline["pts_diff_avg_L82_HT"] - X_test_baseline["pts_diff_avg_L82_VT"]
+    )
+    # X_test_baseline = X_test_baseline[["record_L82_HT", "record_L82_VT", "pts_diff_avg_L82_HT", "pts_diff_avg_L82_VT"]]
+
+    df = create_delta_features(df, feat_eng_config.features)
     df = apply_conference_features(df, conference_filter)
-    if config.feature_engineering.momentum_pairs:
-        df = create_momentum_features(df, config.feature_engineering.momentum_pairs)
+    # if config.feature_engineering.momentum_pairs:
+    #     df = create_momentum_features(df, config.feature_engineering.momentum_pairs)
 
-    test_size = split_config.test_size
-    val_size = split_config.val_size
-    random_state = split_config.random_state
-
-    exclude_cols = metadata_columns + originally_enriched_columns + [target_column]
-    print(exclude_cols)
-    cols_to_drop = [col for col in exclude_cols if col in df.columns]
-    X = df.drop(columns=cols_to_drop)
+    if feat_eng_config.selection_mode == "inclusion":
+        feature_columns = resolve_feature_columns(
+            feat_eng_config.features,
+            conference_filter,
+            momentum_pairs=config.feature_engineering.momentum_pairs or None,
+        )
+        keep_cols = feature_columns + [date_column]
+        available = [c for c in keep_cols if c in df.columns]
+        missing_features = [c for c in feature_columns if c not in df.columns]
+        if missing_features:
+            logger.warning(
+                f"Expected feature columns not found in data: {missing_features}"
+            )
+        X = df[available]
+    else:
+        exclude_cols = metadata_columns + intermediate_columns + [target_column]
+        cols_to_drop = [col for col in exclude_cols if col in df.columns]
+        X = df.drop(columns=cols_to_drop)
 
     if date_column not in X.columns:
         raise ValueError(f"Date column '{date_column}' required for temporal split")
@@ -272,11 +294,6 @@ def train_single_model(
         f"Features BEFORE selection ({len(X_train.columns)}): {sorted(X_train.columns.tolist())}"
     )
 
-    # Keep full feature set for baselines (independent of feature selection)
-    X_train_baseline = X_train
-    X_val_baseline = X_val
-    X_test_baseline = X_test
-
     # --- Feature Selection (Boruta-SHAP) ---
     boruta_selector = None
     if config.feature_selection.enabled:
@@ -326,7 +343,7 @@ def train_single_model(
             plt.close(fig_boruta)
             logger.info("Boruta-SHAP visualization saved.")
 
-    logger.info(f"Features sent to model: {list(X_train.columns)}")
+    # logger.info(f"Features sent to model: {list(X_train.columns)}")
     logger.info(
         f"Data splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
     )
@@ -361,13 +378,16 @@ def train_single_model(
 
     models_to_train = {}
 
+    # ====== Record Difference Baseline ======
     logger.info(f"\n{'=' * 60}")
     logger.info("Record Difference Baseline")
     logger.info(f"{'=' * 60}")
 
     baseline_model = RecordDifferenceBaseline()
     models_to_train[baseline_model.name] = train_baseline_model(
-        baseline_model, X_train_baseline, y_train, X_val_baseline, y_val, X_test_baseline, y_test
+        baseline_model,
+        X_test_baseline,
+        y_test_baseline,
     )
 
     if baseline_model.name in models_to_train and models_to_train[baseline_model.name]:
@@ -376,45 +396,26 @@ def train_single_model(
             tracker.log_metrics(baseline_metrics)
             tracker.set_tags({"model_type": "baseline"})
 
-    try:
-        logger.info(f"\n{'=' * 60}")
-        logger.info("Point Differential Baseline")
-        logger.info(f"{'=' * 60}")
+    # ====== Point Differential Baseline ======
+    #! TODO: Make this feature available even when it's not passed to train config
+    # logger.info(f"\n{'=' * 60}")
+    # logger.info("Point Differential Baseline")
+    # logger.info(f"{'=' * 60}")
 
-        baseline_model = PointDifferentialBaseline(
-            feature_column="pts_diff_avg_L82_delta"
-        )
-        baseline_model.fit(X_train_baseline, y_train)
+    # baseline_model = PointDifferentialBaseline(feature_column="pts_diff_avg_L82_delta")
 
-        baseline_trainer = ModelTrainer(
-            model=baseline_model, task_type="classification", random_state=random_state
-        )
-        baseline_trainer.is_fitted = True
+    # models_to_train[baseline_model.name] = {
+    #     "pipeline": baseline_model,
+    #     "trainer": baseline_trainer,
+    #     "training_results": {},
+    #     "test_metrics": baseline_test_metrics,
+    # }
 
-        baseline_test_metrics = baseline_trainer.evaluate(X_test_baseline, y_test)
+    # with tracker.child_run(baseline_model.name):
+    #     tracker.log_metrics(baseline_test_metrics)
+    #     tracker.set_tags({"model_type": "baseline"})
 
-        models_to_train[baseline_model.name] = {
-            "pipeline": baseline_model,
-            "trainer": baseline_trainer,
-            "training_results": {},
-            "test_metrics": baseline_test_metrics,
-        }
-
-        with tracker.child_run(baseline_model.name):
-            tracker.log_metrics(baseline_test_metrics)
-            tracker.set_tags({"model_type": "baseline"})
-
-    except Exception as e:
-        logger.error(
-            f"Error training {baseline_model.name_caption}: {e}", exc_info=True
-        )
-
-    model_names = list(models_to_train.keys()) + [
-        "random_forest",
-        "gradient_boosting",
-        "xgboost",
-        "lgbm",
-    ]
+    model_names = list(models_to_train.keys()) + list(config.model.train_models)
     for model_name in model_names:
         if "baseline" in model_name:
             continue
@@ -548,7 +549,34 @@ def train_single_model(
             tracker.log_metrics(
                 {f"test_n_games_phase_{phase_label}": int(row["n_games"])}
             )
-        logger.info(f"Season phase accuracy:\n{phase_metrics.to_string(index=False)}")
+
+        record_baseline_data = models_to_train.get("record_baseline")
+        if record_baseline_data:
+            y_test_pred_baseline = record_baseline_data["pipeline"].predict(
+                X_test_baseline
+            )
+            baseline_phase_metrics = compute_season_phase_metrics(
+                y_test, y_test_pred_baseline, metadata_test
+            )
+            combined = phase_metrics.merge(
+                baseline_phase_metrics[["season_phase", "accuracy"]],
+                on="season_phase",
+                suffixes=("_model", "_baseline"),
+            )
+            combined["diff"] = (
+                combined["accuracy_model"] - combined["accuracy_baseline"]
+            )
+            combined = combined.rename(columns={"n_games": "n"})
+            logger.info(
+                "Season phase accuracy (model vs record baseline):\n"
+                + combined[
+                    ["season_phase", "n", "accuracy_model", "accuracy_baseline", "diff"]
+                ].to_string(index=False)
+            )
+        else:
+            logger.info(
+                f"Season phase accuracy:\n{phase_metrics.to_string(index=False)}"
+            )
     best_config_params = {
         k: v
         for k, v in model_config.get(best_model_name, {}).items()
@@ -776,6 +804,12 @@ def train_single_model(
 
         # Metadata-based analysis: error patterns, accuracy breakdowns, calibration
         logger.info("Generating metadata-based analysis...")
+        _record_baseline_data = models_to_train.get("record_baseline")
+        _y_pred_baseline = (
+            _record_baseline_data["pipeline"].predict(X_test_baseline)
+            if _record_baseline_data
+            else None
+        )
         generate_analysis(
             y_true=y_test,
             y_pred=y_test_pred,
@@ -784,6 +818,7 @@ def train_single_model(
             output_dir=output_dir,
             conference_filter=conference_filter,
             model_name=best_model_name,
+            y_pred_baseline=_y_pred_baseline,
         )
         logger.info(
             f"Analysis saved to {output_dir / 'analysis'} and {output_dir / 'tables'}"

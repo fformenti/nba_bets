@@ -177,10 +177,10 @@ def make_east_west_record(games, location=None):
     safe_gp = east_west_record_by_date["games_played_east_vs_west"].replace(0, float("nan"))
     east_west_record_by_date[f"east_record{suffix}"] = (
         east_west_record_by_date["east_wins"] / safe_gp
-    ).fillna(0.0)
+    ).fillna(0.0).round(4)
     east_west_record_by_date[f"west_record{suffix}"] = (
         east_west_record_by_date["west_wins"] / safe_gp
-    ).fillna(0.0)
+    ).fillna(0.0).round(4)
 
     if location is None:
         safe_gp_east = east_west_record_by_date["games_played_at_east"].replace(0, float("nan"))
@@ -193,6 +193,7 @@ def make_east_west_record(games, location=None):
             pd.DataFrame({"at_east": east_wr_at_east, "at_west": east_wr_at_west})
             .mean(axis=1)
             .fillna(0.0)
+            .round(4)
         )
 
         west_wr_at_east = (
@@ -208,6 +209,7 @@ def make_east_west_record(games, location=None):
             pd.DataFrame({"at_east": west_wr_at_east, "at_west": west_wr_at_west})
             .mean(axis=1)
             .fillna(0.0)
+            .round(4)
         )
 
     return east_west_record_by_date[return_cols]

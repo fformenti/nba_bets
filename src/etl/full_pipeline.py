@@ -34,7 +34,7 @@ from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
 
 from src.etl.utils.common import add_neutral_court_game_flag
-from src.ml.config.loader import load_experiment_config
+from src.ml.config.loader import load_features_config
 
 
 def run_full_pipeline(
@@ -57,7 +57,7 @@ def run_full_pipeline(
     Parameters
     ----------
     config_path : str
-        Path to experiment config YAML.
+        Path to features config YAML (e.g. configs/features.yaml).
     raw_games_path : Path, optional
         Path to raw games CSV. If None, uses default from constants.
     teams_history_path : Path, optional
@@ -72,11 +72,13 @@ def run_full_pipeline(
     print("=" * 60)
 
     # Step 0: Load configuration
-    config = load_experiment_config(config_path)
-    feature_engineering_config = config.feature_engineering
+    feature_engineering_config = load_features_config(config_path)
     record_lags = feature_engineering_config.record_lags
     point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
+    distances_lags = feature_engineering_config.distances_lags
+    sos_lags = feature_engineering_config.sos_lags
+    sos_adj_alpha = feature_engineering_config.sos_adj_alpha
 
     # Step 1: Load teams history table (create it if missing)
     print("\n[Step 1/5] Loading teams history table...")
@@ -131,7 +133,8 @@ def run_full_pipeline(
     # Step 4: Create feature tables
     print("\n[Step 4/5] Creating feature tables...")
     create_features_tables(
-        games_with_conference, record_lags, point_differential_lags, location_lags
+        games_with_conference, record_lags, point_differential_lags, location_lags,
+        distances_lags, sos_lags, sos_adj_alpha=sos_adj_alpha,
     )
     print("✓ Created all feature tables")
 
@@ -160,8 +163,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        required=True,
-        help="Path to experiment config YAML (e.g. configs/train/train_same.yaml)",
+        default="configs/features.yaml",
+        help="Path to features config YAML (default: configs/features.yaml)",
     )
     args = parser.parse_args()
 

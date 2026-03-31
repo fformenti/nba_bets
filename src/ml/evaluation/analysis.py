@@ -358,7 +358,7 @@ def compute_season_phase_metrics(
     metadata : pd.DataFrame
         Must contain ``games_played_HT`` and ``games_played_VT``.
     bins : list[int], optional
-        Bin edges. Defaults to ``[15, 30, 50, 82]``.
+        Bin edges. Defaults to 10-game buckets from 0 to 90.
 
     Returns
     -------
@@ -366,7 +366,7 @@ def compute_season_phase_metrics(
         Columns: ``phase``, ``accuracy``, ``n_games``.
     """
     if bins is None:
-        bins = [15, 30, 50, 82]
+        bins = list(range(0, 81, 10)) + [82]
 
     df = _build_analysis_df(y_true, y_pred, None, metadata)
 
@@ -396,41 +396,49 @@ def plot_season_phase_accuracy(
     y_pred: np.ndarray,
     metadata: pd.DataFrame,
     bins: list[int] | None = None,
+    y_pred_baseline: Optional[np.ndarray] = None,
     title: str = "Accuracy by Season Phase (Games Played)",
     figsize: tuple = (10, 6),
 ) -> tuple[plt.Figure, pd.DataFrame]:
     phase_stats = compute_season_phase_metrics(y_true, y_pred, metadata, bins=bins)
 
     fig, ax = plt.subplots(figsize=figsize)
-    colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(phase_stats)))
-    bars = ax.bar(
-        phase_stats["season_phase"].astype(str),
-        phase_stats["accuracy"],
-        color=colors,
-        edgecolor="black",
-        linewidth=0.5,
-    )
+
+    x_labels = phase_stats["season_phase"].astype(str).tolist()
+    x = range(len(x_labels))
 
     overall_acc = (y_true.values == y_pred).mean()
-    ax.axhline(y=overall_acc, color="navy", linestyle="--", lw=1.5, label="Overall accuracy")
 
-    for bar, (_, row) in zip(bars, phase_stats.iterrows()):
-        ax.annotate(
-            f'{row["accuracy"]:.1%}\n(n={int(row["n_games"])})',
-            (bar.get_x() + bar.get_width() / 2, bar.get_height()),
-            xytext=(0, 8),
-            textcoords="offset points",
-            ha="center",
-            fontsize=11,
-            fontweight="bold",
-        )
+    ax.plot(x, phase_stats["accuracy"], "o-", color="steelblue", lw=2, ms=7, label="Model accuracy")
+    ax.axhline(y=overall_acc, color="steelblue", linestyle="--", lw=1.5, alpha=0.6, label=f"Model avg ({overall_acc:.1%})")
 
+    for xi, acc in zip(x, phase_stats["accuracy"]):
+        ax.annotate(f"{acc:.1%}", (xi, acc), xytext=(0, 8), textcoords="offset points",
+                    ha="center", fontsize=8, color="steelblue", fontweight="bold")
+
+    baseline_stats = None
+    if y_pred_baseline is not None:
+        baseline_stats = compute_season_phase_metrics(y_true, y_pred_baseline, metadata, bins=bins)
+        baseline_overall = (y_true.values == y_pred_baseline).mean()
+        ax.plot(x, baseline_stats["accuracy"], "s--", color="tomato", lw=2, ms=7, label="Record baseline accuracy")
+        ax.axhline(y=baseline_overall, color="tomato", linestyle=":", lw=1.5, alpha=0.6, label=f"Baseline avg ({baseline_overall:.1%})")
+        for xi, acc in zip(x, baseline_stats["accuracy"]):
+            ax.annotate(f"{acc:.1%}", (xi, acc), xytext=(0, -14), textcoords="offset points",
+                        ha="center", fontsize=8, color="tomato", fontweight="bold")
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(x_labels, rotation=45, ha="right")
     ax.set_xlabel("Min Games Played (HT, VT)", fontsize=12)
     ax.set_ylabel("Accuracy", fontsize=12)
     ax.set_title(title, fontsize=14, fontweight="bold")
-    ax.set_ylim(0, min(1.15, phase_stats["accuracy"].max() + 0.15))
+
+    y_min = phase_stats["accuracy"].min()
+    if baseline_stats is not None:
+        y_min = min(y_min, baseline_stats["accuracy"].min())
+    ax.set_ylim(max(0, y_min - 0.08), min(1.0, phase_stats["accuracy"].max() + 0.1))
+
     ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3, axis="y")
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
     return fig, phase_stats
@@ -448,6 +456,7 @@ def generate_analysis(
     output_dir: Path,
     conference_filter: str = "all",
     model_name: str = "",
+    y_pred_baseline: Optional[np.ndarray] = None,
 ) -> None:
     """Generate all metadata-based analysis plots and tables.
 
@@ -513,6 +522,7 @@ def generate_analysis(
     if "games_played_HT" in metadata.columns and "games_played_VT" in metadata.columns:
         fig, table = plot_season_phase_accuracy(
             y_true, y_pred, metadata,
+            y_pred_baseline=y_pred_baseline,
             title=f"Accuracy by Season Phase{suffix}",
         )
         fig.savefig(analysis_dir / "season_phase_accuracy.png", dpi=300, bbox_inches="tight")

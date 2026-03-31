@@ -1,220 +1,36 @@
 # Training config for same-conference games
 # Trains a model on games where both teams are in the same conference
 
-description: "Same-conference: all lags, 1980/81 season"
+_include:
+  - "../features.yaml"
+  - "_defaults.yaml"
+
+description: "Same-conference: sos-adjusted record, all lags, 1980/81 season"
 tags:
   variation: "same_conference"
 
-data:
-  path: "data/processed/regular_season/games_features.csv"
-  target_column: "win_bool"
-  date_column: "gameDate"
-  drop_na: true
-
 filters:
-  min_season: "1995/96"
+  min_season: "1980/81"
   conference_filter: "same"
-  minimum_games_train: 15
-  minimum_games_test: 15
-
-weighting:
-  enabled: true
-  saturation_K: 30
-  season_decay_enabled: true
-  season_decay_lambda: 0.1
-
-splitting:
-  method: "temporal"
-  test_size: 0.2
-  val_size: 0.2
-  random_state: 42
 
 feature_engineering:
-  record_lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-  point_differential_lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-  location_lags: [10, 41]
-  distances_lags: [1, 3, 7, 14]
-  sos_lags: [10, 82]
-  # momentum_pairs:
-  #   - feature: pts_diff_avg
-  #     short: 13
-  #     long: 34
+  features:
+    record:
+      enabled: true
+      lags: []
+      location_lags: [10, 41]
+      delta: true
 
-
-  # Columns to exclude from features
-  metadata_columns:
-    - "gameId"
-    - "winner"
-    - "hometeamPrename"
-    - "hometeamId"
-    - "hometeamName"
-    - "homeScore"
-    - "awayteamName"
-    - "awayteamPrename"
-    - "awayteamId"
-    - "awayScore"
-    - "hometeamLocation"
-    - "awayteamLocation"
-    - "gameLocation"
-    - "hometeamConference"
-    - "awayteamConference"
-    - "winnerteamConference"
-    - "gameType"
-    - "gameDateOnlyStr"
-    - "season"
-    - "overtimes"
-    - "postponed"
-    - "is_neutral_court_game"
-    - "games_played_HT"
-    - "games_played_VT"
-
-  originally_enriched_columns:
-    - "win_bool"
-    - "pts_diff"
-    - "total_wins_HT"
-    - "total_losses_HT"
-    - "total_wins_VT"
-    - "total_losses_VT"
-    - "total_wins_HT_at_home"
-    - "total_losses_HT_at_home"
-    - "total_wins_VT_on_road"
-    - "total_losses_VT_on_road"
-    - "games_played_HT_at_home"
-    - "games_played_VT_on_road"
-    - "east_record_at_east"
-    - "west_record_at_west"
-    - "games_played_at_east"
-    - "games_played_at_west"
-    - "conference_diff_east_pct"
-    - "games_played_east_vs_west"
-    - "distance"
-    - "days_at_home"
-    - "days_on_road"
-
-preprocessing:
-  scaling_method: "standard"  # 'standard', 'robust', or 'minmax'
-  imputation_strategy: "mean"
-  handle_outliers: false
-
+    sos_adj_record:
+      enabled: true
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      delta: true
+    
 feature_selection:
-  enabled: true
-  method: "boruta_shap"
-  n_iterations: 20
-  significance_level: 0.05
   include_tentative: false
-  random_state: 42
-
-model:
-  type: "classification"
-  name: "random_forest"
-
-  # Model-specific parameters + per-model hyperparameter tuning
-  random_forest:
-    n_estimators: 300
-    max_depth: 10
-    min_samples_split: 20
-    min_samples_leaf: 15
-    max_features: "sqrt"
-    max_samples: 0.7
-    class_weight: "balanced"
-    hyperparameter_tuning:
-      enabled: true
-      method: "random"
-      n_iter: 20
-      cv_folds: 5
-      scoring: "accuracy"
-      param_grid:
-        n_estimators: [100, 200, 300, 500]
-        max_depth: [5, 7, 10]
-        min_samples_split: [20, 30, 50]
-        min_samples_leaf: [10, 15, 20, 30]
-        max_features: ["sqrt", "log2", 0.5]
-        max_samples: [0.6, 0.7, 0.8]
-
-  gradient_boosting:
-    n_estimators: 300
-    learning_rate: 0.05
-    max_depth: 5
-    min_samples_split: 20
-    min_samples_leaf: 10
-    max_features: "sqrt"
-    hyperparameter_tuning:
-      enabled: true
-      method: "random"
-      n_iter: 20
-      cv_folds: 5
-      scoring: "accuracy"
-      param_grid:
-        n_estimators: [50, 100, 200, 300]
-        learning_rate: [0.005, 0.01, 0.05]
-        max_depth: [3, 4, 5, 6]
-        min_samples_split: [10, 20, 30, 50]
-        min_samples_leaf: [5, 10, 15, 20]
-        subsample: [0.7, 0.8, 0.9]
-        max_features: ["sqrt", "log2", 0.5]
-
-  xgboost:
-    n_estimators: 300
-    learning_rate: 0.05
-    max_depth: 5
-    subsample: 0.8
-    colsample_bytree: 0.8
-    reg_alpha: 0.1
-    reg_lambda: 1.0
-    hyperparameter_tuning:
-      enabled: true
-      method: "random"
-      n_iter: 20
-      cv_folds: 5
-      scoring: "accuracy"
-      param_grid:
-        n_estimators: [100, 200, 300, 500]
-        learning_rate: [0.01, 0.05, 0.1]
-        max_depth: [3, 4, 5, 6]
-        subsample: [0.7, 0.8, 0.9]
-        colsample_bytree: [0.6, 0.8, 1.0]
-        reg_alpha: [0, 0.1, 0.5]
-        reg_lambda: [0.5, 1.0, 2.0]
-
-  lgbm:
-    n_estimators: 300
-    learning_rate: 0.05
-    max_depth: 6
-    num_leaves: 31
-    min_child_samples: 20
-    subsample: 0.8
-    colsample_bytree: 0.8
-    reg_alpha: 0.1
-    reg_lambda: 1.0
-    class_weight: "balanced"
-    verbose: -1
-    hyperparameter_tuning:
-      enabled: true
-      method: "random"
-      n_iter: 20
-      cv_folds: 5
-      scoring: "accuracy"
-      param_grid:
-        n_estimators: [100, 200, 300, 500]
-        learning_rate: [0.01, 0.05, 0.1]
-        max_depth: [4, 6, 8]
-        num_leaves: [15, 23, 31]
-        min_child_samples: [20, 30, 50]
-        subsample: [0.7, 0.8, 0.9]
-        colsample_bytree: [0.6, 0.8, 1.0]
-        reg_alpha: [0, 0.1, 0.5]
-        reg_lambda: [0.5, 1.0, 2.0]
-
-evaluation:
-  save_visualizations: true
-  output_dir: "outputs"
 
 paths:
-  model_registry: "models"
   outputs: "outputs/same"
-  save_local_models: false
 
 mlflow:
   experiment_name: "nba_bets_same_conference"
-  tracking_uri: "sqlite:///mlflow.db"
-  register_model: true

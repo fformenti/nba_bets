@@ -14,7 +14,7 @@ from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
 
 from src.etl.utils.common import add_neutral_court_game_flag
-from src.ml.config.loader import load_experiment_config
+from src.ml.config.loader import load_features_config
 
 from src.utils.logging_config import get_logger, setup_logging
 
@@ -27,8 +27,8 @@ def parse_args():
     parser.add_argument(
         "--config",
         type=str,
-        required=True,
-        help="Path to experiment config YAML (e.g. configs/train/train_same.yaml)",
+        default="configs/features.yaml",
+        help="Path to features config YAML (default: configs/features.yaml)",
     )
     return parser.parse_args()
 
@@ -44,13 +44,13 @@ def main():
     )
 
     # Step 0: Load configuration
-    config = load_experiment_config(args.config)
-    feature_engineering_config = config.feature_engineering
+    feature_engineering_config = load_features_config(args.config)
     record_lags = feature_engineering_config.record_lags
     point_differential_lags = feature_engineering_config.point_differential_lags
     location_lags = feature_engineering_config.location_lags
     distances_lags = feature_engineering_config.distances_lags
     sos_lags = feature_engineering_config.sos_lags
+    sos_adj_alpha = feature_engineering_config.sos_adj_alpha
 
     # Step 1: Add neutral court game flag and conference information
     print("\n[Step 1/4] Adding neutral court game flag and conference information...")
@@ -69,6 +69,7 @@ def main():
         location_lags,
         distances_lags,
         sos_lags,
+        sos_adj_alpha=sos_adj_alpha,
     )
     print("✓ Created all feature tables")
 

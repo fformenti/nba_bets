@@ -17,6 +17,24 @@ ENRICHED_COLUMNS = [
     "total_losses_VT",
 ]
 
+# Intermediate columns produced by ETL that should not be used as model features.
+# Delta-input columns (HT/VT pairs) are handled by create_delta_features().
+# days_at_home/days_on_road are handled by the home_and_road feature group.
+INTERMEDIATE_COLUMNS = [
+    "pts_diff",
+    "distance",
+    "total_wins_HT",
+    "total_losses_HT",
+    "total_wins_VT",
+    "total_losses_VT",
+    "total_wins_HT_at_home",
+    "total_losses_HT_at_home",
+    "total_wins_VT_on_road",
+    "total_losses_VT_on_road",
+    "games_played_HT_at_home",
+    "games_played_VT_on_road",
+]
+
 DEFAULT_METADATA_COLUMNS = [
     "gameId",
     "winner",

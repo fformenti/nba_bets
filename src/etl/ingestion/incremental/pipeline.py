@@ -12,7 +12,7 @@ from src.etl.features.aggregator import create_features_tables, merge_features
 from src.etl.process_ingested_games import filter_regular_season_games
 from src.etl.ingestion.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
-from src.ml.config.loader import load_experiment_config
+from src.ml.config.loader import load_features_config
 from src.utils.logging_config import setup_logging, get_logger
 
 from .agents import (
@@ -128,10 +128,13 @@ def run_incremental_pipeline(
     if not config.update_features:
         return regular_season_games
 
-    feature_config = load_experiment_config(PROJECT_ROOT / config.feature_config_path)
-    record_lags = feature_config.feature_engineering.record_lags
-    point_differential_lags = feature_config.feature_engineering.point_differential_lags
-    location_lags = feature_config.feature_engineering.location_lags
+    feature_config = load_features_config(PROJECT_ROOT / config.feature_config_path)
+    record_lags = feature_config.record_lags
+    point_differential_lags = feature_config.point_differential_lags
+    location_lags = feature_config.location_lags
+    distances_lags = feature_config.distances_lags
+    sos_lags = feature_config.sos_lags
+    sos_adj_alpha = feature_config.sos_adj_alpha
 
     teams_history = load_teams_history_table()
     games_with_conference = add_conference(regular_season_games, teams_history)
@@ -140,6 +143,9 @@ def run_incremental_pipeline(
         record_lags=record_lags,
         point_differential_lags=point_differential_lags,
         location_lags=location_lags,
+        distances_lags=distances_lags,
+        sos_lags=sos_lags,
+        sos_adj_alpha=sos_adj_alpha,
     )
     final_features = merge_features(games_with_conference)
     final_features.to_csv(REGULAR_SEASON_GAMES_FEATURES_PATH, index=False)
