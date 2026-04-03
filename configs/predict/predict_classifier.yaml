@@ -12,7 +12,7 @@ data:
 # Use runs:/ URIs when register_model is false (artifact_path = nba_{model}_{conference}).
 # Use models:/ URIs only when register_model is true in training config.
 model_uris:
-  same: "runs:/3ea9f86f072c4f21beabe38375184351/nba_gradient_boosting_same"
+  same: "runs:/80c32693eab045238fdd93fa5e3e2708/nba_gradient_boosting_same"
   different: "runs:/cd041d98e9c6457b919ffbd64a78f607/nba_gradient_boosting_different"
   all: "runs:/4961c5ab6edb4b35867ed66ec9f39b5d/nba_xgboost_all"
 

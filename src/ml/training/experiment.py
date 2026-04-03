@@ -248,7 +248,6 @@ def train_single_model(
     X_test_baseline["pts_diff_avg_L82_delta"] = (
         X_test_baseline["pts_diff_avg_L82_HT"] - X_test_baseline["pts_diff_avg_L82_VT"]
     )
-    # X_test_baseline = X_test_baseline[["record_L82_HT", "record_L82_VT", "pts_diff_avg_L82_HT", "pts_diff_avg_L82_VT"]]
 
     df = create_delta_features(df, feat_eng_config.features)
     df = apply_conference_features(df, conference_filter)
@@ -357,9 +356,9 @@ def train_single_model(
             f"oldest={season_order[0]}, newest={season_order[-1]}"
         )
 
-    logger.info(
-        f"Features BEFORE selection ({len(X_train.columns)}): {sorted(X_train.columns.tolist())}"
-    )
+    # logger.info(
+    #     f"Features BEFORE selection ({len(X_train.columns)}): {sorted(X_train.columns.tolist())}"
+    # )
 
     # --- Feature Selection (Boruta-SHAP) ---
     boruta_selector = None
@@ -401,7 +400,7 @@ def train_single_model(
             viz_dir.mkdir(parents=True, exist_ok=True)
             fig_boruta = plot_boruta_shap_results(
                 boruta_selector,
-                top_n=30,
+                top_n=50,
                 title=f"Boruta-SHAP Feature Selection ({conference_filter})",
             )
             fig_boruta.savefig(
@@ -663,6 +662,7 @@ def train_single_model(
     calibrated_pipeline = None
     uncalibrated_proba = None
     best_calibration_method = None
+    best_cal_proba = None
 
     if "baseline" not in best_model_name:
         y_test_proba_uncal = best_pipeline.predict_proba(X_test)
@@ -714,8 +714,9 @@ def train_single_model(
             best_cal_method = min(
                 calibration_results, key=lambda m: calibration_results[m]["brier"]
             )
+            best_calibration_method = best_cal_method
+            best_cal_proba = calibration_results[best_cal_method]["proba"]
             if calibration_results[best_cal_method]["brier"] < brier_uncal:
-                best_calibration_method = best_cal_method
                 calibrated_pipeline = calibration_results[best_cal_method]["model"]
                 # Propagate feature_names_in_ for prediction alignment
                 if hasattr(best_pipeline, "feature_names_in_"):
@@ -724,9 +725,15 @@ def train_single_model(
                     )
                 best_pipeline = calibrated_pipeline
                 best_model_data["pipeline"] = best_pipeline
-                tracker.set_tags({"calibration_method": best_calibration_method})
+                tracker.set_tags(
+                    {
+                        "calibration_method": best_calibration_method,
+                        "calibration_improved": True,
+                    }
+                )
                 logger.info(f"Using calibrated model ({best_calibration_method})")
             else:
+                tracker.set_tags({"calibration_improved": False})
                 logger.info(
                     "Calibration did not improve Brier score; keeping uncalibrated model."
                 )
@@ -747,6 +754,7 @@ def train_single_model(
             title=f"Test Set Confusion Matrix - {best_model_name} ({conference_filter})",
         )
         fig_cm.savefig(viz_dir / "confusion_matrix.png", dpi=300, bbox_inches="tight")
+        plt.close(fig_cm)
 
         y_test_proba = None
         if "baseline" not in best_model_name:
@@ -843,6 +851,7 @@ def train_single_model(
                 title=f"ROC Curve - {best_model_name} ({conference_filter})",
             )
             fig_roc.savefig(viz_dir / "roc_curve.png", dpi=300, bbox_inches="tight")
+            plt.close(fig_roc)
 
             fig_acc_bin = plot_prediction_accuracy_by_bin(
                 y_test,
@@ -855,14 +864,11 @@ def train_single_model(
             plt.close(fig_acc_bin)
 
             # Calibration curve
-            if calibrated_pipeline is not None and uncalibrated_proba is not None:
-                calibrated_proba = best_pipeline.predict_proba(X_test)
-                if calibrated_proba.ndim > 1:
-                    calibrated_proba = calibrated_proba[:, 1]
+            if uncalibrated_proba is not None and best_cal_proba is not None:
                 fig_cal = plot_calibration_curve(
                     y_test,
                     uncalibrated_proba,
-                    calibrated_proba,
+                    best_cal_proba,
                     calibration_method=best_calibration_method,
                     title=f"Calibration Curve - {best_model_name} ({conference_filter})",
                 )

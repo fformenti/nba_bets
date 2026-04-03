@@ -5,6 +5,7 @@ import pandas as pd
 
 from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
+    TEAMS_ARENA_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
     REGULAR_SEASON_GAMES_FEATURES_PATH,
 )
@@ -14,6 +15,7 @@ from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
 
 from src.etl.utils.common import add_neutral_court_game_flag
+from src.etl.features.teams_arena import build_teams_arena, add_neutral_court
 from src.ml.config.loader import load_features_config
 
 from src.utils.logging_config import get_logger, setup_logging
@@ -62,6 +64,9 @@ def main():
     games_with_conference = add_neutral_court_game_flag(
         games_with_conference, game_label_column="gameLabel", drop_label_column=True
     )
+    teams_arena = build_teams_arena(games_with_conference)
+    teams_arena.to_csv(TEAMS_ARENA_PATH, index=False)
+    games_with_conference = add_neutral_court(games_with_conference, teams_arena)
     print(f"✓ Added conference information to {len(games_with_conference)} games")
 
     # Step 2: Create feature tables

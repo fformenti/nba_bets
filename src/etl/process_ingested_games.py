@@ -15,12 +15,56 @@ setup_logging(level="INFO")
 def filter_regular_season_games(games) -> DataFrame:
     """Filter games to only include regular season games."""
     # Changes were made to the raw games season 2025/26 has a different patttern from previous years
-    not_regular_season = ["Playoffs", "Preseason", "Play-in Tournament"]
-    games = games.loc[~games["gameType"].isin(not_regular_season)]
-    games = games.loc[~games["gameLabel"].isin(not_regular_season)]
-    games = games.drop(columns=["gameSubLabel", "seriesGameNumber"]).copy()
 
-    return games
+    # == Before 2024/25 ==
+    games_before_2024_2025 = games[games["season"] <= "2022/23"]
+
+    # Remove preseason, playoffs and play-in tournament from gameType
+    gametype_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
+    games_before_2024_2025 = games_before_2024_2025[
+        ~games_before_2024_2025["gameType"].isin(gametype_exclude)
+    ]
+
+    # Remove NBA Cup Championship game
+    games_before_2024_2025 = games_before_2024_2025[
+        games_before_2024_2025["gameId"] != 62300001
+    ]
+    # Semifinals games Id (for location purposes)
+    # semifinals_games_id = [22301230, 22301229]
+
+    # == Before 2024/25 ==
+    games_2024_2025 = games[games["season"] == "2024/25"]
+
+    # Remove preseason, playoffs and play-in tournament from gameType
+    gametype_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
+    games_2024_2025 = games_2024_2025[
+        ~games_2024_2025["gameType"].isin(gametype_exclude)
+    ]
+
+    # Remove Emirates NBA Cup Championship game
+    gameSubLabel_exclude = ["Championship"]
+    games_2024_2025 = games_2024_2025[
+        ~games_2024_2025["gameSubLabel"].isin(gameSubLabel_exclude)
+    ]
+
+    # == From 2025/26  onwards ==
+    games_after_2025 = games[games["season"] >= "2025/26"]
+
+    gameType_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
+    gameLabel_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
+    gameSubLabel_exclude = ["Championship"]
+
+    games_after_2025 = games_after_2025[
+        ~games_after_2025["gameType"].isin(gameType_exclude)
+    ]
+    games_after_2025 = games_after_2025[
+        ~games_after_2025["gameLabel"].isin(gameLabel_exclude)
+    ]
+    games_after_2025 = games_after_2025[
+        ~games_after_2025["gameSubLabel"].isin(gameSubLabel_exclude)
+    ]
+
+    return pd.concat([games_before_2024_2025, games_2024_2025, games_after_2025])
 
 
 if __name__ == "__main__":

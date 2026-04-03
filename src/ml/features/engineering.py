@@ -28,10 +28,17 @@ FEATURE_GROUP_PREFIXES = {
     "rested_days": lambda _: ["rested_days"],
     "streak": lambda _: ["streak"],
     "last_season_record": lambda _: ["last_season_record"],
+    "indifference_flag": lambda _: ["indifference_flag"],
 }
 
 # Groups that have HT_at_home / VT_on_road location variants
-LOCATION_VARIANT_GROUPS = {"record", "point_differential", "last_season_record", "sos_adj_record", "gds"}
+LOCATION_VARIANT_GROUPS = {
+    "record",
+    "point_differential",
+    "last_season_record",
+    "sos_adj_record",
+    "gds",
+}
 
 
 def create_delta_features(
@@ -67,12 +74,17 @@ def create_delta_features(
 
         if not group_config.enabled:
             for prefix in prefixes:
-                columns_to_drop.extend([f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"])
+                columns_to_drop.extend(
+                    [f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"]
+                )
             if group_name in LOCATION_VARIANT_GROUPS:
                 loc_prefixes = prefix_fn(group_config.location_lags)
                 for prefix in loc_prefixes:
                     columns_to_drop.extend(
-                        [f"{prefix}_{HOME_AT_HOME_SUFFIX}", f"{prefix}_{AWAY_ON_ROAD_SUFFIX}"]
+                        [
+                            f"{prefix}_{HOME_AT_HOME_SUFFIX}",
+                            f"{prefix}_{AWAY_ON_ROAD_SUFFIX}",
+                        ]
                     )
             continue
 
@@ -83,7 +95,10 @@ def create_delta_features(
                 if home_col not in df.columns or away_col not in df.columns:
                     logger.debug(f"Skipping delta for {prefix}: columns not found")
                     continue
-                df[f"{prefix}_delta"] = df[home_col] - df[away_col]
+                if prefix != "indifference_flag":
+                    df[f"{prefix}_delta"] = df[home_col] - df[away_col]
+                else:
+                    df[f"{prefix}_delta"] = df[away_col] - df[home_col]
                 created_features.append(f"{prefix}_delta")
                 columns_to_drop.extend([home_col, away_col])
 
@@ -93,7 +108,9 @@ def create_delta_features(
                     home_col = f"{prefix}_{HOME_AT_HOME_SUFFIX}"
                     away_col = f"{prefix}_{AWAY_ON_ROAD_SUFFIX}"
                     if home_col not in df.columns or away_col not in df.columns:
-                        logger.debug(f"Skipping location delta for {prefix}: columns not found")
+                        logger.debug(
+                            f"Skipping location delta for {prefix}: columns not found"
+                        )
                         continue
                     df[f"{prefix}_at_location_delta"] = df[home_col] - df[away_col]
                     created_features.append(f"{prefix}_at_location_delta")
@@ -108,7 +125,10 @@ def create_delta_features(
         df["days_at_home_delta"] = df["days_at_home"] + df["days_on_road"]
         created_features.append("days_at_home_delta")
         columns_to_drop.extend(["days_at_home", "days_on_road"])
-    # else: delta=False → raw survive
+
+    # neutral_court: game-level scalar — no HT/VT split, no delta
+    if not features_config.neutral_court.enabled:
+        columns_to_drop.append("neutral_court")
 
     # Drop columns
     cols_to_drop = [c for c in columns_to_drop if c in df.columns]
@@ -395,6 +415,14 @@ def resolve_feature_columns(
             for prefix in prefixes:
                 columns.extend([f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"])
 
+    # # Indifference Flag Delta
+    # home_road_config = features_config.indifference_flag
+    # if home_road_config.enabled:
+    #     if home_road_config.delta:
+    #         columns.append("indifference_flag_delta")
+    #     else:
+    #         columns.extend(["days_at_home", "days_on_road"])
+
     # home_and_road special case
     home_road_config = features_config.home_and_road
     if home_road_config.enabled:
@@ -402,6 +430,10 @@ def resolve_feature_columns(
             columns.append("days_at_home_delta")
         else:
             columns.extend(["days_at_home", "days_on_road"])
+
+    # neutral_court: game-level scalar — no HT/VT split, no delta
+    if features_config.neutral_court.enabled:
+        columns.append("neutral_court")
 
     # Conference features (created dynamically by apply_conference_features)
     if conference_filter == "different":

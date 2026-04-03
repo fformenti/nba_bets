@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Optional
 from sklearn.base import BaseEstimator
-from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 from src.ml.utils.shap import extract_binary_shap_values
@@ -412,6 +411,40 @@ def plot_prediction_accuracy_by_bin(
     return fig
 
 
+def _reliability_diagram_points(
+    y_true,
+    y_pred: np.ndarray,
+    n_bins: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Mean predicted value, fraction of positives, and counts per probability bin.
+
+    Bins are ``[0, 1/n_bins)``, …, ``[(n_bins-1)/n_bins, 1]`` — left-closed,
+    last bin right-closed so 1.0 is included. Empty bins are omitted.
+    """
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    mean_pred: list[float] = []
+    frac_pos: list[float] = []
+    counts: list[int] = []
+    for i in range(n_bins):
+        lo, hi = bin_edges[i], bin_edges[i + 1]
+        if i == n_bins - 1:
+            mask = (y_pred >= lo) & (y_pred <= hi)
+        else:
+            mask = (y_pred >= lo) & (y_pred < hi)
+        if not mask.any():
+            continue
+        mean_pred.append(float(y_pred[mask].mean()))
+        frac_pos.append(float(y_true[mask].mean()))
+        counts.append(int(mask.sum()))
+    return (
+        np.asarray(mean_pred),
+        np.asarray(frac_pos),
+        np.asarray(counts, dtype=int),
+    )
+
+
 def plot_calibration_curve(
     y_true,
     y_pred_proba_uncalibrated: np.ndarray,
@@ -421,14 +454,17 @@ def plot_calibration_curve(
     title: str = "Calibration Curve (Reliability Diagram)",
     figsize: tuple = (12, 7),
 ) -> plt.Figure:
-    """Plot calibration curves comparing uncalibrated vs calibrated probabilities."""
+    """Plot calibration curves comparing uncalibrated vs calibrated probabilities.
+
+    With default ``n_bins=10``, bins are width 0.1: ``[0, 0.1)``, …, ``[0.9, 1.0]``.
+    """
     from src.ml.evaluation.metrics import compute_brier_score
 
-    fraction_pos_uncal, mean_pred_uncal = calibration_curve(
-        y_true, y_pred_proba_uncalibrated, n_bins=n_bins, strategy="uniform"
+    mean_pred_uncal, fraction_pos_uncal, n_per_bin_uncal = _reliability_diagram_points(
+        y_true, y_pred_proba_uncalibrated, n_bins
     )
-    fraction_pos_cal, mean_pred_cal = calibration_curve(
-        y_true, y_pred_proba_calibrated, n_bins=n_bins, strategy="uniform"
+    mean_pred_cal, fraction_pos_cal, n_per_bin_cal = _reliability_diagram_points(
+        y_true, y_pred_proba_calibrated, n_bins
     )
 
     brier_uncal = compute_brier_score(y_true, y_pred_proba_uncalibrated)
@@ -450,18 +486,21 @@ def plot_calibration_curve(
         label=f"Calibrated [{calibration_method}] (Brier={brier_cal:.4f})",
     )
 
-    # Annotate bin counts for uncalibrated
-    bin_edges = np.linspace(0, 1, n_bins + 1)
-    for pred_val, frac_val in zip(mean_pred_uncal, fraction_pos_uncal):
-        bin_idx = np.clip(np.digitize(pred_val, bin_edges) - 1, 0, n_bins - 1)
-        mask = (y_pred_proba_uncalibrated >= bin_edges[bin_idx]) & (
-            y_pred_proba_uncalibrated < bin_edges[bin_idx + 1]
-        )
-        n = mask.sum()
+    for pred_val, frac_val, n in zip(
+        mean_pred_uncal, fraction_pos_uncal, n_per_bin_uncal
+    ):
         ax.annotate(
             f"n={n}", (pred_val, frac_val),
             textcoords="offset points", xytext=(0, 10),
-            ha="center", fontsize=8, color="dimgray",
+            ha="center", fontsize=8, color="steelblue",
+        )
+    for pred_val, frac_val, n in zip(
+        mean_pred_cal, fraction_pos_cal, n_per_bin_cal
+    ):
+        ax.annotate(
+            f"n={n}", (pred_val, frac_val),
+            textcoords="offset points", xytext=(0, -12),
+            ha="center", fontsize=8, color="darkorange",
         )
 
     ax.set_xlabel("Mean Predicted Probability", fontsize=12)

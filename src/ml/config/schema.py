@@ -108,6 +108,12 @@ class FeaturesMapConfig(BaseModel):
     home_and_road: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False)
     )
+    indifference_flag: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
+    )
+    neutral_court: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
+    )
 
 
 class FeatureEngineeringConfig(BaseModel):

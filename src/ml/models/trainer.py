@@ -29,7 +29,7 @@ class ModelTrainer:
         self,
         model: BaseEstimator,
         task_type: Literal["regression", "classification"],
-        random_state: Optional[int] = None,
+        random_state: Optional[int] = 42,
     ):
         """
         Initialize ModelTrainer.

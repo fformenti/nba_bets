@@ -72,7 +72,9 @@ nba_bets/
 │   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
 │   │   │   ├── strength_of_schedule.py         # Rolling strength of schedule
 │   │   │   ├── sos_adjusted_record.py          # SOS-adjusted winning percentage
-│   │   │   └── game_difficulty_score.py        # Per-game quality score (outcome × opponent strength × location)
+│   │   │   ├── game_difficulty_score.py        # Per-game quality score (outcome × opponent strength × location)
+│   │   │   ├── playoff_standings.py            # Conference standings, GB, and clinching flags per (team, game)
+│   │   │   └── teams_arena.py                  # Home arena lookup per (team, season); derives neutral_court flag
 │   │   │
 │   │   ├── transformation/
 │   │   │   └── add_conference.py               # Add conference column to games

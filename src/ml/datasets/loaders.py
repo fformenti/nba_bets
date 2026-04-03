@@ -49,6 +49,12 @@ def load_dataframe(
     except Exception as e:
         raise ValueError(f"Error reading CSV file {file_path}: {e}") from e
 
+    # CSV round-trip turns bool columns into "True"/"False" strings; restore bool dtype.
+    for col in df.select_dtypes(include=["object"]).columns:
+        unique_vals = set(df[col].dropna().unique())
+        if unique_vals <= {"True", "False"}:
+            df[col] = df[col].map({"True": True, "False": False})
+
     if df.empty:
         raise ValueError(f"Data file is empty: {file_path}")
 

@@ -33,6 +33,8 @@ INTERMEDIATE_COLUMNS = [
     "total_losses_VT_on_road",
     "games_played_HT_at_home",
     "games_played_VT_on_road",
+    # "conf_rank_HT",
+    # "conf_rank_VT",
 ]
 
 DEFAULT_METADATA_COLUMNS = [

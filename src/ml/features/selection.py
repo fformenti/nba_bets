@@ -72,11 +72,17 @@ class BorutaShapSelector:
         hits = np.zeros(n_features, dtype=int)
         importance_accumulator = np.zeros(n_features, dtype=float)
 
-        # Cast boolean columns to int for LightGBM compatibility
+        # Cast boolean columns to int for LightGBM compatibility.
+        # Object columns containing True/False (with possible NaN) arise from
+        # CSV round-trips and need the same treatment.
         X_work = X.copy()
         for col in X_work.columns:
             if X_work[col].dtype == bool:
                 X_work[col] = X_work[col].astype(int)
+            elif X_work[col].dtype == object:
+                unique_vals = set(X_work[col].dropna().unique())
+                if unique_vals <= {True, False}:
+                    X_work[col] = X_work[col].fillna(False).astype(int)
 
         for iteration in range(1, self.n_iterations + 1):
             logger.info(f"Boruta-SHAP iteration {iteration}/{self.n_iterations}")
