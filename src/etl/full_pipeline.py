@@ -75,6 +75,7 @@ def run_full_pipeline(
     feature_engineering_config = load_features_config(config_path)
     record_lags = feature_engineering_config.record_lags
     point_differential_lags = feature_engineering_config.point_differential_lags
+    norm_point_differential_lags = feature_engineering_config.norm_point_differential_lags
     location_lags = feature_engineering_config.location_lags
     distances_lags = feature_engineering_config.distances_lags
     sos_lags = feature_engineering_config.sos_lags
@@ -135,7 +136,8 @@ def run_full_pipeline(
     print("\n[Step 4/5] Creating feature tables...")
     create_features_tables(
         games_with_conference, record_lags, point_differential_lags, location_lags,
-        distances_lags, sos_lags, sos_adj_alpha=sos_adj_alpha,
+        norm_point_differential_lags=norm_point_differential_lags,
+        distances_lags=distances_lags, sos_lags=sos_lags, sos_adj_alpha=sos_adj_alpha,
         sos_adj_location_lags=sos_adj_location_lags,
     )
     print("✓ Created all feature tables")

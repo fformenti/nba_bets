@@ -93,7 +93,10 @@ class FeaturesMapConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
-    point_differential: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    point_differential: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    norm_point_differential: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     sos: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False)
     )
@@ -198,6 +201,10 @@ class FeatureEngineeringConfig(BaseModel):
     @property
     def point_differential_lags(self) -> list[int]:
         return self.features.point_differential.lags
+
+    @property
+    def norm_point_differential_lags(self) -> list[int]:
+        return self.features.norm_point_differential.lags
 
     @property
     def location_lags(self) -> list[int]:

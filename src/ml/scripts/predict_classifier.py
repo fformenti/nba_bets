@@ -248,8 +248,9 @@ def build_features_for_prediction(
         feat_eng_config.record_lags,
         feat_eng_config.point_differential_lags,
         feat_eng_config.location_lags,
-        feat_eng_config.distances_lags,
-        feat_eng_config.sos_lags,
+        norm_point_differential_lags=feat_eng_config.norm_point_differential_lags,
+        distances_lags=feat_eng_config.distances_lags,
+        sos_lags=feat_eng_config.sos_lags,
         sos_adj_alpha=feat_eng_config.sos_adj_alpha,
         sos_adj_location_lags=feat_eng_config.features.sos_adj_record.location_lags,
     )

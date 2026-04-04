@@ -10,6 +10,9 @@ from src.config.paths import (
     TEAMS_HOME_PTS_DIFF_PATH,
     TEAMS_AWAY_PTS_DIFF_PATH,
     TEAMS_PTS_DIFF_PATH,
+    TEAMS_HOME_NORM_PTS_DIFF_PATH,
+    TEAMS_AWAY_NORM_PTS_DIFF_PATH,
+    TEAMS_NORM_PTS_DIFF_PATH,
     EAST_WEST_RECORDS_PATH,
     EAST_WEST_RECORDS_AT_EAST_PATH,
     EAST_WEST_RECORDS_AT_WEST_PATH,
@@ -41,6 +44,10 @@ from src.etl.features.point_differential import (
     calculate_away_pts_diff,
     calculate_home_pts_diff,
     calculate_pts_diff,
+    calculate_norm_home_pts_diff,
+    calculate_norm_away_pts_diff,
+    calculate_norm_pts_diff,
+    _add_season_rolling_avg_total_pts,
 )
 from src.etl.features.rest_days import make_rested_days_table
 
@@ -66,6 +73,7 @@ def create_features_tables(
     record_lags=[],
     point_differential_lags=[],
     location_lags=[],
+    norm_point_differential_lags=[],
     distances_lags=[],
     sos_lags=[],
     sos_adj_alpha: float = 1.0,
@@ -117,6 +125,27 @@ def create_features_tables(
     home_pts_diff.to_csv(TEAMS_HOME_PTS_DIFF_PATH, index=False)
     away_pts_diff.to_csv(TEAMS_AWAY_PTS_DIFF_PATH, index=False)
     teams_pts_diff.to_csv(TEAMS_PTS_DIFF_PATH, index=False)
+
+    # Normalized point differential (season-to-date avg total pts as denominator)
+    # games already has pts_diff column from above; add rolling season avg
+    games_with_season_avg = _add_season_rolling_avg_total_pts(games)
+
+    home_norm_pts_diff = calculate_norm_home_pts_diff(games_with_season_avg, location_lags)
+    away_norm_pts_diff = calculate_norm_away_pts_diff(games_with_season_avg, location_lags)
+
+    # Combined home+away for all-games rolling avg
+    home_for_norm = games_with_season_avg.rename(columns={"hometeamId": "teamId"})
+    away_for_norm = games_with_season_avg.copy()
+    away_for_norm["pts_diff"] = away_for_norm["pts_diff"] * -1
+    away_for_norm = away_for_norm.rename(columns={"awayteamId": "teamId"})
+    teams_norm_pts_diff = calculate_norm_pts_diff(
+        pd.concat([home_for_norm, away_for_norm], ignore_index=True),
+        norm_point_differential_lags,
+    )
+
+    home_norm_pts_diff.to_csv(TEAMS_HOME_NORM_PTS_DIFF_PATH, index=False)
+    away_norm_pts_diff.to_csv(TEAMS_AWAY_NORM_PTS_DIFF_PATH, index=False)
+    teams_norm_pts_diff.to_csv(TEAMS_NORM_PTS_DIFF_PATH, index=False)
 
     east_west_record.to_csv(EAST_WEST_RECORDS_PATH, index=False)
     east_west_record_at_east.to_csv(EAST_WEST_RECORDS_AT_EAST_PATH, index=False)
@@ -276,6 +305,22 @@ def merge_features(games):
     games = join_games_and_teams_feature(
         games, away_pts_diff, "awayteamId", "VT_on_road"
     )
+
+    # Normalized point differential
+    if TEAMS_NORM_PTS_DIFF_PATH.exists():
+        teams_norm_pts_diff = pd.read_csv(TEAMS_NORM_PTS_DIFF_PATH)
+        games = join_games_and_teams_feature(games, teams_norm_pts_diff, "hometeamId", "HT")
+        games = join_games_and_teams_feature(games, teams_norm_pts_diff, "awayteamId", "VT")
+    if TEAMS_HOME_NORM_PTS_DIFF_PATH.exists():
+        home_norm_pts_diff = pd.read_csv(TEAMS_HOME_NORM_PTS_DIFF_PATH)
+        games = join_games_and_teams_feature(
+            games, home_norm_pts_diff, "hometeamId", "HT_at_home"
+        )
+    if TEAMS_AWAY_NORM_PTS_DIFF_PATH.exists():
+        away_norm_pts_diff = pd.read_csv(TEAMS_AWAY_NORM_PTS_DIFF_PATH)
+        games = join_games_and_teams_feature(
+            games, away_norm_pts_diff, "awayteamId", "VT_on_road"
+        )
 
     # East vs West
     games = games.merge(

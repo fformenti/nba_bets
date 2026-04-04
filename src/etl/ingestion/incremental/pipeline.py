@@ -131,6 +131,7 @@ def run_incremental_pipeline(
     feature_config = load_features_config(PROJECT_ROOT / config.feature_config_path)
     record_lags = feature_config.record_lags
     point_differential_lags = feature_config.point_differential_lags
+    norm_point_differential_lags = feature_config.norm_point_differential_lags
     location_lags = feature_config.location_lags
     distances_lags = feature_config.distances_lags
     sos_lags = feature_config.sos_lags
@@ -147,6 +148,7 @@ def run_incremental_pipeline(
         record_lags=record_lags,
         point_differential_lags=point_differential_lags,
         location_lags=location_lags,
+        norm_point_differential_lags=norm_point_differential_lags,
         distances_lags=distances_lags,
         sos_lags=sos_lags,
         sos_adj_alpha=sos_adj_alpha,

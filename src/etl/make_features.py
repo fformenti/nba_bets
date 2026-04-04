@@ -49,6 +49,7 @@ def main():
     feature_engineering_config = load_features_config(args.config)
     record_lags = feature_engineering_config.record_lags
     point_differential_lags = feature_engineering_config.point_differential_lags
+    norm_point_differential_lags = feature_engineering_config.norm_point_differential_lags
     location_lags = feature_engineering_config.location_lags
     distances_lags = feature_engineering_config.distances_lags
     sos_lags = feature_engineering_config.sos_lags
@@ -76,6 +77,7 @@ def main():
         record_lags,
         point_differential_lags,
         location_lags,
+        norm_point_differential_lags,
         distances_lags,
         sos_lags,
         sos_adj_alpha=sos_adj_alpha,

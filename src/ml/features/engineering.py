@@ -21,6 +21,7 @@ AWAY_ON_ROAD_SUFFIX = f"{AWAY_SUFFIX}_on_road"
 FEATURE_GROUP_PREFIXES = {
     "record": lambda lags: [f"record_L{lag}" for lag in lags],
     "point_differential": lambda lags: [f"pts_diff_avg_L{lag}" for lag in lags],
+    "norm_point_differential": lambda lags: [f"norm_pts_diff_avg_L{lag}" for lag in lags],
     "sos": lambda lags: [f"sos_L{lag}" for lag in lags],
     "sos_adj_record": lambda lags: [f"sos_adj_record_L{lag}" for lag in lags],
     "gds": lambda lags: [f"gds_L{lag}" for lag in lags],
@@ -35,6 +36,7 @@ FEATURE_GROUP_PREFIXES = {
 LOCATION_VARIANT_GROUPS = {
     "record",
     "point_differential",
+    "norm_point_differential",
     "last_season_record",
     "sos_adj_record",
     "gds",
