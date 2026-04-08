@@ -68,7 +68,7 @@ nba_bets/
 │   │   │   ├── east_vs_west.py                 # Conference win/loss records
 │   │   │   ├── rest_days.py                    # Days since last game
 │   │   │   ├── distances.py                    # Rolling travel distance
-│   │   │   ├── last_season_record.py           # Last season's win percentage record
+│   │   │   ├── last_season_record.py           # Last season's win percentage record; SOS-adjusted variant (adjusted_last_season_record)
 │   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
 │   │   │   ├── strength_of_schedule.py         # Rolling strength of schedule
 │   │   │   ├── sos_adjusted_record.py          # SOS-adjusted winning percentage

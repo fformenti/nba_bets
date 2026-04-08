@@ -29,6 +29,7 @@ FEATURE_GROUP_PREFIXES = {
     "rested_days": lambda _: ["rested_days"],
     "streak": lambda _: ["streak"],
     "last_season_record": lambda _: ["last_season_record"],
+    "adjusted_last_season_record": lambda _: ["adjusted_last_season_record"],
     "indifference_flag": lambda _: ["indifference_flag"],
 }
 
@@ -38,6 +39,7 @@ LOCATION_VARIANT_GROUPS = {
     "point_differential",
     "norm_point_differential",
     "last_season_record",
+    "adjusted_last_season_record",
     "sos_adj_record",
     "gds",
 }

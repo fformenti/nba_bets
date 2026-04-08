@@ -21,6 +21,9 @@ from src.config.paths import (
     LAST_SEASON_RECORD_PATH,
     LAST_SEASON_HOME_RECORD_PATH,
     LAST_SEASON_AWAY_RECORD_PATH,
+    LAST_SEASON_ADJ_RECORD_PATH,
+    LAST_SEASON_ADJ_HOME_RECORD_PATH,
+    LAST_SEASON_ADJ_AWAY_RECORD_PATH,
     TEAMS_STREAKS_PATH,
     TEAMS_SOS_PATH,
     TEAMS_SOS_ADJ_RECORD_PATH,
@@ -56,6 +59,9 @@ from src.etl.features.last_season_record import (
     create_last_season_record,
     create_last_season_home_record,
     create_last_season_away_record,
+    create_adjusted_last_season_record,
+    create_adjusted_last_season_home_record,
+    create_adjusted_last_season_away_record,
 )
 from src.etl.features.streaks import calculate_streak
 from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
@@ -213,6 +219,21 @@ def create_features_tables(
                 alpha=sos_adj_alpha,
             )
             teams_sos_adj_away.to_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH, index=False)
+
+        adj_last_season_record = create_adjusted_last_season_record(
+            games, teams_sos_full, alpha=sos_adj_alpha
+        )
+        adj_last_season_record.to_csv(LAST_SEASON_ADJ_RECORD_PATH, index=False)
+
+        adj_last_season_home_record = create_adjusted_last_season_home_record(
+            games, teams_sos_full, alpha=sos_adj_alpha
+        )
+        adj_last_season_home_record.to_csv(LAST_SEASON_ADJ_HOME_RECORD_PATH, index=False)
+
+        adj_last_season_away_record = create_adjusted_last_season_away_record(
+            games, teams_sos_full, alpha=sos_adj_alpha
+        )
+        adj_last_season_away_record.to_csv(LAST_SEASON_ADJ_AWAY_RECORD_PATH, index=False)
 
     if gds_lags:
         # Use sos_adj_record if it was computed above, else empty DF (triggers fallback)
@@ -382,6 +403,49 @@ def merge_features(games):
         left_on=["season", "awayteamId"],
         right_on=["season", "teamId"],
     ).drop(columns=["teamId"])
+
+    # Adjusted Last Season Record
+    if LAST_SEASON_ADJ_RECORD_PATH.exists():
+        adj_last_season_record = pd.read_csv(LAST_SEASON_ADJ_RECORD_PATH)
+        games = games.merge(
+            adj_last_season_record.rename(
+                columns={"adjusted_last_season_record": "adjusted_last_season_record_HT"}
+            ),
+            how="left",
+            left_on=["season", "hometeamId"],
+            right_on=["season", "teamId"],
+        ).drop(columns=["teamId"])
+
+        games = games.merge(
+            adj_last_season_record.rename(
+                columns={"adjusted_last_season_record": "adjusted_last_season_record_VT"}
+            ),
+            how="left",
+            left_on=["season", "awayteamId"],
+            right_on=["season", "teamId"],
+        ).drop(columns=["teamId"])
+
+    if LAST_SEASON_ADJ_HOME_RECORD_PATH.exists():
+        adj_last_season_home_record = pd.read_csv(LAST_SEASON_ADJ_HOME_RECORD_PATH)
+        games = games.merge(
+            adj_last_season_home_record.rename(
+                columns={"adjusted_last_season_record": "adjusted_last_season_record_HT_at_home"}
+            ),
+            how="left",
+            left_on=["season", "hometeamId"],
+            right_on=["season", "teamId"],
+        ).drop(columns=["teamId"])
+
+    if LAST_SEASON_ADJ_AWAY_RECORD_PATH.exists():
+        adj_last_season_away_record = pd.read_csv(LAST_SEASON_ADJ_AWAY_RECORD_PATH)
+        games = games.merge(
+            adj_last_season_away_record.rename(
+                columns={"adjusted_last_season_record": "adjusted_last_season_record_VT_on_road"}
+            ),
+            how="left",
+            left_on=["season", "awayteamId"],
+            right_on=["season", "teamId"],
+        ).drop(columns=["teamId"])
 
     games = join_games_and_teams_feature(games, teams_streaks, "hometeamId", "HT")
     games = join_games_and_teams_feature(games, teams_streaks, "awayteamId", "VT")

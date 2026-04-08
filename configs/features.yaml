@@ -57,6 +57,10 @@ feature_engineering:
       location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
       enabled: true
 
+    adjusted_last_season_record:
+      location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
+      enabled: true
+
     home_and_road:
       # Special: days_at_home (home team) and days_on_road (away team)
       # These are raw per-team columns, NOT HT/VT suffixed

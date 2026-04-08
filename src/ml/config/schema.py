@@ -105,6 +105,7 @@ class FeaturesMapConfig(BaseModel):
     rested_days: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     streak: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    adjusted_last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     gds: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(enabled=False)
     )

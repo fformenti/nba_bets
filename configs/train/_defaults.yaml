@@ -98,6 +98,9 @@ feature_engineering:
       enabled: false
     last_season_record:
       delta: true
+      enabled: false
+    adjusted_last_season_record:
+      location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
       enabled: true
     home_and_road:
       delta: false
