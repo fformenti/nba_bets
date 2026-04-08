@@ -12,6 +12,57 @@ tags:
 filters:
   conference_filter: "different"
 
+feature_engineering:
+  features:
+    record:
+      enabled: false
+      lags: []
+      location_lags: []
+      delta: false
+
+    point_differential:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      location_lags: [5, 10, 20, 41]
+      delta: true
+      enabled: false
+    norm_point_differential:
+      lags: [1, 3, 5, 8, 13, 21, 34, 55]
+      location_lags: [5, 10, 20, 41]
+      delta: true
+      enabled: true
+    gds:
+      lags: [3, 5, 8, 13, 21, 34, 55, 82]
+      location_lags: [5, 10, 20, 41]
+      delta: true
+      enabled: false
+
+    sos_adj_record:
+      enabled: true
+      # lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
+      lags: []
+      location_lags: [5, 10, 20, 41]
+      delta: true
+
+    rested_days:
+      delta: true
+      enabled: true
+
+    adjusted_last_season_record:
+      location_lags: [] # no lags, but has HT_at_home/VT_on_road variants
+      delta: true
+      enabled: true
+
+    indifference_flag:
+      delta: true
+      enabled: true
+
+    home_and_road:
+      delta: true
+      enabled: true
+
+feature_selection:
+  include_tentative: true
+
 paths:
   outputs: "outputs/different"
 
