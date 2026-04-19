@@ -379,7 +379,7 @@ def compute_season_phase_metrics(
     )
 
     labels = [f"{bins[i]}-{bins[i+1]}" for i in range(len(bins) - 1)]
-    df["phase"] = pd.cut(min_gp, bins=bins, labels=labels, include_lowest=True)
+    df["phase"] = pd.cut(min_gp + 1, bins=bins, labels=labels, include_lowest=True)
 
     phase_stats = (
         df.groupby("phase", observed=True)["correct"]

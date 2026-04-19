@@ -4,9 +4,9 @@ import pandas as pd
 
 from src.config.paths import (
     UPCOMING_GAMES_PREDICTIONS_PATH,
-    POLYMARKET_TEAMS_ABV_PATH,
     POLYMARKET_DAILY_BETS_DIR,
 )
+from src.ml.utils.polymarket import get_game_slug
 
 GAME_BUDGET = 100
 GAMMA_API = "https://gamma-api.polymarket.com"
@@ -15,30 +15,11 @@ CLOB_API = "https://clob.polymarket.com"
 
 def get_predictions_df(game_date_str):
     predictions_df = pd.read_csv(UPCOMING_GAMES_PREDICTIONS_PATH)
-    polymarket_teams_abv_df = pd.read_csv(POLYMARKET_TEAMS_ABV_PATH)
-
-    predictions_df = predictions_df.merge(
-        polymarket_teams_abv_df,
-        left_on=["hometeamId", "season"],
-        right_on=["teamId", "season"],
-        how="left",
-    ).drop(columns=["teamId"])
-    predictions_df.rename(
-        columns={"polymarket_abv": "home_team_polymarket_abv"}, inplace=True
-    )
-
-    predictions_df = predictions_df.merge(
-        polymarket_teams_abv_df,
-        left_on=["awayteamId", "season"],
-        right_on=["teamId", "season"],
-        how="left",
-    )
-    predictions_df.rename(
-        columns={"polymarket_abv": "away_team_polymarket_abv"}, inplace=True
-    )
 
     predictions_df["game_slug"] = predictions_df.apply(
-        lambda row: f"nba-{row['away_team_polymarket_abv'].lower()}-{row['home_team_polymarket_abv'].lower()}-{row['gameDateOnlyStr']}",
+        lambda row: get_game_slug(
+            row["awayteamId"], row["hometeamId"], row["gameDateOnlyStr"], row["season"]
+        ),
         axis=1,
     )
 
@@ -55,10 +36,7 @@ def get_predictions_df(game_date_str):
         ]
     ]
 
-    predictions_date = predictions_df.loc[
-        predictions_df["gameDateOnlyStr"] == game_date_str
-    ]
-    return predictions_date
+    return predictions_df.loc[predictions_df["gameDateOnlyStr"] == game_date_str]
 
 
 def get_market_tokens_by_slug(game_slug):

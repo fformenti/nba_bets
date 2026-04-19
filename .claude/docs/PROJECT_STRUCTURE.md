@@ -26,6 +26,9 @@ nba_bets/
 │   │   ├── historical/                         # Parsed & filtered historical games
 │   │   └── incremental/                        # Parsed incremental games
 │   ├── processed/
+│   │   ├── holdout/
+│   │   │   └── test_metadata.csv               # Fixed holdout set (frozen once via make-holdout-set)
+│   │   ├── game_slug_lookup.csv                # game_id → Polymarket slug (via make-game-slug-lookup)
 │   │   └── regular_season/
 │   │       └── features/                       # Feature tables + games_features.csv
 │   └── predictions/
@@ -38,7 +41,9 @@ nba_bets/
 │   │   └── aws.py                              # AWS config
 │   │
 │   ├── data_creation/
-│   │   └── polymarket_teams_abrev.py           # Team abbreviation mapping for Polymarket
+│   │   ├── polymarket_teams_abrev.py           # Team abbreviation mapping for Polymarket
+│   │   ├── make_holdout_set.py                 # Freeze holdout test set from games_features.csv (run once)
+│   │   └── make_game_slug_lookup.py            # Generate game_id → Polymarket slug lookup from holdout
 │   │
 │   ├── etl/
 │   │   ├── ingestion/
@@ -94,7 +99,7 @@ nba_bets/
 │   │   │
 │   │   ├── datasets/
 │   │   │   ├── loaders.py                      # Load games_features.csv as DataFrame
-│   │   │   └── splitters.py                    # Temporal / random / stratified splits
+│   │   │   └── splitters.py                    # Temporal / random / stratified / fixed-holdout splits
 │   │   │
 │   │   ├── features/
 │   │   │   ├── engineering.py                  # Delta features, conference features
@@ -134,7 +139,8 @@ nba_bets/
 │   │   │
 │   │   └── utils/
 │   │       ├── validation.py                   # Data validation utilities
-│   │       └── shap.py                         # SHAP output compatibility helpers
+│   │       ├── shap.py                         # SHAP output compatibility helpers
+│   │       └── polymarket.py                   # Slug generation: slugify(), get_game_slug()
 │   │
 │   ├── eda/
 │   │   └── home_win_ratio_by_season.py         # Home win ratio bar chart by season

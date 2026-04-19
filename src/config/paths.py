@@ -113,9 +113,16 @@ TEAMS_GDS_HOME_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_home.csv"
 TEAMS_GDS_AWAY_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_away.csv"
 PLAYOFF_STANDINGS_PATH = REGULAR_SEASON_FEATURES_DIR / "playoff_standings.csv"
 
+# Holdout (fixed test set, frozen once)
+HOLDOUT_DIR = PROCESSED_DIR / "holdout"
+HOLDOUT_TEST_METADATA_PATH = HOLDOUT_DIR / "test_metadata.csv"
+
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"
 POLYMARKET_DAILY_BETS_DIR = PREDICTIONS_DIR / "daily_bets"
+
+# Polymarket analysis
+GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"
 
 # ===== Outputs =====
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"

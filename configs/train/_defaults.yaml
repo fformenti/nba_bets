@@ -10,7 +10,7 @@ data:
 filters:
   min_season: "1980/81"
   minimum_games_train: 15
-  minimum_games_test: 15
+  minimum_games_test: 5
 
 weighting:
   enabled: true

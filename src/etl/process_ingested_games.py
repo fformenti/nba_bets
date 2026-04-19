@@ -17,7 +17,7 @@ def filter_regular_season_games(games) -> DataFrame:
     # Changes were made to the raw games season 2025/26 has a different patttern from previous years
 
     # == Before 2024/25 ==
-    games_before_2024_2025 = games[games["season"] <= "2022/23"]
+    games_before_2024_2025 = games[games["season"] <= "2023/24"]
 
     # Remove preseason, playoffs and play-in tournament from gameType
     gametype_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]

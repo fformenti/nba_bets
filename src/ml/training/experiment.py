@@ -6,10 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.config.paths import CONFIGS_TRAIN_DIR, REGULAR_SEASON_GAMES_FEATURES_PATH
+from src.config.paths import (
+    CONFIGS_TRAIN_DIR,
+    HOLDOUT_TEST_METADATA_PATH,
+    REGULAR_SEASON_GAMES_FEATURES_PATH,
+)
 from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
-from src.ml.datasets.splitters import temporal_split
+from src.ml.datasets.splitters import fixed_holdout_split, temporal_split
 from sklearn.calibration import CalibratedClassifierCV
 
 from src.ml.evaluation.metrics import (
@@ -214,10 +218,6 @@ def train_single_model(
     else:
         logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
 
-    games_enriched = filter_minimum_games_played(
-        cast(pd.DataFrame, games_enriched), minimum_games_test
-    )
-
     date_range_name = None
     if date_column and date_column in games_enriched.columns:
         dates = pd.to_datetime(games_enriched[date_column], errors="coerce").dropna()
@@ -238,10 +238,31 @@ def train_single_model(
         metadata_columns=metadata_columns,
     )
 
+    # Resolve holdout indices once — used for both baseline and main splits
+    _use_fixed_holdout = HOLDOUT_TEST_METADATA_PATH.exists()
+    if _use_fixed_holdout:
+        _holdout_meta = pd.read_csv(HOLDOUT_TEST_METADATA_PATH, usecols=["gameId"])
+        _holdout_game_ids = set(_holdout_meta["gameId"].astype(int))
+        _holdout_indices = metadata[metadata["gameId"].isin(_holdout_game_ids)].index
+        logger.info(
+            f"Using fixed holdout: {len(_holdout_indices)} games "
+            f"({len(_holdout_game_ids)} in file, {len(_holdout_indices)} matched)"
+        )
+    else:
+        logger.warning(
+            f"Fixed holdout not found at {HOLDOUT_TEST_METADATA_PATH}. "
+            "Falling back to temporal split — test set will shift as new games are added. "
+            "Run `make make-holdout-set` to freeze the holdout."
+        )
+
     # Special Dataframe for baseline models
-    _, _, X_test_baseline, _, _, y_test_baseline = temporal_split(
-        df, y, date_column=date_column, test_size=test_size, val_size=val_size
-    )
+    if _use_fixed_holdout:
+        X_test_baseline = df.loc[_holdout_indices].copy()
+        y_test_baseline = y.loc[_holdout_indices].copy()
+    else:
+        _, _, X_test_baseline, _, _, y_test_baseline = temporal_split(
+            df, y, date_column=date_column, test_size=test_size, val_size=val_size
+        )
     X_test_baseline["record_L82_delta"] = (
         X_test_baseline["record_L82_HT"] - X_test_baseline["record_L82_VT"]
     )
@@ -285,27 +306,41 @@ def train_single_model(
 
     if date_column not in X.columns:
         raise ValueError(f"Date column '{date_column}' required for temporal split")
-    X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
-        X, y, date_column=date_column, test_size=test_size, val_size=val_size
-    )
+    if _use_fixed_holdout:
+        X_train, X_val, X_test, y_train, y_val, y_test = fixed_holdout_split(
+            X, y, holdout_indices=_holdout_indices, date_column=date_column, val_size=val_size
+        )
+    else:
+        X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
+            X, y, date_column=date_column, test_size=test_size, val_size=val_size
+        )
     X_train = cast(pd.DataFrame, X_train.drop(columns=[date_column]))
     X_val = X_val.drop(columns=[date_column])
     X_test = X_test.drop(columns=[date_column])
 
-    if minimum_games_train > minimum_games_test:
-        train_gp = games_enriched.loc[X_train.index]
-        train_mask = (train_gp["games_played_HT"] > minimum_games_train) & (
-            train_gp["games_played_VT"] > minimum_games_train
-        )
-        X_train = X_train.loc[train_mask]
-        y_train = cast(pd.Series, y_train.loc[train_mask])
+    train_gp = games_enriched.loc[X_train.index]
+    train_mask = (train_gp["games_played_HT"] > minimum_games_train) & (
+        train_gp["games_played_VT"] > minimum_games_train
+    )
+    X_train = X_train.loc[train_mask]
+    y_train = cast(pd.Series, y_train.loc[train_mask])
 
-        val_gp = games_enriched.loc[X_val.index]
-        val_mask = (val_gp["games_played_HT"] > minimum_games_train) & (
-            val_gp["games_played_VT"] > minimum_games_train
-        )
-        X_val = cast(pd.DataFrame, X_val.loc[val_mask])
-        y_val = cast(pd.Series, y_val.loc[val_mask])
+    val_gp = games_enriched.loc[X_val.index]
+    val_mask = (val_gp["games_played_HT"] > minimum_games_train) & (
+        val_gp["games_played_VT"] > minimum_games_train
+    )
+    X_val = cast(pd.DataFrame, X_val.loc[val_mask])
+    y_val = cast(pd.Series, y_val.loc[val_mask])
+
+    test_gp = games_enriched.loc[X_test.index]
+    test_mask = (test_gp["games_played_HT"] > minimum_games_test) & (
+        test_gp["games_played_VT"] > minimum_games_test
+    )
+    X_test = X_test.loc[test_mask]
+    y_test = cast(pd.Series, y_test.loc[test_mask])
+
+    X_test_baseline = X_test_baseline.loc[X_test.index]
+    y_test_baseline = y_test_baseline.loc[X_test.index]
 
     metadata_test = metadata.loc[X_test.index].copy()
 
@@ -624,7 +659,7 @@ def train_single_model(
         record_baseline_data = models_to_train.get("record_baseline")
         if record_baseline_data:
             y_test_pred_baseline = record_baseline_data["pipeline"].predict(
-                X_test_baseline
+                X_test_baseline.loc[X_test.index]
             )
             baseline_phase_metrics = compute_season_phase_metrics(
                 y_test, y_test_pred_baseline, metadata_test

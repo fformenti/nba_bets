@@ -15,6 +15,12 @@ make-distances-table:
 polymarket-teams-abrev:
 	uv run python -m src.data_creation.polymarket_teams_abrev
 
+make-holdout-set:
+	uv run python -m src.data_creation.make_holdout_set
+
+make-game-slug-lookup:
+	uv run python -m src.data_creation.make_game_slug_lookup
+
 ingest-raw-games:
 	uv run python -m src.etl.ingestion.raw_games
 

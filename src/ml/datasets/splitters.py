@@ -169,6 +169,74 @@ def temporal_split(
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
+def fixed_holdout_split(
+    X: pd.DataFrame,
+    y: pd.Series,
+    holdout_indices: "pd.Index",
+    date_column: str,
+    val_size: float = 0.2,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """
+    Split data using a pre-defined holdout set frozen on disk.
+
+    Rows whose pandas index appears in holdout_indices become the test set.
+    The remaining rows are split into train/val via temporal_split.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Features DataFrame (must include date_column). Index must align with y.
+    y : pd.Series
+        Target Series
+    holdout_indices : pd.Index
+        Pandas index values of rows that form the fixed test set.
+        Computed by the caller from the metadata DataFrame.
+    date_column : str
+        Name of the date column, used for train/val temporal ordering.
+    val_size : float, default=0.2
+        Proportion of non-holdout data to use for validation.
+
+    Returns
+    -------
+    tuple
+        (X_train, X_val, X_test, y_train, y_val, y_test)
+    """
+    if date_column not in X.columns:
+        raise ValueError(f"Date column '{date_column}' not found in DataFrame")
+
+    holdout_mask = X.index.isin(holdout_indices)
+    X_test = X.loc[holdout_mask].copy()
+    y_test = y.loc[holdout_mask].copy()
+    X_remaining = X.loc[~holdout_mask].copy()
+    y_remaining = y.loc[~holdout_mask].copy()
+
+    if len(X_test) == 0:
+        raise ValueError(
+            "No holdout games found in the dataset. "
+            "Ensure the holdout file was generated from the same games_features.csv."
+        )
+
+    # Split remaining data into train/val only (no test portion)
+    n_total = len(X_remaining)
+    dates = pd.to_datetime(X_remaining[date_column])
+    sorted_indices = dates.sort_values().index
+    X_sorted = X_remaining.loc[sorted_indices]
+    y_sorted = y_remaining.loc[sorted_indices]
+
+    n_val = int(n_total * val_size)
+    n_train = n_total - n_val
+    X_train = X_sorted.iloc[:n_train].copy()
+    X_val = X_sorted.iloc[n_train:].copy()
+    y_train = y_sorted.iloc[:n_train].copy()
+    y_val = y_sorted.iloc[n_train:].copy()
+
+    logger.info(
+        f"Fixed holdout split: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
 def stratified_split(
     X: pd.DataFrame,
     y: pd.Series,
