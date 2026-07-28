@@ -9,6 +9,7 @@ from typing import Dict, Any
 from src.ml.config.schema import (
     ExperimentConfig,
     FeaturesConfig,
+    LLMTrainingConfig,
     PredictionConfig,
 )
 
@@ -119,6 +120,28 @@ def load_experiment_config(config_path: Path | str) -> ExperimentConfig:
     raw_config = load_yaml_config(config_path)
     raw_config = _resolve_includes(raw_config, config_path.parent)
     return ExperimentConfig.model_validate(raw_config)
+
+
+def load_llm_training_config(config_path: Path | str) -> LLMTrainingConfig:
+    """
+    Load an LLM fine-tuning config from a YAML file.
+
+    Supports ``_include`` directives, same as :func:`load_experiment_config`.
+
+    Parameters
+    ----------
+    config_path : Path | str
+        Path to YAML configuration file (e.g. configs/train_llm/*.yaml)
+
+    Returns
+    -------
+    LLMTrainingConfig
+        Validated LLM training configuration
+    """
+    config_path = Path(config_path).resolve()
+    raw_config = load_yaml_config(config_path)
+    raw_config = _resolve_includes(raw_config, config_path.parent)
+    return LLMTrainingConfig.model_validate(raw_config)
 
 
 def load_features_config(config_path: Path | str):

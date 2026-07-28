@@ -1,7 +1,9 @@
-.PHONY: teams-history etl incremental train train-all get-upcoming-games
+.PHONY: teams-history etl incremental train train-all train-llm evaluate-llm get-upcoming-games
 
 TRAIN_CONFIG ?= train_same
 PREDICTION_CONFIG ?= predict_classifier
+LLM_CONFIG ?= llama31_8b_qlora
+LLM_RUN ?=
 
 teams-history:
 	uv run python -m src.etl.ingestion.teams_history
@@ -50,6 +52,14 @@ train:
 
 train-all:
 	uv run python -m src.ml.scripts.run_experiments --config configs/train/*.yaml
+
+# LLM fine-tuning (needs `uv sync --extra gpu` on a CUDA box).
+# Pass LLM_RUN=<name> to resume an interrupted run from its Hub checkpoint.
+train-llm:
+	uv run python -m src.ml.scripts.train_llm --config configs/train_llm/$(LLM_CONFIG).yaml $(if $(LLM_RUN),--run-name $(LLM_RUN),)
+
+evaluate-llm:
+	uv run python -m src.ml.scripts.evaluate_llm --config configs/train_llm/$(LLM_CONFIG).yaml --run-name $(LLM_RUN)
 
 bet-polymarket:
 	uv run python src/ml/scripts/place_bets.py

@@ -17,6 +17,11 @@ CONFIGS_TRAIN_DIR = CONFIGS_DIR / "train"
 # Aligns with Makefile EXPERIMENT ?= train_same / make train
 DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH = CONFIGS_TRAIN_DIR / "train_same.yaml"
 DEFAULT_FEATURES_CONFIG_PATH = CONFIGS_DIR / "features.yaml"
+# LLM fine-tuning configs live in their own directory so the `train-all`
+# target (which globs configs/train/*.yaml) does not pick them up.
+CONFIGS_TRAIN_LLM_DIR = CONFIGS_DIR / "train_llm"
+# Aligns with Makefile LLM_CONFIG ?= llama31_8b_qlora / make train-llm
+DEFAULT_TRAIN_LLM_CONFIG_PATH = CONFIGS_TRAIN_LLM_DIR / "llama31_8b_qlora.yaml"
 
 # ===== Base data directories =====
 DATA_DIR = PROJECT_ROOT / "data"
@@ -128,6 +133,10 @@ GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 ENRICHED_GAMES_VIZ_DIR = OUTPUTS_DIR / "enriched_games" / "viz"
 HOME_WIN_RATIO_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_by_season.png"
+
+# LLM fine-tuning: checkpoints, downloaded resume snapshots and eval charts
+LLM_OUTPUTS_DIR = OUTPUTS_DIR / "llm"
+LLM_EVAL_OUTPUTS_DIR = LLM_OUTPUTS_DIR / "eval"
 
 
 def project_relpath(path: Path) -> str:

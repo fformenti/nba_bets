@@ -356,3 +356,146 @@ class PredictionConfig(BaseModel):
 
     allow_missing_features: bool = False
     max_files: Optional[int] = None
+
+
+# ===== LLM fine-tuning (QLoRA SFT) =====
+
+
+class HubConfig(BaseModel):
+    """Hugging Face Hub destination for adapters and checkpoints."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    user: str = "fformenti"
+    project_name: str = "nba-bets"
+    private: bool = True
+    push_checkpoints: bool = Field(
+        default=True,
+        description="Push intermediate checkpoints to the Hub so a dropped "
+        "connection can be resumed from.",
+    )
+
+
+class LLMDataConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    dataset_name: str = "fformenti/nba-bets"
+    train_split: str = "train"
+    eval_split: str = "validation"
+    text_field: str = "text"
+    max_sequence_length: int = 1024
+    max_train_samples: Optional[int] = Field(
+        default=None, description="Cap training rows; useful for smoke tests."
+    )
+
+
+class QuantizationConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    mode: Literal["4bit", "8bit", "none"] = "8bit"
+    compute_dtype: Literal["bfloat16", "float16"] = "bfloat16"
+    bnb_4bit_quant_type: Literal["nf4", "fp4"] = "nf4"
+    bnb_4bit_use_double_quant: bool = True
+
+
+class LoraSettings(BaseModel):
+    """LoRA hyperparameters (named to avoid clashing with peft.LoraConfig)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    r: int = 32
+    alpha: int = 64
+    dropout: float = 0.1
+    target_modules: list[str] = Field(
+        default_factory=lambda: ["q_proj", "v_proj", "k_proj", "o_proj"]
+    )
+    bias: Literal["none", "all", "lora_only"] = "none"
+
+
+class LLMTrainerConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    epochs: int = 2
+    per_device_train_batch_size: int = 2
+    gradient_accumulation_steps: int = 4
+    learning_rate: float = 1e-4
+    lr_scheduler_type: str = "cosine"
+    warmup_ratio: float = 0.03
+    optimizer: str = "paged_adamw_32bit"
+    weight_decay: float = 0.001
+    max_grad_norm: float = 0.3
+    bf16: bool = True
+    fp16: bool = False
+    gradient_checkpointing: bool = True
+    logging_steps: int = 50
+    save_steps: int = 500
+    save_total_limit: int = 10
+    seed: int = 42
+    train_on_completion_only: bool = Field(
+        default=False,
+        description="Mask the prompt so loss is computed only over the answer "
+        "following completion_template.",
+    )
+    completion_template: str = (
+        "The home team finished the game with a point differential of"
+    )
+
+
+class LLMEvaluationConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    split: str = "test"
+    size: int = 200
+    max_new_tokens: int = 8
+    seed: int = 42
+
+
+class WandbConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    project: str = "nba-bets"
+    watch: str = "gradients"
+
+
+class LLMMLflowConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    experiment_name: str = "nba_bets_llm"
+    tracking_uri: str = "sqlite:///mlflow.db"
+
+
+class LLMTrackingConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    wandb: WandbConfig = WandbConfig()
+    mlflow: LLMMLflowConfig = LLMMLflowConfig()
+
+
+class LLMPathsConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    output_dir: str = "outputs/llm"
+
+
+class LLMTrainingConfig(BaseModel):
+    """Configuration for QLoRA supervised fine-tuning of a causal LM."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    description: str | None = None
+    run_name: Optional[str] = Field(
+        default=None,
+        description="Pin a run name to resume it. When None a timestamped "
+        "name is generated at launch.",
+    )
+    base_model: str = "meta-llama/Meta-Llama-3.1-8B"
+    hub: HubConfig = HubConfig()
+    data: LLMDataConfig = LLMDataConfig()
+    quantization: QuantizationConfig = QuantizationConfig()
+    lora: LoraSettings = LoraSettings()
+    training: LLMTrainerConfig = LLMTrainerConfig()
+    evaluation: LLMEvaluationConfig = LLMEvaluationConfig()
+    tracking: LLMTrackingConfig = LLMTrackingConfig()
+    paths: LLMPathsConfig = LLMPathsConfig()

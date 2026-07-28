@@ -11,6 +11,8 @@ nba_bets/
 │   │   ├── train_all.yaml                      # Training overrides: all games
 │   │   ├── train_different.yaml                # Training overrides: cross-conference
 │   │   └── train_same.yaml                     # Training overrides: same conference
+│   ├── train_llm/                              # Separate dir: train-all globs configs/train/*.yaml
+│   │   └── llama31_8b_qlora.yaml               # QLoRA SFT config (model, LoRA, hub, tracking)
 │   └── predict/
 │       └── predict_classifier.yaml             # Prediction config
 │
@@ -115,7 +117,10 @@ nba_bets/
 │   │   │   ├── data_prep.py                    # Data preparation helpers
 │   │   │   ├── experiment.py                   # Experiment definition and execution
 │   │   │   ├── model_factory.py                # Build models from config
-│   │   │   └── runners.py                      # High-level training runners
+│   │   │   ├── runners.py                      # High-level training runners
+│   │   │   ├── llm_finetune.py                 # QLoRA SFT: preflight, Hub checkpoint resume, SFTTrainer
+│   │   │   ├── llm_eval.py                     # Score a fine-tuned LoRA adapter as a sign classifier
+│   │   │   └── utils.py                        # Tester_Regressors / Tester_Classifiers (headless plotly charts)
 │   │   │
 │   │   ├── evaluation/
 │   │   │   ├── metrics.py                      # Classification metrics
@@ -135,6 +140,8 @@ nba_bets/
 │   │   │   ├── predict_classifier.py           # Predict upcoming games from config
 │   │   │   ├── predict_upcoming.py             # Wrapper for predict_classifier
 │   │   │   ├── run_experiments.py              # Run multiple experiments in batch
+│   │   │   ├── train_llm.py                    # QLoRA fine-tune an LLM (resumable; make train-llm)
+│   │   │   ├── evaluate_llm.py                 # Evaluate a fine-tuned adapter (make evaluate-llm)
 │   │   │   └── place_bets.py                   # Place bets via Polymarket API
 │   │   │
 │   │   └── utils/

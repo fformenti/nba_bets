@@ -24,6 +24,22 @@ dependencies = [
     "py-clob-client>=0.34.5",
     "openai-agents>=0.10.2",
     "shap>=0.50.0",
+    "python-dotenv>=1.0.0",
+    "plotly>=5.20.0",
+    "tqdm>=4.66.0",
+]
+
+# GPU-only fine-tuning stack. Kept out of the core dependencies because
+# bitsandbytes has no macOS wheel and would break `uv sync` on a laptop.
+# On the training box: uv sync --extra gpu
+[project.optional-dependencies]
+gpu = [
+    "peft>=0.14",
+    "trl>=0.13",
+    "accelerate>=1.0",
+    "bitsandbytes>=0.45",
+    "wandb>=0.19",
+    "sentencepiece>=0.2",
 ]
 
 [dependency-groups]
