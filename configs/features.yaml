@@ -50,6 +50,11 @@ feature_engineering:
     rested_days:
       enabled: true
 
+    back_to_back:
+      # Consecutive games on consecutive days: 0 = rested yesterday,
+      # 1 = back-to-back, 2 = three games in three days, etc.
+      enabled: true
+
     streak:
       enabled: true
 

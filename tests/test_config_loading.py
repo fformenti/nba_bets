@@ -6,9 +6,7 @@ from pathlib import Path
 from src.ml.config.loader import (
     load_experiment_config,
     load_features_config,
-    load_yaml_config,
     _deep_merge,
-    _resolve_includes,
 )
 
 CONFIGS_DIR = Path("configs")
@@ -77,36 +75,35 @@ class TestTrainConfigLoading:
         config = load_experiment_config(config_path)
         assert config is not None
 
-    def test_train_same_record_and_point_diff_lags(self):
-        """train_same overrides lags on top of merged features + _defaults."""
-        config = load_experiment_config(TRAIN_SAME)
-        assert config.feature_engineering.record_lags == [13, 34, 55, 82]
-        assert config.feature_engineering.point_differential_lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
+    @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
+    def test_lag_shortcut_properties_mirror_feature_groups(self, config_path):
+        """The flat *_lags properties are views onto the resolved feature groups."""
+        fe = load_experiment_config(config_path).feature_engineering
+        assert fe.record_lags == fe.features.record.lags
+        assert fe.point_differential_lags == fe.features.point_differential.lags
+        assert fe.location_lags == fe.features.record.location_lags
+        assert fe.distances_lags == fe.features.distance.lags
+        assert fe.sos_lags == fe.features.sos.lags
 
-    @pytest.mark.parametrize("config_path", [TRAIN_DIFFERENT, TRAIN_ALL], ids=lambda p: p.stem)
-    def test_train_different_all_full_lag_lists(self, config_path):
-        """Configs without per-experiment lag overrides keep merged defaults."""
-        full = [1, 3, 5, 8, 13, 21, 34, 55, 82]
-        config = load_experiment_config(config_path)
-        assert config.feature_engineering.record_lags == full
-        assert config.feature_engineering.point_differential_lags == full
+    @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
+    def test_experiment_overrides_win_over_includes(self, config_path):
+        """Per-experiment feature blocks override both features.yaml and _defaults."""
+        fe = load_experiment_config(config_path).feature_engineering
+        # every train config disables `record` and enables `norm_point_differential`,
+        # overriding features.yaml (record enabled) via the include chain
+        assert fe.features.record.enabled is False
+        assert fe.features.record.lags == []
+        assert fe.features.norm_point_differential.enabled is True
+        assert fe.features.norm_point_differential.lags == [1, 3, 5, 8, 13, 21, 34, 55]
 
-    @pytest.mark.parametrize("config_path", [TRAIN_DIFFERENT, TRAIN_ALL], ids=lambda p: p.stem)
-    def test_non_selected_groups_disabled(self, config_path):
-        """Feature groups that are opt-in are disabled by default."""
-        config = load_experiment_config(config_path)
-        features = config.feature_engineering.features
+    @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
+    def test_opt_in_groups_disabled_by_default(self, config_path):
+        """Groups no experiment enables stay off after the merge."""
+        features = load_experiment_config(config_path).feature_engineering.features
         assert features.sos.enabled is False
-        assert features.sos_adj_record.enabled is False
         assert features.streak.enabled is False
         assert features.last_season_record.enabled is False
-        assert features.home_and_road.enabled is False
-
-    def test_train_same_sos_adj_record_enabled(self):
-        """train_same explicitly enables sos_adj_record with its own independent lags."""
-        config = load_experiment_config(TRAIN_SAME)
-        assert config.feature_engineering.features.sos_adj_record.enabled is True
-        assert config.feature_engineering.features.sos_adj_record.lags == [13, 34, 55, 82]
+        assert features.neutral_court.enabled is False
 
     @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
     def test_sos_adj_alpha_from_features_yaml(self, config_path):
@@ -128,22 +125,18 @@ class TestTrainConfigLoading:
         config = load_experiment_config(TRAIN_ALL)
         assert config.filters.conference_filter == "all"
 
-    def test_train_same_include_tentative_false(self):
-        config = load_experiment_config(TRAIN_SAME)
-        assert config.feature_selection.include_tentative is False
-
-    def test_train_different_include_tentative_true(self):
-        config = load_experiment_config(TRAIN_DIFFERENT)
+    @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
+    def test_include_tentative_inherited_from_defaults(self, config_path):
+        config = load_experiment_config(config_path)
         assert config.feature_selection.include_tentative is True
 
-    def test_features_config_has_feature_groups(self):
-        config = load_experiment_config(TRAIN_SAME)
-        features = config.feature_engineering.features
-        assert features.record.enabled is True
-        assert features.record.delta is True
+    def test_delta_flags_come_from_defaults_yaml(self):
+        """features.yaml declares no delta; _defaults.yaml supplies it for every group."""
+        features = load_experiment_config(TRAIN_SAME).feature_engineering.features
         assert features.sos.delta is False
-        assert features.home_and_road.delta is False
-        assert features.home_and_road.enabled is False
+        assert features.neutral_court.delta is False
+        assert features.distance.delta is True
+        assert features.streak.delta is True
 
     def test_model_hyperparameter_defaults_from_defaults_yaml(self):
         """Classifier blocks inherit hyperparameter_tuning from _defaults.yaml."""

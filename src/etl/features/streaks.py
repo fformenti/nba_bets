@@ -40,11 +40,15 @@ def calculate_streak(games: pd.DataFrame) -> pd.DataFrame:
             away[base_cols + ["teamId", "win_bool"]],
         ],
         ignore_index=True,
-    ).sort_values(["teamId", "season", "gameDate"])
+    ).sort_values(["teamId", "season", "gameDate", "gameId"])
 
-    streak_values: list[int] = []
+    # Collect per-group results as index-aligned Series rather than one flat
+    # list: a positional assignment would silently attach streaks to the wrong
+    # rows if the sort keys or the groupby ever stopped agreeing.
+    streak_parts: list[pd.Series] = []
     for _, group in all_games.groupby(["teamId", "season"], sort=False):
-        wins = group.sort_values("gameDate")["win_bool"].values
+        group = group.sort_values(["gameDate", "gameId"])
+        wins = group["win_bool"].values
         n = len(wins)
         streak = np.zeros(n, dtype=int)
         for i in range(1, n):
@@ -52,7 +56,7 @@ def calculate_streak(games: pd.DataFrame) -> pd.DataFrame:
                 streak[i] = max(streak[i - 1], 0) + 1
             else:
                 streak[i] = min(streak[i - 1], 0) - 1
-        streak_values.extend(streak)
+        streak_parts.append(pd.Series(streak, index=group.index))
 
-    all_games["streak"] = streak_values
+    all_games["streak"] = pd.concat(streak_parts)
     return all_games[["gameId", "season", "teamId", "gameDate", "streak"]]

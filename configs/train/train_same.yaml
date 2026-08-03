@@ -49,6 +49,10 @@ feature_engineering:
       delta: true
       enabled: true
 
+    back_to_back:
+      delta: true
+      enabled: true
+
     adjusted_last_season_record:
       location_lags: [] # no lags, but has HT_at_home/VT_on_road variants
       delta: true

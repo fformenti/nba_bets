@@ -1,8 +1,21 @@
-"""Last season's win percentage record feature."""
+"""Last season's win percentage record feature.
+
+Six public builders share the same shape: aggregate a season win percentage
+over some scope (all games / home only / road only), optionally adjust it for
+strength of schedule, then attach each team's *previous* season value. They
+differ only in scope, whether the SOS adjustment is applied, and the output
+column name — see ``_team_season_win_pct`` and ``_prior_season_lookup``.
+"""
 
 import pandas as pd
 
 from src.etl.features.sos_adjusted_record import _apply_adjustment
+
+# Assumed strength for a franchise with no prior season in the dataset
+# (expansion teams such as the 1995/96 Raptors, and every team in the
+# first season on record). Used as the terminal fallback for opponent
+# quality in SOS and GDS.
+NEW_FRANCHISE_STRENGTH = 0.200
 
 
 def _prev_season(season: str) -> str:
@@ -13,59 +26,131 @@ def _prev_season(season: str) -> str:
     return f"{prev_start}/{prev_end}"
 
 
-def create_last_season_record(games: pd.DataFrame) -> pd.DataFrame:
+def _team_season_win_pct(games: pd.DataFrame, scope: str = "all") -> pd.DataFrame:
     """
-    Compute each team's previous-season win percentage.
-
-    For expansion teams (no prior season), fills with the minimum
-    win percentage of all teams in that previous season.
-    Returns NaN for teams in the first season of the dataset
-    (handled by the ML pipeline's mean imputer).
+    Win percentage per team per season.
 
     Parameters
     ----------
     games : pd.DataFrame
         Wide-format games with: season, hometeamId, awayteamId, winner.
+    scope : {"all", "home", "away"}
+        Which games to count: every game, home games only, or road games only.
 
     Returns
     -------
     pd.DataFrame
-        Columns: teamId, season, last_season_record.
+        Columns: teamId, season, win_pct.
     """
-    home = games[["season", "hometeamId", "winner"]].copy()
-    home = home.rename(columns={"hometeamId": "teamId"})
-    home["win_bool"] = (home["teamId"] == home["winner"]).astype(int)
+    if scope not in ("all", "home", "away"):
+        raise ValueError(f"scope must be 'all', 'home' or 'away', got {scope!r}")
 
-    away = games[["season", "awayteamId", "winner"]].copy()
-    away = away.rename(columns={"awayteamId": "teamId"})
-    away["win_bool"] = (away["teamId"] == away["winner"]).astype(int)
+    frames = []
+
+    # Both sides test equality against the team itself. Testing the away side as
+    # `winner != hometeamId` would be equivalent for played games, but would turn
+    # an unknown winner (NA, or the 0 placeholder used for upcoming games) into a
+    # fabricated road win while the home side recorded a loss.
+    if scope in ("all", "home"):
+        home = games[["season", "hometeamId", "winner"]].rename(
+            columns={"hometeamId": "teamId"}
+        )
+        frames.append(home.assign(win_bool=(home["teamId"] == home["winner"]).astype(int)))
+
+    if scope in ("all", "away"):
+        away = games[["season", "awayteamId", "winner"]].rename(
+            columns={"awayteamId": "teamId"}
+        )
+        frames.append(away.assign(win_bool=(away["teamId"] == away["winner"]).astype(int)))
 
     long = pd.concat(
-        [home[["season", "teamId", "win_bool"]], away[["season", "teamId", "win_bool"]]],
+        [frame[["season", "teamId", "win_bool"]] for frame in frames],
         ignore_index=True,
     )
 
-    season_record = (
+    return (
         long.groupby(["teamId", "season"])["win_bool"]
         .mean()
-        .round(4)
         .rename("win_pct")
         .reset_index()
     )
 
+
+def _prior_season_lookup(season_record: pd.DataFrame, out_col: str) -> pd.DataFrame:
+    """
+    Attach each team's *previous* season ``win_pct`` as *out_col*.
+
+    Expansion teams (no prior season on record) fall back to the minimum
+    prior-season value among teams playing in the same season. Teams in the
+    first season of the dataset stay NaN, since no prior season exists at all;
+    the ML pipeline's imputer handles those.
+
+    Parameters
+    ----------
+    season_record : pd.DataFrame
+        Columns: teamId, season, win_pct.
+    out_col : str
+        Name for the resulting previous-season column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: teamId, season, {out_col}.
+    """
+    season_record = season_record.copy()
     season_record["prev_season"] = season_record["season"].map(_prev_season)
 
-    # Look up each team's win_pct in their previous season
     prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "last_season_record"}
+        columns={"season": "prev_season", "win_pct": out_col}
     )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
+    season_record = season_record.merge(
+        prev_lookup, on=["teamId", "prev_season"], how="left"
+    )
 
-    # Expansion teams: fill with that previous season's minimum
-    prev_season_min = season_record.groupby("prev_season")["last_season_record"].transform("min")
-    season_record["last_season_record"] = season_record["last_season_record"].fillna(prev_season_min)
+    prev_season_min = season_record.groupby("prev_season")[out_col].transform("min")
+    season_record[out_col] = season_record[out_col].fillna(prev_season_min)
 
-    return season_record[["teamId", "season", "last_season_record"]].copy()
+    return season_record[["teamId", "season", out_col]].copy()
+
+
+def build_prior_season_strength(
+    games: pd.DataFrame,
+    default: float = NEW_FRANCHISE_STRENGTH,
+) -> pd.DataFrame:
+    """
+    Prior-season win percentage per team-season, used as a strength prior.
+
+    Unlike ``create_last_season_record()`` (which back-fills expansion teams
+    with the previous season's league minimum), teams with no prior season
+    get a fixed *default*.  This is the fallback for opponent quality at the
+    start of a season, when no current-season games have been played yet.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Wide-format games with: season, hometeamId, awayteamId, winner.
+    default : float
+        Strength assigned to franchises with no prior season on record.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: teamId, season, prior_season_strength.
+    """
+    season_record = _team_season_win_pct(games)
+    season_record["prev_season"] = season_record["season"].map(_prev_season)
+
+    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
+        columns={"season": "prev_season", "win_pct": "prior_season_strength"}
+    )
+    season_record = season_record.merge(
+        prev_lookup, on=["teamId", "prev_season"], how="left"
+    )
+    season_record["prior_season_strength"] = season_record[
+        "prior_season_strength"
+    ].fillna(default)
+
+    return season_record[["teamId", "season", "prior_season_strength"]].copy()
 
 
 def _season_sos(sos_df: pd.DataFrame) -> pd.DataFrame:
@@ -91,8 +176,88 @@ def _apply_sos_to_season_record(
     league_avg_sos = merged.groupby("season")["season_sos"].transform("mean")
     merged["win_pct"] = _apply_adjustment(
         merged["win_pct"], merged["season_sos"], league_avg_sos, alpha
-    ).round(4)
+    )
     return merged.drop(columns=["season_sos"])
+
+
+# ── Plain (unadjusted) previous-season records ───────────────────────────────
+
+
+def create_last_season_record(games: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute each team's previous-season win percentage.
+
+    For expansion teams (no prior season), fills with the minimum
+    previous-season win percentage among teams playing that season.
+    Returns NaN for teams in the first season of the dataset
+    (handled by the ML pipeline's mean imputer).
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Wide-format games with: season, hometeamId, awayteamId, winner.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: teamId, season, last_season_record.
+    """
+    return _prior_season_lookup(
+        _team_season_win_pct(games, scope="all"), "last_season_record"
+    )
+
+
+def create_last_season_home_record(games: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute each team's previous-season win percentage at home.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Wide-format games with: season, hometeamId, winner.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: teamId, season, last_season_record.
+    """
+    return _prior_season_lookup(
+        _team_season_win_pct(games, scope="home"), "last_season_record"
+    )
+
+
+def create_last_season_away_record(games: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute each team's previous-season win percentage on the road.
+
+    Parameters
+    ----------
+    games : pd.DataFrame
+        Wide-format games with: season, awayteamId, winner.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: teamId, season, last_season_record.
+    """
+    return _prior_season_lookup(
+        _team_season_win_pct(games, scope="away"), "last_season_record"
+    )
+
+
+# ── SOS-adjusted previous-season records ─────────────────────────────────────
+
+
+def _create_adjusted_last_season_record(
+    games: pd.DataFrame,
+    sos_df: pd.DataFrame,
+    alpha: float,
+    scope: str,
+) -> pd.DataFrame:
+    """Shared body for the three SOS-adjusted previous-season builders."""
+    season_record = _team_season_win_pct(games, scope=scope)
+    season_record = _apply_sos_to_season_record(season_record, sos_df, alpha)
+    return _prior_season_lookup(season_record, "adjusted_last_season_record")
 
 
 def create_adjusted_last_season_record(
@@ -123,40 +288,7 @@ def create_adjusted_last_season_record(
     pd.DataFrame
         Columns: teamId, season, adjusted_last_season_record.
     """
-    home = games[["season", "hometeamId", "winner"]].copy()
-    home = home.rename(columns={"hometeamId": "teamId"})
-    home["win_bool"] = (home["teamId"] == home["winner"]).astype(int)
-
-    away = games[["season", "awayteamId", "winner"]].copy()
-    away = away.rename(columns={"awayteamId": "teamId"})
-    away["win_bool"] = (away["teamId"] == away["winner"]).astype(int)
-
-    long = pd.concat(
-        [home[["season", "teamId", "win_bool"]], away[["season", "teamId", "win_bool"]]],
-        ignore_index=True,
-    )
-
-    season_record = (
-        long.groupby(["teamId", "season"])["win_bool"]
-        .mean()
-        .round(4)
-        .rename("win_pct")
-        .reset_index()
-    )
-
-    season_record = _apply_sos_to_season_record(season_record, sos_df, alpha)
-
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
-
-    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "adjusted_last_season_record"}
-    )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
-
-    prev_season_min = season_record.groupby("prev_season")["adjusted_last_season_record"].transform("min")
-    season_record["adjusted_last_season_record"] = season_record["adjusted_last_season_record"].fillna(prev_season_min)
-
-    return season_record[["teamId", "season", "adjusted_last_season_record"]].copy()
+    return _create_adjusted_last_season_record(games, sos_df, alpha, scope="all")
 
 
 def create_adjusted_last_season_home_record(
@@ -172,31 +304,7 @@ def create_adjusted_last_season_home_record(
     pd.DataFrame
         Columns: teamId, season, adjusted_last_season_record.
     """
-    home = games[["season", "hometeamId", "winner"]].copy()
-    home = home.rename(columns={"hometeamId": "teamId"})
-    home["win_bool"] = (home["teamId"] == home["winner"]).astype(int)
-
-    season_record = (
-        home.groupby(["teamId", "season"])["win_bool"]
-        .mean()
-        .round(4)
-        .rename("win_pct")
-        .reset_index()
-    )
-
-    season_record = _apply_sos_to_season_record(season_record, sos_df, alpha)
-
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
-
-    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "adjusted_last_season_record"}
-    )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
-
-    prev_season_min = season_record.groupby("prev_season")["adjusted_last_season_record"].transform("min")
-    season_record["adjusted_last_season_record"] = season_record["adjusted_last_season_record"].fillna(prev_season_min)
-
-    return season_record[["teamId", "season", "adjusted_last_season_record"]].copy()
+    return _create_adjusted_last_season_record(games, sos_df, alpha, scope="home")
 
 
 def create_adjusted_last_season_away_record(
@@ -212,106 +320,4 @@ def create_adjusted_last_season_away_record(
     pd.DataFrame
         Columns: teamId, season, adjusted_last_season_record.
     """
-    away = games[["season", "awayteamId", "hometeamId", "winner"]].copy()
-    away = away.rename(columns={"awayteamId": "teamId"})
-    away["win_bool"] = (away["winner"] != away["hometeamId"]).astype(int)
-
-    season_record = (
-        away.groupby(["teamId", "season"])["win_bool"]
-        .mean()
-        .round(4)
-        .rename("win_pct")
-        .reset_index()
-    )
-
-    season_record = _apply_sos_to_season_record(season_record, sos_df, alpha)
-
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
-
-    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "adjusted_last_season_record"}
-    )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
-
-    prev_season_min = season_record.groupby("prev_season")["adjusted_last_season_record"].transform("min")
-    season_record["adjusted_last_season_record"] = season_record["adjusted_last_season_record"].fillna(prev_season_min)
-
-    return season_record[["teamId", "season", "adjusted_last_season_record"]].copy()
-
-
-def create_last_season_home_record(games: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute each team's previous-season win percentage at home.
-
-    Parameters
-    ----------
-    games : pd.DataFrame
-        Wide-format games with: season, hometeamId, winner.
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns: teamId, season, last_season_record.
-    """
-    home = games[["season", "hometeamId", "winner"]].copy()
-    home = home.rename(columns={"hometeamId": "teamId"})
-    home["win_bool"] = (home["teamId"] == home["winner"]).astype(int)
-
-    season_record = (
-        home.groupby(["teamId", "season"])["win_bool"]
-        .mean()
-        .round(4)
-        .rename("win_pct")
-        .reset_index()
-    )
-
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
-
-    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "last_season_record"}
-    )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
-
-    prev_season_min = season_record.groupby("prev_season")["last_season_record"].transform("min")
-    season_record["last_season_record"] = season_record["last_season_record"].fillna(prev_season_min)
-
-    return season_record[["teamId", "season", "last_season_record"]].copy()
-
-
-def create_last_season_away_record(games: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute each team's previous-season win percentage on the road.
-
-    Parameters
-    ----------
-    games : pd.DataFrame
-        Wide-format games with: season, awayteamId, hometeamId, winner.
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns: teamId, season, last_season_record.
-    """
-    away = games[["season", "awayteamId", "hometeamId", "winner"]].copy()
-    away = away.rename(columns={"awayteamId": "teamId"})
-    away["win_bool"] = (away["winner"] != away["hometeamId"]).astype(int)
-
-    season_record = (
-        away.groupby(["teamId", "season"])["win_bool"]
-        .mean()
-        .round(4)
-        .rename("win_pct")
-        .reset_index()
-    )
-
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
-
-    prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
-        columns={"season": "prev_season", "win_pct": "last_season_record"}
-    )
-    season_record = season_record.merge(prev_lookup, on=["teamId", "prev_season"], how="left")
-
-    prev_season_min = season_record.groupby("prev_season")["last_season_record"].transform("min")
-    season_record["last_season_record"] = season_record["last_season_record"].fillna(prev_season_min)
-
-    return season_record[["teamId", "season", "last_season_record"]].copy()
+    return _create_adjusted_last_season_record(games, sos_df, alpha, scope="away")

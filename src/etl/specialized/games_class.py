@@ -1,6 +1,6 @@
-from typing import Optional
-from transformers import AutoTokenizer  # type: ignore
 from dataclasses import dataclass
+
+from transformers import AutoTokenizer  # type: ignore
 
 BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B"
 
@@ -27,9 +27,9 @@ class TeamFeatures:
     avg_pts_diff_last_13_location: float
     rested_days: int
     conference: str
-    days_at_location: Optional[int] = None
-    days_at_home: Optional[int] = None
-    days_on_road: Optional[int] = None
+    days_at_location: int | None = None
+    days_at_home: int | None = None
+    days_on_road: int | None = None
 
 
 class Game:
@@ -46,10 +46,10 @@ class Game:
         "What is the point differential between the home team and the visiting team?"
         " Use positive values for the home team winning the match and negative values for the visiting team winning it.\n"
     )
-    PROMPT_SUFFIX = "The home team finished the game with a point differential of"
+    PROMPT_SUFFIX = "The home team finished the game with a point differential of "
 
     token_count: int = 0
-    prompt: Optional[str] = None
+    prompt: str | None = None
 
     def __init__(self, data):
         self.game_id = data["gameId"]
@@ -58,7 +58,7 @@ class Game:
         self.away_features = self._make_team_features(data, is_home=False)
         self.east_west_pct = data["east_wins_pct_L1"]
         self._outcome_str = self._format_outcome(self.point_diff)
-        self.prompt: Optional[str] = None
+        self.prompt: str | None = None
         self.token_count: int = 0
         self._generate_prompt()
 
@@ -76,7 +76,7 @@ class Game:
         return TeamFeatures(
             games_played=data[f"games_played_{prefix}T"],
             games_played_location=data[f"games_played_{prefix}T"],
-            record=data[f"record_{prefix}T"],
+            record=data[f"record_L82{prefix}T"],
             record_last_5_games=data[f"record_L5_{prefix}T"],
             record_last_13_games=data[f"record_L13_{prefix}T"],
             record_last_26_games=data[f"record_L26_{prefix}T"],
@@ -89,9 +89,7 @@ class Game:
             avg_pts_diff_last_26=data[f"pts_diff_avg_L26_{prefix}T"],
             avg_pts_diff_location=data[f"pts_diff_avg_{prefix}T_{location}"],
             avg_pts_diff_last_5_location=data[f"pts_diff_avg_L5_{prefix}T_{location}"],
-            avg_pts_diff_last_13_location=data[
-                f"pts_diff_avg_L13_{prefix}T_{location}"
-            ],
+            avg_pts_diff_last_13_location=data[f"pts_diff_avg_L13_{prefix}T_{location}"],
             rested_days=data[f"rested_days_{prefix}T"],
             conference=data[f"{'home' if is_home else 'away'}teamConference"],
             days_at_location=data["days_at_home"] if is_home else data["days_on_road"],

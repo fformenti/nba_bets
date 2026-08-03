@@ -2,14 +2,12 @@
 
 import os
 import pickle
-import sys
 from pathlib import Path
 
 import pandas as pd
 from datasets import Dataset, DatasetDict
 from huggingface_hub import login
 
-from src.config.paths import REGULAR_SEASON_GAMES_FEATURES_PATH
 from src.etl.specialized.games_class import Game
 
 
@@ -50,8 +48,8 @@ def make_huggingface_dataset(list_of_games: list[Game], test=False) -> Dataset:
     return Dataset.from_dict(
         {
             "game_id": game_id,
-            "text": prompts,
-            "point_diff": point_diff,
+            "prompt": prompts,
+            "completion": point_diff,
         }
     )
 

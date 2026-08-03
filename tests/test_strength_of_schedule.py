@@ -63,7 +63,7 @@ def test_sos_team1_game_g7(sample_games):
     result = calculate_strength_of_schedule(sample_games, lags=[10])
     row = result[(result["teamId"] == 1) & (result["gameId"] == "g7")]
     assert len(row) == 1
-    assert abs(row["sos_L10"].iloc[0] - 1 / 3) < 1e-6
+    assert abs(row["sos_L10"].iloc[0] - 1 / 3) < 1e-9
 
 
 def test_sos_team3_game_g8(sample_games):
@@ -80,7 +80,7 @@ def test_sos_team3_game_g8(sample_games):
     result = calculate_strength_of_schedule(sample_games, lags=[10])
     row = result[(result["teamId"] == 3) & (result["gameId"] == "g8")]
     expected = (0.0 + 1.0 + 1 / 3) / 3
-    assert abs(row["sos_L10"].iloc[0] - expected) < 1e-6
+    assert abs(row["sos_L10"].iloc[0] - expected) < 1e-9
 
 
 def test_sos_nan_for_insufficient_games(sample_games):
@@ -120,7 +120,7 @@ def test_sos_team1_game_g5_exactly_at_threshold(sample_games):
         sample_games, lags=[10], min_opponents=2
     )
     row = result[(result["teamId"] == 1) & (result["gameId"] == "g5")]
-    assert abs(row["sos_L10"].iloc[0] - 0.5) < 1e-6
+    assert abs(row["sos_L10"].iloc[0] - 0.5) < 1e-9
 
 
 def test_multiple_lags(sample_games):
@@ -158,7 +158,7 @@ def test_small_window_with_low_min(sample_games):
         sample_games, lags=[2], min_opponents=2
     )
     row = result[(result["teamId"] == 1) & (result["gameId"] == "g7")]
-    assert abs(row["sos_L2"].iloc[0] - 1 / 3) < 1e-6
+    assert abs(row["sos_L2"].iloc[0] - 1 / 3) < 1e-9
 
 
 def test_empty_lags(sample_games):

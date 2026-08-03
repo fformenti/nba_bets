@@ -27,6 +27,7 @@ FEATURE_GROUP_PREFIXES = {
     "gds": lambda lags: [f"gds_L{lag}" for lag in lags],
     "distance": lambda lags: [f"distance_L{lag}" for lag in lags],
     "rested_days": lambda _: ["rested_days"],
+    "back_to_back": lambda _: ["back_to_back"],
     "streak": lambda _: ["streak"],
     "last_season_record": lambda _: ["last_season_record"],
     "adjusted_last_season_record": lambda _: ["adjusted_last_season_record"],

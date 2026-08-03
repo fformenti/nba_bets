@@ -70,9 +70,7 @@ def find_resumable_checkpoint(
         logger.info(f"No existing Hub repo {hub_model_id} - starting a fresh run.")
         return None
 
-    steps = {
-        int(match.group(1)) for f in files if (match := _CHECKPOINT_RE.match(f))
-    }
+    steps = {int(match.group(1)) for f in files if (match := _CHECKPOINT_RE.match(f))}
     if not steps:
         logger.info(
             f"Hub repo {hub_model_id} exists but has no checkpoint-* directories "
@@ -252,16 +250,6 @@ def load_train_dataset(config: LLMTrainingConfig):
     return train
 
 
-def _build_collator(config: LLMTrainingConfig, tokenizer):
-    """Completion-only collator, so loss ignores the prompt."""
-    from trl import DataCollatorForCompletionOnlyLM
-
-    return DataCollatorForCompletionOnlyLM(
-        response_template=config.training.completion_template,
-        tokenizer=tokenizer,
-    )
-
-
 def run_training(
     config: LLMTrainingConfig,
     run_name: str,
@@ -313,14 +301,11 @@ def run_training(
         train_dataset=train,
         peft_config=build_lora_config(config),
         args=build_sft_config(config, run_name, output_dir),
-        data_collator=(
-            _build_collator(config, tokenizer)
-            if config.training.train_on_completion_only
-            else None
-        ),
     )
 
-    result = trainer.train(resume_from_checkpoint=str(checkpoint) if checkpoint else None)
+    result = trainer.train(
+        resume_from_checkpoint=str(checkpoint) if checkpoint else None
+    )
 
     trainer.model.push_to_hub(hub_model_id, private=config.hub.private)
     logger.info(f"Pushed final adapter to the hub: {hub_model_id}")

@@ -17,8 +17,10 @@ def calculate_record(games, lags=[]):
     pd.DataFrame
         DataFrame with record statistics
     """
-    # Sort by Team and Game Date to perform cumulative calculations correctly
-    games = games.sort_values(["teamId", "gameDate", "season"])
+    # Sort by Team and Game Date to perform cumulative calculations correctly.
+    # Keys lead with the groupby keys; gameId breaks ties so games sharing a
+    # tip-off timestamp order deterministically.
+    games = games.sort_values(["teamId", "season", "gameDate", "gameId"])
     games["win_bool_l1"] = games.groupby(["teamId", "season"])["win_bool"].shift(1)
 
     games["total_wins"] = games.groupby(["teamId", "season"])["win_bool_l1"].transform(
@@ -47,7 +49,6 @@ def calculate_record(games, lags=[]):
             games.groupby(["teamId", "season"])["win_bool_l1"]
             .rolling(window=lag, min_periods=1)
             .mean()
-            .round(4)
             .reset_index(level=[0, 1], drop=True)
         )
         record_lags_cols.append(f"record_L{lag}")
@@ -89,8 +90,11 @@ def calculate_home_record(home_games, lags=[]):
 def calculate_away_record(away_games, lags=[]):
     """Calculate away team records."""
     df = away_games.copy()
+    # Test equality against the away team rather than inequality against the home
+    # team: equivalent for played games, but an unknown winner (NA, or the 0
+    # placeholder used for upcoming games) must count as a loss on both sides.
     df["win_bool"] = df.apply(
-        lambda x: 1 if x["winner"] != x["hometeamId"] else 0, axis=1
+        lambda x: 1 if x["winner"] == x["awayteamId"] else 0, axis=1
     )
 
     df = df.rename(

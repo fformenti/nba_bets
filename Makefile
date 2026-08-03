@@ -1,4 +1,17 @@
-.PHONY: teams-history etl incremental train train-all train-llm evaluate-llm get-upcoming-games
+.PHONY: teams-history etl incremental train train-all train-llm evaluate-llm get-upcoming-games lint lint-fix format test
+
+lint:
+	uv run ruff check .
+
+lint-fix:
+	uv run ruff check . --fix
+
+format:
+	uv run ruff format .
+
+test:
+	uv run pytest
+
 
 TRAIN_CONFIG ?= train_same
 PREDICTION_CONFIG ?= predict_classifier

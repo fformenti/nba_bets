@@ -2,6 +2,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.etl.utils.common import save_feature_table
 from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     LOCATIONS_DISTANCES_PATH,
@@ -115,7 +116,12 @@ def make_teams_distances_table_season(
         end_date = season_end
         teams_season = teams_game_dates_season["teamId"].unique()
 
-        date_range = pd.date_range(start=start_date, end=end_date)
+        # Normalize to midnight: pd.date_range carries the start's time-of-day,
+        # so a finale tipping off earlier in the day than the opener would fall
+        # past `end` and drop the season's last day entirely.
+        date_range = pd.date_range(
+            start=start_date.normalize(), end=end_date.normalize()
+        )
         full_calendar_teams = pd.MultiIndex.from_product(
             [date_range, teams_season], names=["gameDate", "teamId"]
         ).to_frame(index=False)
@@ -200,7 +206,6 @@ def make_teams_distances_table_season(
             full_calendar_teams[f"distance_L{lag}"] = (
                 full_calendar_teams.groupby(["teamId", "season"])["distance"]
                 .transform(lambda x: x.rolling(window=int(lag), min_periods=1).mean())
-                .round(0)
             )
             distances_lags_cols.append(f"distance_L{lag}")
 
@@ -218,4 +223,4 @@ def make_teams_distances_table_season(
 
 if __name__ == "__main__":
     teams_distances = make_teams_distances_table_season(lags=[1, 3, 7, 14])
-    teams_distances.to_csv(TEAMS_DISTANCES_PATH, index=False)
+    save_feature_table(teams_distances, TEAMS_DISTANCES_PATH)

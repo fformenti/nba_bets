@@ -22,19 +22,20 @@ def _make_disabled() -> FeatureGroupConfig:
     return FeatureGroupConfig(enabled=False, lags=[])
 
 
+def _all_disabled(**overrides: FeatureGroupConfig) -> FeaturesMapConfig:
+    """Every feature group off, except the ones passed in.
+
+    Built from the model fields so groups added to FeaturesMapConfig later
+    default to off here instead of silently leaking into resolved columns.
+    """
+    groups = {name: _make_disabled() for name in FeaturesMapConfig.model_fields}
+    groups.update(overrides)
+    return FeaturesMapConfig(**groups)
+
+
 def _record_only(lags: list[int]) -> FeaturesMapConfig:
     """FeaturesMapConfig with only record lags set; all other groups disabled."""
-    return FeaturesMapConfig(
-        record=FeatureGroupConfig(lags=lags, delta=True, enabled=True),
-        point_differential=_make_disabled(),
-        sos=_make_disabled(),
-        sos_adj_record=_make_disabled(),
-        distance=_make_disabled(),
-        rested_days=_make_disabled(),
-        streak=_make_disabled(),
-        last_season_record=_make_disabled(),
-        home_and_road=_make_disabled(),
-    )
+    return _all_disabled(record=FeatureGroupConfig(lags=lags, delta=True, enabled=True))
 
 
 # ── resolve_feature_columns ─────────────────────────────────────────────────
@@ -52,32 +53,14 @@ class TestResolveFeatureColumns:
         assert cols == ["record_L10_delta", "record_L82_delta"]
 
     def test_disabled_group_excluded(self):
-        cfg = FeaturesMapConfig(
-            record=FeatureGroupConfig(enabled=False, lags=[10]),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(enabled=False),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
-        )
+        cfg = _all_disabled(record=FeatureGroupConfig(enabled=False, lags=[10]))
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert cols == []
 
     def test_sos_adj_record_independent_of_record(self):
         """sos_adj_record with its own lags resolves without needing record intersection."""
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
+        cfg = _all_disabled(
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[10], delta=True),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert "sos_adj_record_L10_delta" in cols
@@ -85,16 +68,9 @@ class TestResolveFeatureColumns:
 
     def test_sos_adj_record_and_record_both_enabled(self):
         """Both record and sos_adj_record can be enabled independently."""
-        cfg = FeaturesMapConfig(
+        cfg = _all_disabled(
             record=FeatureGroupConfig(enabled=True, lags=[82], delta=True),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[13, 55], delta=True),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert "record_L82_delta" in cols
@@ -104,16 +80,10 @@ class TestResolveFeatureColumns:
 
     def test_sos_adj_record_uses_own_lags(self):
         """sos_adj_record resolves only declared lags, not any intersection."""
-        cfg = FeaturesMapConfig(
+        cfg = _all_disabled(
             record=FeatureGroupConfig(enabled=True, lags=[1, 3, 5, 82], delta=True),
-            point_differential=_make_disabled(),
             sos=FeatureGroupConfig(enabled=False, lags=[1, 3, 5, 82]),
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[13, 55], delta=True),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         # sos_adj_record produces only its declared lags
@@ -124,18 +94,10 @@ class TestResolveFeatureColumns:
 
     def test_sos_adj_record_location_variants(self):
         """sos_adj_record produces at_location_delta columns when location_lags set."""
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
+        cfg = _all_disabled(
             sos_adj_record=FeatureGroupConfig(
                 enabled=True, lags=[13], location_lags=[10, 41], delta=True
             ),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert "sos_adj_record_L13_delta" in cols
@@ -160,19 +122,10 @@ class TestResolveFeatureColumns:
         assert "conference_diff_home_advantage_pct" in cols
 
     def test_location_variants_included(self):
-        cfg = FeaturesMapConfig(
+        cfg = _all_disabled(
             record=FeatureGroupConfig(
-                lags=[10], location_lags=[10],
-                delta=True, enabled=True,
+                lags=[10], location_lags=[10], delta=True, enabled=True
             ),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(enabled=False),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
         assert "record_L10_delta" in cols
@@ -187,15 +140,7 @@ class TestResolveFeatureColumns:
         assert "record_momentum_L5_L10_delta" in cols
 
     def test_home_and_road_raw_columns(self):
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(enabled=False),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
+        cfg = _all_disabled(
             home_and_road=FeatureGroupConfig(enabled=True, delta=False),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
@@ -203,15 +148,7 @@ class TestResolveFeatureColumns:
         assert "days_on_road" in cols
 
     def test_home_and_road_delta_column(self):
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(enabled=False),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
+        cfg = _all_disabled(
             home_and_road=FeatureGroupConfig(enabled=True, delta=True),
         )
         cols = resolve_feature_columns(cfg, conference_filter="same")
@@ -227,16 +164,8 @@ class TestCreateDeltaResilience:
         return pd.DataFrame({col: [1.0, 2.0] for col in columns})
 
     def _features_config_with_record_lags(self, lags: list[int]) -> FeaturesMapConfig:
-        return FeaturesMapConfig(
+        return _all_disabled(
             record=FeatureGroupConfig(lags=lags, delta=True, enabled=True),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(enabled=False),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
 
     def test_no_crash_on_missing_columns(self):
@@ -267,16 +196,8 @@ class TestCreateDeltaResilience:
 
     def test_sos_adj_record_delta_always_drops_source_columns(self):
         """create_delta_features drops HT/VT when delta=True for sos_adj_record."""
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
+        cfg = _all_disabled(
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[13], delta=True),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
         )
         df = pd.DataFrame({
             "sos_adj_record_L13_HT": [0.6, 0.5],
@@ -289,18 +210,8 @@ class TestCreateDeltaResilience:
 
     def test_sos_adj_record_location_delta_creation(self):
         """create_delta_features creates sos_adj_record location deltas."""
-        cfg = FeaturesMapConfig(
-            record=_make_disabled(),
-            point_differential=_make_disabled(),
-            sos=_make_disabled(),
-            sos_adj_record=FeatureGroupConfig(
-                enabled=True, lags=[13], location_lags=[10], delta=True
-            ),
-            distance=_make_disabled(),
-            rested_days=_make_disabled(),
-            streak=_make_disabled(),
-            last_season_record=_make_disabled(),
-            home_and_road=_make_disabled(),
+        cfg = _all_disabled(
+            sos_adj_record=FeatureGroupConfig( enabled=True, lags=[13], location_lags=[10], delta=True ),
         )
         df = pd.DataFrame({
             "sos_adj_record_L13_HT": [0.6, 0.5],

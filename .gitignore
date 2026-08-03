@@ -1,12 +1,18 @@
 /data
+scratchpad
 notebooks
 sandbox
 .env
 old
+.vscode
 
 **/credentials/
 src/__pycache__/*
 .vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/tasks.json
 __pycache__
 .ruff_cache/
 

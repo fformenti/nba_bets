@@ -2,6 +2,10 @@
 
 import pandas as pd
 
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 from src.config.paths import (
     TEAMS_HOME_RECORDS_PATH,
@@ -66,6 +70,7 @@ from src.etl.features.last_season_record import (
 from src.etl.features.streaks import calculate_streak
 from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
 from src.etl.features.sos_adjusted_record import calculate_sos_adjusted_record
+from src.etl.utils.common import save_feature_table
 from src.etl.features.game_difficulty_score import (
     calculate_game_difficulty_score,
     calculate_home_gds,
@@ -114,7 +119,8 @@ def create_features_tables(
     home_pts_diff = calculate_home_pts_diff(games, location_lags)
     away_pts_diff = calculate_away_pts_diff(games, location_lags)
     teams_pts_diff = calculate_pts_diff(
-        pd.concat([home_pts_diff, away_pts_diff]), point_differential_lags
+        pd.concat([home_pts_diff, away_pts_diff], ignore_index=True),
+        point_differential_lags,
     )
 
     east_west_record = make_east_west_record(games)
@@ -124,13 +130,13 @@ def create_features_tables(
     teams_distances = make_teams_distances_table_season(distances_lags, games=games)
 
     # Save the dataframes to CSV files
-    home_records.to_csv(TEAMS_HOME_RECORDS_PATH, index=False)
-    away_records.to_csv(TEAMS_AWAY_RECORDS_PATH, index=False)
-    teams_record.to_csv(TEAMS_RECORDS_PATH, index=False)
+    save_feature_table(home_records, TEAMS_HOME_RECORDS_PATH)
+    save_feature_table(away_records, TEAMS_AWAY_RECORDS_PATH)
+    save_feature_table(teams_record, TEAMS_RECORDS_PATH)
 
-    home_pts_diff.to_csv(TEAMS_HOME_PTS_DIFF_PATH, index=False)
-    away_pts_diff.to_csv(TEAMS_AWAY_PTS_DIFF_PATH, index=False)
-    teams_pts_diff.to_csv(TEAMS_PTS_DIFF_PATH, index=False)
+    save_feature_table(home_pts_diff, TEAMS_HOME_PTS_DIFF_PATH)
+    save_feature_table(away_pts_diff, TEAMS_AWAY_PTS_DIFF_PATH)
+    save_feature_table(teams_pts_diff, TEAMS_PTS_DIFF_PATH)
 
     # Normalized point differential (season-to-date avg total pts as denominator)
     # games already has pts_diff column from above; add rolling season avg
@@ -149,31 +155,31 @@ def create_features_tables(
         norm_point_differential_lags,
     )
 
-    home_norm_pts_diff.to_csv(TEAMS_HOME_NORM_PTS_DIFF_PATH, index=False)
-    away_norm_pts_diff.to_csv(TEAMS_AWAY_NORM_PTS_DIFF_PATH, index=False)
-    teams_norm_pts_diff.to_csv(TEAMS_NORM_PTS_DIFF_PATH, index=False)
+    save_feature_table(home_norm_pts_diff, TEAMS_HOME_NORM_PTS_DIFF_PATH)
+    save_feature_table(away_norm_pts_diff, TEAMS_AWAY_NORM_PTS_DIFF_PATH)
+    save_feature_table(teams_norm_pts_diff, TEAMS_NORM_PTS_DIFF_PATH)
 
-    east_west_record.to_csv(EAST_WEST_RECORDS_PATH, index=False)
-    east_west_record_at_east.to_csv(EAST_WEST_RECORDS_AT_EAST_PATH, index=False)
-    east_west_record_at_west.to_csv(EAST_WEST_RECORDS_AT_WEST_PATH, index=False)
-    rested_days.to_csv(RESTED_DAYS_PATH, index=False)
-    teams_distances.to_csv(TEAMS_DISTANCES_PATH, index=False)
+    save_feature_table(east_west_record, EAST_WEST_RECORDS_PATH)
+    save_feature_table(east_west_record_at_east, EAST_WEST_RECORDS_AT_EAST_PATH)
+    save_feature_table(east_west_record_at_west, EAST_WEST_RECORDS_AT_WEST_PATH)
+    save_feature_table(rested_days, RESTED_DAYS_PATH)
+    save_feature_table(teams_distances, TEAMS_DISTANCES_PATH)
 
     last_season_record = create_last_season_record(games)
-    last_season_record.to_csv(LAST_SEASON_RECORD_PATH, index=False)
+    save_feature_table(last_season_record, LAST_SEASON_RECORD_PATH)
 
     last_season_home_record = create_last_season_home_record(games)
-    last_season_home_record.to_csv(LAST_SEASON_HOME_RECORD_PATH, index=False)
+    save_feature_table(last_season_home_record, LAST_SEASON_HOME_RECORD_PATH)
 
     last_season_away_record = create_last_season_away_record(games)
-    last_season_away_record.to_csv(LAST_SEASON_AWAY_RECORD_PATH, index=False)
+    save_feature_table(last_season_away_record, LAST_SEASON_AWAY_RECORD_PATH)
 
     teams_streaks = calculate_streak(games)
-    teams_streaks.to_csv(TEAMS_STREAKS_PATH, index=False)
+    save_feature_table(teams_streaks, TEAMS_STREAKS_PATH)
 
     playoff_standings = compute_playoff_flags(games)
     # game_motivation = calculate_game_motivation(playoff_standings)
-    playoff_standings.to_csv(PLAYOFF_STANDINGS_PATH, index=False)
+    save_feature_table(playoff_standings, PLAYOFF_STANDINGS_PATH)
 
     teams_sos_adj_record = None
 
@@ -189,7 +195,7 @@ def create_features_tables(
         sos_save_cols = ["gameId", "season", "teamId", "gameDate"] + [
             f"sos_L{lag}" for lag in sos_lags
         ]
-        teams_sos_full[sos_save_cols].to_csv(TEAMS_SOS_PATH, index=False)
+        save_feature_table(teams_sos_full[sos_save_cols], TEAMS_SOS_PATH)
 
         if record_lags:
             teams_sos_adj_record = calculate_sos_adjusted_record(
@@ -199,7 +205,7 @@ def create_features_tables(
                 sos_lags=all_sos_lags,
                 alpha=sos_adj_alpha,
             )
-            teams_sos_adj_record.to_csv(TEAMS_SOS_ADJ_RECORD_PATH, index=False)
+            save_feature_table(teams_sos_adj_record, TEAMS_SOS_ADJ_RECORD_PATH)
 
         if sos_adj_location_lags:
             teams_sos_adj_home = calculate_sos_adjusted_record(
@@ -209,7 +215,7 @@ def create_features_tables(
                 sos_lags=all_sos_lags,
                 alpha=sos_adj_alpha,
             )
-            teams_sos_adj_home.to_csv(TEAMS_SOS_ADJ_HOME_RECORD_PATH, index=False)
+            save_feature_table(teams_sos_adj_home, TEAMS_SOS_ADJ_HOME_RECORD_PATH)
 
             teams_sos_adj_away = calculate_sos_adjusted_record(
                 records_df=away_records,
@@ -218,22 +224,22 @@ def create_features_tables(
                 sos_lags=all_sos_lags,
                 alpha=sos_adj_alpha,
             )
-            teams_sos_adj_away.to_csv(TEAMS_SOS_ADJ_AWAY_RECORD_PATH, index=False)
+            save_feature_table(teams_sos_adj_away, TEAMS_SOS_ADJ_AWAY_RECORD_PATH)
 
         adj_last_season_record = create_adjusted_last_season_record(
             games, teams_sos_full, alpha=sos_adj_alpha
         )
-        adj_last_season_record.to_csv(LAST_SEASON_ADJ_RECORD_PATH, index=False)
+        save_feature_table(adj_last_season_record, LAST_SEASON_ADJ_RECORD_PATH)
 
         adj_last_season_home_record = create_adjusted_last_season_home_record(
             games, teams_sos_full, alpha=sos_adj_alpha
         )
-        adj_last_season_home_record.to_csv(LAST_SEASON_ADJ_HOME_RECORD_PATH, index=False)
+        save_feature_table(adj_last_season_home_record, LAST_SEASON_ADJ_HOME_RECORD_PATH)
 
         adj_last_season_away_record = create_adjusted_last_season_away_record(
             games, teams_sos_full, alpha=sos_adj_alpha
         )
-        adj_last_season_away_record.to_csv(LAST_SEASON_ADJ_AWAY_RECORD_PATH, index=False)
+        save_feature_table(adj_last_season_away_record, LAST_SEASON_ADJ_AWAY_RECORD_PATH)
 
     if gds_lags:
         # Use sos_adj_record if it was computed above, else empty DF (triggers fallback)
@@ -249,7 +255,7 @@ def create_features_tables(
             lags=gds_lags,
             beta=gds_beta,
         )
-        teams_gds.to_csv(TEAMS_GDS_PATH, index=False)
+        save_feature_table(teams_gds, TEAMS_GDS_PATH)
 
         if gds_location_lags:
             teams_gds_home = calculate_home_gds(
@@ -258,7 +264,7 @@ def create_features_tables(
                 location_lags=gds_location_lags,
                 beta=gds_beta,
             )
-            teams_gds_home.to_csv(TEAMS_GDS_HOME_PATH, index=False)
+            save_feature_table(teams_gds_home, TEAMS_GDS_HOME_PATH)
 
             teams_gds_away = calculate_away_gds(
                 games=games,
@@ -266,7 +272,7 @@ def create_features_tables(
                 location_lags=gds_location_lags,
                 beta=gds_beta,
             )
-            teams_gds_away.to_csv(TEAMS_GDS_AWAY_PATH, index=False)
+            save_feature_table(teams_gds_away, TEAMS_GDS_AWAY_PATH)
 
     return
 
@@ -526,9 +532,13 @@ def merge_features(games):
 
 # ==== Teams Features ====
 def join_games_and_teams_feature(games, teams_feature, join_column, suffix):
-    feature_specific_cols = set(teams_feature.columns).difference(games.columns)
+    # Iterate teams_feature.columns rather than a set: list(set(...)) ordered the
+    # merged columns by string hash, which Python randomises per process, so every
+    # ETL run emitted games_features.csv with a different column order.
+    games_cols = set(games.columns)
+    feature_specific_cols = [c for c in teams_feature.columns if c not in games_cols]
     join_cols = ["gameId", "season", "teamId"]
-    keep_cols = list(feature_specific_cols.union(set(join_cols)))
+    keep_cols = join_cols + [c for c in feature_specific_cols if c not in join_cols]
     games = (
         games.merge(
             teams_feature[keep_cols],
@@ -549,6 +559,7 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
         "gameDateOnlyStr",
         "teamId",
         "rested_days",
+        "back_to_back",
     ]
     if is_hometeam:
         rest_columns.append("days_at_home")
@@ -566,12 +577,31 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
     ).drop(columns=["teamId"])
 
     fill_cols = [
-        c for c in ["rested_days", "days_at_home", "days_on_road"] if c in games.columns
+        c
+        for c in ["rested_days", "back_to_back", "days_at_home", "days_on_road"]
+        if c in games.columns
     ]
+
+    # The rest-days grid covers every day of every season, so a game with no
+    # match means the grid has a hole. Filling it with 0 silently fabricates a
+    # back-to-back, so surface it instead of letting it pass unnoticed.
+    missing = games[fill_cols].isna().any(axis=1)
+    if missing.any():
+        sample = games.loc[missing, "gameId"].head(5).tolist()
+        logger.warning(
+            "Rest days missing for %d %s games (columns: %s); filling with 0. "
+            "Sample gameIds: %s",
+            int(missing.sum()),
+            "home" if is_hometeam else "away",
+            ", ".join(fill_cols),
+            sample,
+        )
+
     games[fill_cols] = games[fill_cols].fillna(0).astype(int)
 
     return games.rename(
         columns={
             "rested_days": f"rested_days_{suffix}",
+            "back_to_back": f"back_to_back_{suffix}",
         }
     )

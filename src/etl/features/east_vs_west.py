@@ -87,9 +87,12 @@ def make_east_west_record(games, location=None):
 
     all_season_date_range = get_season_date_range(games)
 
+    # Join on season too: the right side is grouped by (season, date), so joining
+    # on date alone would duplicate rows for any date shared by two seasons.
     east_west_record_by_date = all_season_date_range.merge(
         east_west_record_by_date[
             [
+                "season",
                 "gameDateOnlyStr",
                 "east_wins_date",
                 "west_wins_date",
@@ -99,8 +102,9 @@ def make_east_west_record(games, location=None):
                 "east_wins_date_at_west",
             ]
         ],
-        on="gameDateOnlyStr",
+        on=["season", "gameDateOnlyStr"],
         how="left",
+        validate="1:1",
     )
 
     east_west_record_by_date.fillna(0, inplace=True)
@@ -177,10 +181,10 @@ def make_east_west_record(games, location=None):
     safe_gp = east_west_record_by_date["games_played_east_vs_west"].replace(0, float("nan"))
     east_west_record_by_date[f"east_record{suffix}"] = (
         east_west_record_by_date["east_wins"] / safe_gp
-    ).fillna(0.0).round(4)
+    ).fillna(0.0)
     east_west_record_by_date[f"west_record{suffix}"] = (
         east_west_record_by_date["west_wins"] / safe_gp
-    ).fillna(0.0).round(4)
+    ).fillna(0.0)
 
     if location is None:
         safe_gp_east = east_west_record_by_date["games_played_at_east"].replace(0, float("nan"))
@@ -193,7 +197,6 @@ def make_east_west_record(games, location=None):
             pd.DataFrame({"at_east": east_wr_at_east, "at_west": east_wr_at_west})
             .mean(axis=1)
             .fillna(0.0)
-            .round(4)
         )
 
         west_wr_at_east = (
@@ -209,7 +212,6 @@ def make_east_west_record(games, location=None):
             pd.DataFrame({"at_east": west_wr_at_east, "at_west": west_wr_at_west})
             .mean(axis=1)
             .fillna(0.0)
-            .round(4)
         )
 
     return east_west_record_by_date[return_cols]

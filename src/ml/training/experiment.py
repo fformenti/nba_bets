@@ -807,34 +807,35 @@ def train_single_model(
                 trained_model = best_pipeline
                 preprocessor_fitted = None
 
-            if hasattr(trained_model, "feature_importances_"):
-                if preprocessor_fitted is not None and hasattr(
-                    preprocessor_fitted, "get_feature_names_out"
-                ):
-                    try:
-                        feature_names = clean_feature_names(
-                            list(
-                                preprocessor_fitted.get_feature_names_out(
-                                    list(X_train.columns)
-                                )
+            # Resolved for both the importance and SHAP plots below.
+            if preprocessor_fitted is not None and hasattr(
+                preprocessor_fitted, "get_feature_names_out"
+            ):
+                try:
+                    feature_names = clean_feature_names(
+                        list(
+                            preprocessor_fitted.get_feature_names_out(
+                                list(X_train.columns)
                             )
                         )
-                    except Exception as e:
-                        logger.warning(
-                            f"Could not extract feature names from preprocessor: {e}. Using original."
-                        )
-                        feature_names = (
-                            numerical_features
-                            + (boolean_features or [])
-                            + (categorical_features or [])
-                        )
-                else:
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Could not extract feature names from preprocessor: {e}. Using original."
+                    )
                     feature_names = (
                         numerical_features
                         + (boolean_features or [])
                         + (categorical_features or [])
                     )
+            else:
+                feature_names = (
+                    numerical_features
+                    + (boolean_features or [])
+                    + (categorical_features or [])
+                )
 
+            if hasattr(trained_model, "feature_importances_"):
                 if len(feature_names) != len(trained_model.feature_importances_):
                     logger.error(
                         f"Feature names length ({len(feature_names)}) does not match "

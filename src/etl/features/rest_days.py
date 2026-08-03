@@ -4,6 +4,14 @@ import pandas as pd
 from pandas import DataFrame
 from numpy import nan
 
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+# Consecutive days at home / on the road above this are treated as a league
+# stoppage (e.g. the 2020 COVID suspension) rather than a real homestand or trip.
+COVID_BREAK_THRESHOLD = 30
+
 
 def is_home(home_game, away_game):
     """Determine if team is playing at home."""
@@ -45,7 +53,11 @@ def make_rested_days_table(games):
         games_season = games.loc[games["season"] == season].copy()
         season_start = games_season["gameDate"].min()
         season_end = games_season["gameDate"].max()
-        season_teams_ids = games_season["hometeamId"].unique()
+        # Union of both sides: a team that never hosts in a season would
+        # otherwise get no rows in the calendar grid, and so no rest features.
+        season_teams_ids = pd.unique(
+            pd.concat([games_season["hometeamId"], games_season["awayteamId"]])
+        )
 
         # Days in Between Games
         rested_days_season.append(
@@ -79,14 +91,22 @@ def make_rested_days_table_season(
     pd.DataFrame
         Rest days DataFrame
     """
-    date_range = pd.date_range(start=start_date, end=end_date)
+    # Normalize to midnight: pd.date_range carries the start's time-of-day, so a
+    # finale tipping off earlier in the day than the opener would fall past `end`
+    # and drop the season's last day entirely.
+    date_range = pd.date_range(
+        start=start_date.normalize(), end=end_date.normalize()
+    )
     rested_days = pd.MultiIndex.from_product(
         [date_range, teams_season], names=["gameDate", "teamId"]
     ).to_frame(index=False)
     rested_days["gameDateOnlyStr"] = rested_days["gameDate"].dt.strftime("%Y-%m-%d")
 
+    # drop_duplicates is required: these merges only ask "did this team play at
+    # home/away on this date?", so a team with two games on one calendar day
+    # would otherwise duplicate its grid row and every downstream join.
     rested_days = rested_days.merge(
-        games_filtered[["gameDateOnlyStr", "hometeamId"]],
+        games_filtered[["gameDateOnlyStr", "hometeamId"]].drop_duplicates(),
         left_on=["gameDateOnlyStr", "teamId"],
         right_on=["gameDateOnlyStr", "hometeamId"],
         how="left",
@@ -94,7 +114,7 @@ def make_rested_days_table_season(
     ).drop("hometeamId", axis=1)
 
     rested_days = rested_days.merge(
-        games_filtered[["gameDateOnlyStr", "awayteamId"]],
+        games_filtered[["gameDateOnlyStr", "awayteamId"]].drop_duplicates(),
         left_on=["gameDateOnlyStr", "teamId"],
         right_on=["gameDateOnlyStr", "awayteamId"],
         how="left",
@@ -114,6 +134,20 @@ def make_rested_days_table_season(
     )
 
     rested_days = rested_days.sort_values(["teamId", "gameDate"])
+
+    # Back-to-back: how many consecutive days immediately before this one the
+    # team also played. 0 = rested yesterday, 1 = back-to-back, 2 = three games
+    # in three days, and so on.
+    #
+    # `rest` is still unshifted here, so (1 - rest) is "played today". Runs of
+    # consecutive playing days are broken by any rest day; the run counter minus
+    # one gives the number of preceding games in the current run.
+    rested_days["played"] = 1 - rested_days["rest"]
+    play_run_id = (rested_days["played"] == 0).cumsum()
+    rested_days["back_to_back"] = (
+        rested_days.groupby(["teamId", play_run_id])["played"].cumsum() - 1
+    ).clip(lower=0)
+
     rested_days["rest"] = (
         rested_days.groupby("teamId")["rest"].shift(1).fillna(1).astype(int)
     )
@@ -144,12 +178,33 @@ def make_rested_days_table_season(
         ["teamId", (rested_days["at_road_indicator"] == 0).cumsum()]
     )["at_road_indicator"].transform("cumsum")
 
-    # Fix covid games outliers. If days_at_home or days_on_road is greater than 30, set it to 1.
-    rested_days.loc[rested_days["days_at_home"] > 30, "days_at_home"] = 1
-    rested_days.loc[rested_days["days_on_road"] > 30, "days_on_road"] = 1
+    # Fix league-stoppage outliers (COVID). A team idle at home for months would
+    # otherwise dwarf every real homestand.
+    #
+    # days_at_home is capped at this season's largest non-outlier value, so the
+    # ordering stays monotone and on the same scale as the rest of the season.
+    # days_on_road resets to 1: teams went home during the break, so the first
+    # game back is day one of a new road trip.
+    at_home_outliers = rested_days["days_at_home"] > COVID_BREAK_THRESHOLD
+    on_road_outliers = rested_days["days_on_road"] > COVID_BREAK_THRESHOLD
+
+    if at_home_outliers.any() or on_road_outliers.any():
+        normal = rested_days.loc[~at_home_outliers, "days_at_home"]
+        cap = int(normal.max()) if len(normal) else COVID_BREAK_THRESHOLD
+        logger.warning(
+            "Rest days: clamping league-stoppage outliers "
+            "(days_at_home>%d: %d rows -> %d, days_on_road>%d: %d rows -> 1)",
+            COVID_BREAK_THRESHOLD,
+            int(at_home_outliers.sum()),
+            cap,
+            COVID_BREAK_THRESHOLD,
+            int(on_road_outliers.sum()),
+        )
+        rested_days.loc[at_home_outliers, "days_at_home"] = cap
+        rested_days.loc[on_road_outliers, "days_on_road"] = 1
 
     rested_days = rested_days.drop(
-        columns=["gameDate", "home_game", "away_game", "rest"]
+        columns=["gameDate", "home_game", "away_game", "rest", "played"]
     )
 
     return rested_days

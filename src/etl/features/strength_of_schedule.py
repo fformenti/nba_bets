@@ -8,6 +8,11 @@ is evaluated as of the current game's date.
 import numpy as np
 import pandas as pd
 
+from src.etl.features.last_season_record import (
+    NEW_FRANCHISE_STRENGTH,
+    build_prior_season_strength,
+)
+
 
 def calculate_strength_of_schedule(
     games: pd.DataFrame,
@@ -32,6 +37,13 @@ def calculate_strength_of_schedule(
         Minimum number of previous opponents required to produce a value.
         Returns NaN if fewer.
 
+    Notes
+    -----
+    An opponent who has not played yet this season has no current-season win
+    percentage; their prior-season record is used instead (see
+    ``build_prior_season_strength``).  Without this, early-season SOS
+    collapses to 0.0 or NaN for whole slates of games.
+
     Returns
     -------
     pd.DataFrame
@@ -45,8 +57,11 @@ def calculate_strength_of_schedule(
     all_games = _build_team_game_table(games)
     all_games = _add_cumulative_win_pct(all_games)
     lookup = _build_win_pct_lookup(all_games)
+    prior_strength = _build_prior_strength_lookup(games)
 
-    sos_columns = _compute_sos_columns(all_games, lookup, lags, min_opponents)
+    sos_columns = _compute_sos_columns(
+        all_games, lookup, lags, min_opponents, prior_strength
+    )
     for col_name, values in sos_columns.items():
         all_games[col_name] = values
 
@@ -104,14 +119,25 @@ def _build_win_pct_lookup(
     return lookup
 
 
+def _build_prior_strength_lookup(games: pd.DataFrame) -> dict[tuple, float]:
+    """Build dict mapping (teamId, season) → prior-season win percentage."""
+    prior = build_prior_season_strength(games)
+    return {
+        (team_id, season): strength
+        for team_id, season, strength in prior.itertuples(index=False)
+    }
+
+
 def _compute_sos_columns(
     all_games: pd.DataFrame,
     lookup: dict[tuple, tuple[np.ndarray, np.ndarray]],
     lags: list[int],
     min_opponents: int,
+    prior_strength: dict[tuple, float] | None = None,
 ) -> dict[str, list[float]]:
     """Compute SOS values for each lag window across all team-season groups."""
     sos_columns: dict[str, list[float]] = {f"sos_L{lag}": [] for lag in lags}
+    prior_strength = prior_strength or {}
 
     for (_team_id, _season), group in all_games.groupby(
         ["teamId", "season"], sort=False
@@ -134,15 +160,21 @@ def _compute_sos_columns(
                 opp_win_pcts = []
                 for opp_id in prev_opponents:
                     key = (opp_id, _season)
-                    if key not in lookup:
-                        continue
-                    opp_dates, opp_pcts = lookup[key]
-                    idx = np.searchsorted(opp_dates, current_date, side="left") - 1
+                    idx = -1
+                    if key in lookup:
+                        opp_dates, opp_pcts = lookup[key]
+                        idx = np.searchsorted(opp_dates, current_date, side="left") - 1
                     if idx >= 0:
                         opp_win_pcts.append(opp_pcts[idx])
+                    else:
+                        # Opponent has no completed games this season yet;
+                        # use their prior-season strength instead of dropping them.
+                        opp_win_pcts.append(
+                            prior_strength.get(key, NEW_FRANCHISE_STRENGTH)
+                        )
 
                 if len(opp_win_pcts) >= min_opponents:
-                    col_values[i] = round(np.mean(opp_win_pcts), 4)
+                    col_values[i] = np.mean(opp_win_pcts)
 
             sos_columns[f"sos_L{lag}"].extend(col_values)
 

@@ -12,6 +12,11 @@ percentage scaled up; those facing weaker opponents get scaled down.
 import numpy as np
 import pandas as pd
 
+# By construction the average opponent win percentage across the league is
+# 0.5.  Used when the league average is undefined or degenerate (0), which
+# would otherwise make the adjustment factor NaN or infinite.
+NEUTRAL_LEAGUE_SOS = 0.5
+
 
 def calculate_sos_adjusted_record(
     records_df: pd.DataFrame,
@@ -59,6 +64,10 @@ def calculate_sos_adjusted_record(
 
     matched_lags = sorted(set(record_lags) & set(sos_lags))
 
+    # gameDate carries the tip-off time, so grouping on it directly averages
+    # over the ~2 teams sharing an exact tip-off instead of the day's slate.
+    game_day = pd.to_datetime(merged["gameDate"]).dt.normalize()
+
     result_cols = []
 
     # --- sos_adj_record_L{lag} for each matched lag ---
@@ -67,13 +76,47 @@ def calculate_sos_adjusted_record(
         record_col = f"record_L{lag}"
         adj_col = f"sos_adj_record_L{lag}"
 
-        league_avg_lag = merged.groupby(["season", "gameDate"])[sos_col].transform("mean")
+        league_avg_lag = _season_to_date_league_avg(merged, sos_col, game_day)
         merged[adj_col] = _apply_adjustment(
             merged[record_col], merged[sos_col], league_avg_lag, alpha,
-        ).round(4)
+        )
         result_cols.append(adj_col)
 
     return merged[join_keys + result_cols].copy()
+
+
+def _season_to_date_league_avg(
+    merged: pd.DataFrame,
+    sos_col: str,
+    game_day: pd.Series,
+) -> pd.Series:
+    """
+    League-wide average SOS for the season up to and including each game day.
+
+    Averaging over a single day's slate is unstable: the NBA regularly plays
+    only one game on a given date, so the "league average" would be drawn
+    from two teams.  Expanding over the season to date keeps the value
+    as-of-date while giving it a meaningful sample size.
+    """
+    per_game = pd.DataFrame(
+        {"season": merged["season"].to_numpy(), "day": game_day.to_numpy(),
+         "sos": merged[sos_col].to_numpy()}
+    )
+
+    daily = (
+        per_game.groupby(["season", "day"])["sos"]
+        .agg(total="sum", n="count")  # both skip NaN, so they stay consistent
+        .reset_index()
+        .sort_values(["season", "day"])
+    )
+    daily["cum_total"] = daily.groupby("season")["total"].cumsum()
+    daily["cum_n"] = daily.groupby("season")["n"].cumsum()
+    daily["league_avg"] = daily["cum_total"] / daily["cum_n"].replace(0, np.nan)
+
+    league_avg = per_game.merge(
+        daily[["season", "day", "league_avg"]], on=["season", "day"], how="left"
+    )["league_avg"]
+    return pd.Series(league_avg.to_numpy(), index=merged.index)
 
 
 def _apply_adjustment(
@@ -83,5 +126,5 @@ def _apply_adjustment(
     alpha: float,
 ) -> pd.Series:
     """Apply multiplicative SOS adjustment with safe division."""
-    safe_avg = league_avg_sos.replace(0, np.nan)
+    safe_avg = league_avg_sos.replace(0, np.nan).fillna(NEUTRAL_LEAGUE_SOS)
     return raw * (team_sos / safe_avg) ** alpha

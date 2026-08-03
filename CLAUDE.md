@@ -6,42 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Use `uv` for all Python operations. Never use `pip` or `python` directly.
 
-## Common Commands
-
-```bash
-# Training
-make train                          # Uses EXPERIMENT=train_same by default
-make train EXPERIMENT=train_same    # Explicit experiment name
-
-# ETL / Data pipelines
-make ingest-raw-games               # Parse raw NBA Games.csv into ingested format
-make process-league-schedule        # Parse league schedule CSV
-make make-features                  # Build all feature tables and merge them
-make process-ingested-games         # Process newly ingested games
-
-# Incremental / Upcoming games
-make get-upcoming-games             # Fetch upcoming games from schedule
-make get-upcoming-games-results     # Fetch results for upcoming games
-make append-games-results           # Append results to history
-make process-results-pipeline       # Full incremental results pipeline
-
-# Prediction & Betting
-make predict-upcoming               # Predict on upcoming games
-make bet-polymarket                 # Place bets via Polymarket API
-
-# Reference data
-make teams-history                  # Load NBA teams metadata
-make teams-locations                # Fetch team location coordinates
-make make-distances-table           # Build travel distance table
-```
-
-Run train/predict modules with any experiment config (see `configs/train/` and `configs/predict/`):
-```bash
-uv run python -m src.ml.scripts.train_classifier --config <configs/train/your_experiment.yaml>
-uv run python -m src.ml.scripts.predict_classifier --config <configs/predict/your_predict.yaml>
-```
-Use the YAML that matches the model and data split you are testing (e.g. `train_same.yaml`, `train_different.yaml`).
-
 ## Architecture Overview
 
 ### Data Flow

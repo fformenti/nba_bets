@@ -1,8 +1,19 @@
 """Common utility functions for data processing."""
 
 import pandas as pd
-from src.config.constants import NEUTRAL_COURT_GAME_LABELS
+from src.config.constants import CSV_FLOAT_FORMAT, NEUTRAL_COURT_GAME_LABELS
 from src.config.paths import TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH
+
+
+def save_feature_table(df: pd.DataFrame, path, **kwargs) -> None:
+    """
+    Write a feature table to CSV, rounding floats to CSV_FLOAT_FORMAT.
+
+    This is the only place feature values get rounded.  Every calculation
+    upstream runs at full double precision so that intermediates feeding
+    other features are never truncated.
+    """
+    df.to_csv(path, index=False, float_format=CSV_FLOAT_FORMAT, **kwargs)
 
 
 CANONICAL_INGESTED_COLUMNS = [
@@ -87,14 +98,31 @@ def enrich_games_locations(df: pd.DataFrame) -> pd.DataFrame:
 def deduplicate_games(
     existing_df: pd.DataFrame, new_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """Remove rows from existing_df that match any row in new_df on composite key."""
+    """Remove rows from existing_df that match any row in new_df on composite key.
+
+    Note: the key collapses same-day repeat pairings, so a same-day home-and-home
+    between two teams would be de-duplicated down to a single game.
+    """
     key_cols = ["gameDateOnlyStr", "hometeamId", "awayteamId"]
-    new_keys = set(
-        tuple(row)
-        for row in new_df[key_cols].dropna().itertuples(index=False)
-    )
-    existing_keys = existing_df[key_cols].dropna().itertuples(index=False)
-    mask = [tuple(row) not in new_keys for row in existing_keys]
+
+    def _keys(df):
+        # Normalize dtypes before comparing: an id read as float64 or Int64 would
+        # never match the same id as int64 in a set lookup, silently skipping
+        # the dedupe and duplicating games.
+        normalized = df[key_cols].copy()
+        for col in ["hometeamId", "awayteamId"]:
+            normalized[col] = pd.to_numeric(normalized[col], errors="coerce")
+        normalized["gameDateOnlyStr"] = normalized["gameDateOnlyStr"].astype("string")
+        return normalized
+
+    new_keys = set(_keys(new_df).dropna().itertuples(index=False, name=None))
+
+    # Build the mask over the FULL frame, not a dropna'd copy: a shorter mask
+    # raises "Boolean index has wrong length" against existing_df.
+    mask = [
+        row not in new_keys
+        for row in _keys(existing_df).itertuples(index=False, name=None)
+    ]
     return existing_df.loc[mask].copy()
 
 
@@ -111,10 +139,33 @@ def coerce_numeric_columns(
         Column names to convert.
     dtype : str, default="int64"
         Target dtype after conversion. Use "Int64" for nullable integers.
+
+    Raises
+    ------
+    ValueError
+        If a value cannot be parsed and *dtype* cannot hold NaN.
     """
     for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").astype(dtype)
+        if col not in df.columns:
+            continue
+
+        converted = pd.to_numeric(df[col], errors="coerce")
+
+        # The default int64 cannot hold NaN — whether pre-existing or just
+        # produced by errors="coerce". Report which values are at fault instead
+        # of letting pandas raise an opaque "Cannot convert non-finite values".
+        if dtype.startswith("int") and converted.isna().any():
+            unparseable = converted.isna() & df[col].notna()
+            sample = df.loc[unparseable, col].unique()[:5].tolist()
+            raise ValueError(
+                f"Column {col!r} has {int(converted.isna().sum())} value(s) that "
+                f"cannot be represented as {dtype} "
+                f"({int(unparseable.sum())} unparseable, e.g. {sample}; "
+                f"the rest were already null). "
+                f'Pass dtype="Int64" to allow nulls.'
+            )
+
+        df[col] = converted.astype(dtype)
     return df
 
 
@@ -126,7 +177,12 @@ def get_season_date_range(games):
         season_start = games_season["gameDate"].min()
         season_end = games_season["gameDate"].max()
 
-        date_range = pd.date_range(start=season_start, end=season_end)
+        # Normalize to midnight: pd.date_range carries the start's time-of-day, so a
+        # finale tipping off earlier in the day than the opener would fall past
+        # `end` and drop the season's last day entirely.
+        date_range = pd.date_range(
+            start=season_start.normalize(), end=season_end.normalize()
+        )
         season_dates = pd.MultiIndex.from_product(
             [date_range], names=["gameDate"]
         ).to_frame(index=False)
@@ -137,37 +193,7 @@ def get_season_date_range(games):
         season_dates.drop(columns=["gameDate"], inplace=True)
         all_season_date_range.append(season_dates)
 
-    return pd.concat(all_season_date_range)
-
-
-def calculate_arena_occupation(home_games):
-    """
-    Calculate arena occupation metrics for home games.
-
-    Parameters
-    ----------
-    home_games : pd.DataFrame
-        DataFrame with home games data including attendance
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with arena occupation metrics added
-    """
-    home_games["attendance_last_game"] = home_games.groupby(["teamId"])[
-        "attendance"
-    ].shift(1)
-    home_games["attendance_last_5"] = (
-        home_games.groupby("teamId")["attendance_last_game"]
-        .rolling(window=5, min_periods=1)
-        .mean()
-        .reset_index(level=0, drop=True)
-    )
-
-    home_games["attendance_last_game"] = home_games.groupby("teamId")[
-        "attendance_last_game"
-    ].bfill()
-    return home_games
+    return pd.concat(all_season_date_range, ignore_index=True)
 
 
 def get_nba_season(game_date):

@@ -13,6 +13,11 @@ Rolling averages of GDS at various lag windows become the ML features.
 import numpy as np
 import pandas as pd
 
+from src.etl.features.last_season_record import (
+    NEW_FRANCHISE_STRENGTH,
+    build_prior_season_strength,
+)
+
 
 def calculate_game_difficulty_score(
     games: pd.DataFrame,
@@ -49,7 +54,9 @@ def calculate_game_difficulty_score(
         gameId, season, teamId, gameDate, gds_L{lag1}, ...
     """
     team_games = _build_team_game_table(games)
-    team_games = _add_opponent_quality(team_games, sos_adj_record_df)
+    team_games = _add_opponent_quality(
+        team_games, sos_adj_record_df, build_prior_season_strength(games)
+    )
     team_games["gds_raw"] = _compute_raw_gds(team_games, beta)
 
     team_games = _add_rolling_gds(team_games, lags, min_games)
@@ -69,7 +76,9 @@ def calculate_home_gds(
 ) -> pd.DataFrame:
     """Calculate rolling GDS over home games only."""
     team_games = _build_team_game_table(games)
-    team_games = _add_opponent_quality(team_games, sos_adj_record_df)
+    team_games = _add_opponent_quality(
+        team_games, sos_adj_record_df, build_prior_season_strength(games)
+    )
     team_games["gds_raw"] = _compute_raw_gds(team_games, beta)
 
     home_only = team_games[team_games["is_home"] == 1].copy()
@@ -90,7 +99,9 @@ def calculate_away_gds(
 ) -> pd.DataFrame:
     """Calculate rolling GDS over away games only."""
     team_games = _build_team_game_table(games)
-    team_games = _add_opponent_quality(team_games, sos_adj_record_df)
+    team_games = _add_opponent_quality(
+        team_games, sos_adj_record_df, build_prior_season_strength(games)
+    )
     team_games["gds_raw"] = _compute_raw_gds(team_games, beta)
 
     away_only = team_games[team_games["is_away"] == 1].copy()
@@ -136,8 +147,18 @@ def _build_team_game_table(games: pd.DataFrame) -> pd.DataFrame:
 def _add_opponent_quality(
     team_games: pd.DataFrame,
     sos_adj_record_df: pd.DataFrame,
+    prior_season_strength: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Add opponent quality Q column, with fallback to cumulative win%."""
+    """
+    Add opponent quality Q column.
+
+    Falls back in order: SOS-adjusted record -> cumulative win% ->
+    opponent's prior-season record -> NEW_FRANCHISE_STRENGTH.  The last two
+    steps matter on opening night, when the opponent has no current-season
+    games and the first two measures are both undefined; without them the
+    NaN propagates into ``gds_raw`` and blanks every rolling window that
+    only covers such games.
+    """
     team_games = team_games.copy()
 
     # Try to get sos_adj_record as primary quality measure
@@ -163,14 +184,32 @@ def _add_opponent_quality(
         how="left",
     )
 
-    # Use sos_adj_record where available, fall back to cum_win_pct
-    team_games["opp_quality"] = team_games["opp_sos_adj"].fillna(
-        team_games["opp_cum_pct"]
+    # Second fallback: opponent's prior-season record (no current-season games yet)
+    if prior_season_strength is not None and not prior_season_strength.empty:
+        prior = prior_season_strength.rename(
+            columns={
+                "teamId": "opponentId",
+                "prior_season_strength": "opp_prior_season",
+            }
+        )
+        team_games = team_games.merge(prior, on=["season", "opponentId"], how="left")
+    else:
+        team_games["opp_prior_season"] = np.nan
+
+    # Use sos_adj_record where available, fall back to cum_win_pct, then to
+    # the opponent's prior season, then to the new-franchise prior.
+    team_games["opp_quality"] = (
+        team_games["opp_sos_adj"]
+        .fillna(team_games["opp_cum_pct"])
+        .fillna(team_games["opp_prior_season"])
+        .fillna(NEW_FRANCHISE_STRENGTH)
     )
     # Clamp to [0, 1] (sos_adj can slightly exceed 1)
     team_games["opp_quality"] = team_games["opp_quality"].clip(0, 1)
 
-    team_games.drop(columns=["opp_sos_adj", "opp_cum_pct"], inplace=True)
+    team_games.drop(
+        columns=["opp_sos_adj", "opp_cum_pct", "opp_prior_season"], inplace=True
+    )
     return team_games
 
 
@@ -218,7 +257,7 @@ def _compute_raw_gds(team_games: pd.DataFrame, beta: float) -> pd.Series:
     win_score = q * (1 + beta * is_away)
     loss_score = -(1 - q) * (1 + beta * is_home)
 
-    return np.where(w == 1, win_score, loss_score).round(4)
+    return np.where(w == 1, win_score, loss_score)
 
 
 def _add_rolling_gds(
@@ -239,7 +278,6 @@ def _add_rolling_gds(
             team_games.groupby(["teamId", "season"])["gds_shifted"]
             .rolling(window=lag, min_periods=min_games)
             .mean()
-            .round(4)
             .reset_index(level=[0, 1], drop=True)
         )
 

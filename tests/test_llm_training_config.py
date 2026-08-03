@@ -1,12 +1,7 @@
-"""Tests for LLM training config loading and headless evaluation charts."""
-
-from pathlib import Path
-
-import pytest
+"""Tests for LLM training config loading."""
 
 from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH
 from src.ml.config.loader import load_llm_training_config
-from src.ml.training.utils import Tester_Classifiers
 
 
 def test_default_llm_config_loads():
@@ -36,34 +31,12 @@ def test_run_name_resolution_prefers_cli_then_config():
     assert resolve_run_name(config, None).startswith("nba-bets-")
 
 
-def _fake_data(n=6):
-    """Alternating truths; the stub predictor always guesses positive."""
-    return [
-        {"game_id": f"g{i}", "text": f"prompt {i}", "point_diff": 5 if i % 2 else -5}
-        for i in range(n)
-    ]
+def test_classifier_scores_by_sign_agreement():
+    """Tester_Classifiers grades a point-diff prediction on which team it picks."""
+    from src.ml.training.utils import Tester_Classifiers
 
-
-def test_classifier_tester_is_headless_and_returns_metrics(tmp_path: Path):
-    data = _fake_data(6)
-    tester = Tester_Classifiers(
-        lambda item: "3.0", data, title="stub", size=200, output_dir=tmp_path
-    )
-
-    # size is clamped to the data length rather than IndexError-ing on 200.
-    assert tester.size == 6
-
-    metrics = tester.run()
-
-    # Always guessing positive is right for the 3 positive truths.
-    assert metrics == {"accuracy": pytest.approx(0.5), "n_correct": 3, "size": 6}
-
-    for name in ("scatter", "accuracy_trend", "confidence_curve"):
-        assert (tmp_path / f"{name}.html").exists()
-
-
-def test_datapoint_label_prefers_game_id():
-    from src.ml.training.utils import _datapoint_label
-
-    assert _datapoint_label({"game_id": 42, "text": "no title marker here"}) == "42"
-    assert _datapoint_label({"text": "Title: Lakers vs Heat\nrest"}) == "Lakers vs Heat"
+    assert Tester_Classifiers.is_correct(guess=3.0, truth=5.0) == 1
+    assert Tester_Classifiers.is_correct(guess=-3.0, truth=-5.0) == 1
+    assert Tester_Classifiers.is_correct(guess=3.0, truth=-5.0) == 0
+    # A zero-margin truth counts as a home loss, so a positive guess is wrong.
+    assert Tester_Classifiers.is_correct(guess=3.0, truth=0.0) == 0

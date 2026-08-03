@@ -65,6 +65,15 @@ DEFAULT_METADATA_COLUMNS = [
 # Current season start year (e.g., 2025 for 2025/26 season).
 CURRENT_SEASON_START_YEAR = 2025
 
+# Precision for floats written to feature CSVs.  Feature math runs at full
+# double precision; rounding happens only here, at the persistence boundary,
+# so intermediate results (e.g. SOS feeding sos_adj_record, or the season-to-date
+# scoring average that normalises point differential) are not truncated.
+#
+# 6dp because norm_pts_diff values sit around 0.05 — the 4dp used elsewhere
+# would leave them with only three significant figures.
+CSV_FLOAT_FORMAT = "%.6f"
+
 # Neutral court game labels
 INTERNATIONAL_GAMES = [
     "NBA Berlin Game",

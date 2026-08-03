@@ -12,6 +12,7 @@ from src.etl.features.aggregator import create_features_tables, merge_features
 from src.etl.process_ingested_games import filter_regular_season_games
 from src.etl.ingestion.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
+from src.etl.utils.common import save_feature_table
 from src.ml.config.loader import load_features_config
 from src.utils.logging_config import setup_logging, get_logger
 
@@ -158,7 +159,7 @@ def run_incremental_pipeline(
         gds_beta=gds_beta,
     )
     final_features = merge_features(games_with_conference)
-    final_features.to_csv(REGULAR_SEASON_GAMES_FEATURES_PATH, index=False)
+    save_feature_table(final_features, REGULAR_SEASON_GAMES_FEATURES_PATH)
     logger.info("Saved merged features to %s", REGULAR_SEASON_GAMES_FEATURES_PATH)
 
     return final_features

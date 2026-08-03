@@ -60,11 +60,15 @@ def worked_example_games():
         Team 4's cum_win_pct as of Jan 4 = 1/3 (1W-2L after g2,g3,g5)
         → SOS = 1/3
 
-    league_avg_sos on Jan 4 = mean(2/3, 1/3) = 0.5
+    league_avg_sos is season-to-date, not same-day: every defined SOS value
+    from the start of the season through Jan 4.
+      Jan 3: 0.5 (Team 2), 0.75 (Team 4)
+      Jan 4: 2/3 (Team 1), 1/3 (Team 3)
+      → (0.5 + 0.75 + 2/3 + 1/3) / 4 = 0.5625
 
     SOS-adjusted (alpha=1.0):
-      Team 1: 0.5 * (2/3 / 0.5) = 0.5 * 4/3 = 2/3 ≈ 0.667
-      Team 3: 0.5 * (1/3 / 0.5) = 0.5 * 2/3 = 1/3 ≈ 0.333
+      Team 1: 0.5 * (2/3 / 0.5625) ≈ 0.5926
+      Team 3: 0.5 * (1/3 / 0.5625) ≈ 0.2963
 
     Same raw record → different adjusted records.
     """
@@ -134,8 +138,8 @@ class TestWorkedExample:
         adj_team1 = team1_g6["sos_adj_record_L10"].iloc[0]
         adj_team3 = team3_g6["sos_adj_record_L10"].iloc[0]
 
-        assert abs(adj_team1 - 2 / 3) < 1e-6, f"Team 1 adj={adj_team1}, expected 2/3"
-        assert abs(adj_team3 - 1 / 3) < 1e-6, f"Team 3 adj={adj_team3}, expected 1/3"
+        assert adj_team1 == pytest.approx(0.5 * (2 / 3) / 0.5625)
+        assert adj_team3 == pytest.approx(0.5 * (1 / 3) / 0.5625)
 
         # Team 1 ranks higher than Team 3 after adjustment
         assert adj_team1 > adj_team3
@@ -151,10 +155,11 @@ class TestFunctional:
         """
         Team 3 at g8 (Jan 8).
 
-        record_L82 = round(mean([1, 0, 1]), 2) = 0.67
+        record_L82 = mean([1, 0, 1]) = 2/3
         sos_L82 = (0 + 1.0 + 1/3) / 3 = 4/9
-        league_avg_sos at Jan 8 = mean(4/9, 5/9) = 0.5
-        sos_adj_record_L82 = 0.67 * (4/9 / 0.5) = 0.67 * 8/9
+        league_avg_sos is season-to-date: the only defined SOS values are
+        Jan 7 (1/3, 2/3) and Jan 8 (5/9, 4/9), which average to 0.5.
+        sos_adj_record_L82 = 2/3 * (4/9 / 0.5) = 16/27
         """
         records_df = _build_records(sample_games, record_lags=[82])
         sos_df = calculate_strength_of_schedule(sample_games, lags=[82])
@@ -164,9 +169,8 @@ class TestFunctional:
         )
 
         row = result[(result["teamId"] == 3) & (result["gameId"] == "g8")]
-        # record_L82 is rounded to 0.67, so expected = 0.67 * 8/9
-        expected = 0.67 * (8 / 9)
-        assert abs(row["sos_adj_record_L82"].iloc[0] - expected) < 1e-6
+        expected = (2 / 3) * ((4 / 9) / 0.5)
+        assert row["sos_adj_record_L82"].iloc[0] == pytest.approx(expected)
 
     def test_alpha_zero_equals_raw(self, worked_example_games):
         """With alpha=0, (sos / avg)^0 = 1, so adjusted == raw."""
@@ -180,7 +184,7 @@ class TestFunctional:
         )
 
         team1_g6 = result[(result["teamId"] == 1) & (result["gameId"] == "g6")]
-        assert abs(team1_g6["sos_adj_record_L10"].iloc[0] - 0.5) < 1e-6
+        assert abs(team1_g6["sos_adj_record_L10"].iloc[0] - 0.5) < 1e-9
 
     def test_nan_early_season(self, sample_games):
         """Early-season rows where SOS is NaN produce NaN adjusted values."""

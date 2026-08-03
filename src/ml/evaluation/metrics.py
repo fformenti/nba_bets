@@ -124,6 +124,7 @@ MODEL_DISPLAY_NAMES = {
     "gradient_boosting": "Gradient Boosting",
     "xgboost": "XGBoost",
     "lgbm": "LightGBM",
+    "neural_network": "Neural Network",
     "best_record_baseline": "Best Record Baseline",
     "point_differential_baseline": "Point Differential Baseline",
 }

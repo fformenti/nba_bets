@@ -46,4 +46,62 @@ gpu = [
 dev = [
     "findspark>=2.0.1",
     "jupyter>=1.1.1",
+    "ruff>=0.14",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["mlruns", "outputs", "data", "old", "sandbox", "notebooks"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes — undefined names, unused imports
+    "I",        # isort — import sorting
+    "B",        # bugbear — mutable defaults, loop-variable capture
+    "SIM",      # simplify
+    "UP",       # pyupgrade — modernize to 3.11 syntax
+    "C4",       # comprehensions
+    "RET",      # return-flow issues
+    "ARG",      # unused arguments
+    "PTH",      # prefer pathlib over os.path
+    "PD",       # pandas-vet — inplace=True, chained assignment
+    "NPY",      # numpy — legacy np.random.seed, deprecated aliases
+    "RUF",      # ruff-specific
+    "S",        # bandit — security (pickle, subprocess, hardcoded secrets)
+    "DTZ",      # naive datetimes
+    "T20",      # stray print() — this project has a logger
+    "ERA",      # commented-out code
+    "TID",      # tidy imports
+    "G",        # logging format — f-strings in logger calls
+    "PL",       # pylint subset
+    "TRY",      # exception antipatterns
+]
+ignore = [
+    "E501",    # line length — the formatter owns this
+    "PD011",   # .values false-fires on non-pandas objects
+    "PLR0913", # many args is normal for model/training functions
+    "PLR0917", # ditto, positional variant
+    "PLR2004", # magic numbers — too noisy in feature engineering
+    "RET504",  # named return variable aids readability
+    "TRY003",  # long messages inside raise are fine
+    "G004",    # f-string in logging — 167 hits, style-only, drowns real signal
+    "PLC0415", # import outside top-level — deliberate for lazy torch/GPU imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ARG", "PLR2004"]           # assert, fixtures, literals
+"**/*.ipynb" = ["T20", "E402", "ERA001", "F401"]  # notebooks are exploratory
+"src/eda/**" = ["T20", "ERA001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers --strict-config"

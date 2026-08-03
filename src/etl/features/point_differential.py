@@ -44,7 +44,9 @@ def calculate_pts_diff(games, lags=[]):
     pd.DataFrame
         DataFrame with point differential statistics
     """
-    games = games.sort_values(["teamId", "gameDate", "season"])
+    # Sort keys must lead with the groupby keys, and gameId breaks ties so games
+    # sharing a tip-off timestamp order deterministically.
+    games = games.sort_values(["teamId", "season", "gameDate", "gameId"])
 
     games["pts_diff_L1"] = games.groupby(["teamId", "season"])["pts_diff"].shift(1)
 
@@ -54,7 +56,6 @@ def calculate_pts_diff(games, lags=[]):
             games.groupby(["teamId", "season"])["pts_diff_L1"]
             .rolling(window=lag, min_periods=1)
             .mean()
-            .round(4)
             .reset_index(level=[0, 1], drop=True)
         ).fillna(0.0)
         avg_pts_diff_lags_cols.append(f"pts_diff_avg_L{lag}")
@@ -89,13 +90,26 @@ def _add_season_rolling_avg_total_pts(games: pd.DataFrame) -> pd.DataFrame:
     games["_total_pts_L1"] = games.groupby("season")["_total_pts"].shift(1)
 
     # expanding mean = season-to-date average using only past games
-    games["season_avg_total_pts"] = (
+    season_to_date = (
         games.groupby("season")["_total_pts_L1"]
         .expanding()
         .mean()
-        .round(4)
         .reset_index(level=0, drop=True)
-    ).fillna(games["_total_pts"].mean())  # fallback: overall mean for very first game
+    )
+
+    # The first game of a season has no season-to-date average yet. Fall back to
+    # the PREVIOUS season's average rather than the all-seasons mean: this
+    # feature exists to neutralise era scoring pace, so a denominator mixing the
+    # 1940s and the 2020s defeats its purpose (and peeks at the future).
+    # Seasons sort lexically in chronological order ("1999/00" < "2000/01").
+    season_mean = games.groupby("season")["_total_pts"].mean()
+    fallback = games["season"].map(season_mean.shift(1))
+
+    # The earliest season in the dataset has no predecessor; use its own mean.
+    # This affects only that season's very first game.
+    fallback = fallback.fillna(games["season"].map(season_mean))
+
+    games["season_avg_total_pts"] = season_to_date.fillna(fallback)
 
     games = games.drop(columns=["_total_pts", "_total_pts_L1"])
     return games
@@ -109,7 +123,7 @@ def _compute_norm_pts_diff(games: pd.DataFrame, lags: list) -> pd.DataFrame:
     game before rolling averages are computed.  This makes the feature
     season-neutral across eras with different scoring pace.
     """
-    games = games.sort_values(["teamId", "gameDate", "season"])
+    games = games.sort_values(["teamId", "season", "gameDate", "gameId"])
 
     games["norm_pts_diff"] = (
         games["pts_diff"] / games["season_avg_total_pts"].replace(0, float("nan"))
@@ -124,7 +138,6 @@ def _compute_norm_pts_diff(games: pd.DataFrame, lags: list) -> pd.DataFrame:
             games.groupby(["teamId", "season"])["norm_pts_diff_L1"]
             .rolling(window=lag, min_periods=1)
             .mean()
-            .round(6)
             .reset_index(level=[0, 1], drop=True)
         ).fillna(0.0)
         norm_cols.append(col)

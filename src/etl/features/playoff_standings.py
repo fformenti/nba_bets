@@ -15,6 +15,10 @@ included (post-game stats) while today's games have not yet been played
 import numpy as np
 import pandas as pd
 
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def _get_playoff_cutoff(season: str) -> int:
     """Return playoff spots per conference for the given season.
@@ -405,8 +409,6 @@ def _rank_conference_snapshot(
     ranked["eliminated_from_playoffs"] = eliminated
     ranked["clinched_final_seed"] = clinched_seed
 
-    ranked["game_incetive_flag"] = eliminated | clinched_seed
-
     return ranked
 
 
@@ -446,6 +448,23 @@ def compute_playoff_flags(games: pd.DataFrame) -> pd.DataFrame:
     h2h_df = _compute_h2h_records(team_games)
 
     result_pieces = []
+
+    # groupby drops rows with a null key, so team-games whose conference is
+    # missing from the lookup table are skipped here and end up with NaN
+    # standings features. Ranking them as a pseudo-conference would be worse,
+    # so report the loss rather than hiding it.
+    no_conference = team_games["conference"].isna()
+    if no_conference.any():
+        skipped = team_games.loc[no_conference]
+        seasons = sorted(skipped["season"].unique())
+        logger.warning(
+            "Playoff standings: skipping %d team-games with no conference "
+            "across %d seasons (%s..%s); these get NaN standings features.",
+            int(no_conference.sum()),
+            len(seasons),
+            seasons[0],
+            seasons[-1],
+        )
 
     for (season, conference), conf_group in team_games.groupby(
         ["season", "conference"]

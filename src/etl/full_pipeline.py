@@ -33,7 +33,7 @@ from src.etl.ingestion.teams_history import (
 from src.etl.transformation.add_conference import add_conference
 from src.etl.features.aggregator import create_features_tables, merge_features
 
-from src.etl.utils.common import add_neutral_court_game_flag
+from src.etl.utils.common import add_neutral_court_game_flag, save_feature_table
 from src.ml.config.loader import load_features_config
 
 
@@ -149,7 +149,7 @@ def run_full_pipeline(
 
     final_features = merge_features(games_with_conference)
 
-    final_features.to_csv(output_path, index=False)
+    save_feature_table(final_features, output_path)
     print(f"✓ Created final features table with {len(final_features)} rows")
     print(f"✓ Saved to: {output_path}")
 

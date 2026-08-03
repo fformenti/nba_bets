@@ -13,6 +13,7 @@ _DEFAULT_CLASSIFIER_MODEL_NAMES: tuple[str, ...] = (
     "gradient_boosting",
     "xgboost",
     "lgbm",
+    "neural_network",
 )
 
 
@@ -103,6 +104,7 @@ class FeaturesMapConfig(BaseModel):
     sos_adj_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     distance: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     rested_days: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    back_to_back: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     streak: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     adjusted_last_season_record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
@@ -275,6 +277,7 @@ class ModelConfig(BaseModel):
     gradient_boosting: dict[str, Any] = Field(default_factory=dict)
     xgboost: dict[str, Any] = Field(default_factory=dict)
     lgbm: dict[str, Any] = Field(default_factory=dict)
+    neural_network: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationConfig(BaseModel):

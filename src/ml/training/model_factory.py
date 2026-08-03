@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
@@ -120,6 +121,33 @@ def create_model(
             "model__colsample_bytree": [0.6, 0.8, 1.0],
             "model__reg_alpha": [0, 0.1, 0.5],
             "model__reg_lambda": [0.5, 1.0, 2.0],
+        }
+    elif model_name == "neural_network":
+        nn_config = model_config.get("neural_network", {})
+        model = MLPClassifier(
+            hidden_layer_sizes=tuple(nn_config.get("hidden_layer_sizes", [64, 32])),
+            activation=nn_config.get("activation", "relu"),
+            solver=nn_config.get("solver", "adam"),
+            alpha=nn_config.get("alpha", 0.001),
+            learning_rate_init=nn_config.get("learning_rate_init", 0.001),
+            batch_size=nn_config.get("batch_size", 256),
+            max_iter=nn_config.get("max_iter", 300),
+            early_stopping=nn_config.get("early_stopping", True),
+            validation_fraction=nn_config.get("validation_fraction", 0.1),
+            n_iter_no_change=nn_config.get("n_iter_no_change", 15),
+            random_state=random_state,
+        )
+        param_grid = {
+            "model__hidden_layer_sizes": [
+                (32,),
+                (64,),
+                (64, 32),
+                (128, 64),
+                (128, 64, 32),
+            ],
+            "model__alpha": [0.0001, 0.001, 0.01, 0.1],
+            "model__learning_rate_init": [0.0001, 0.0005, 0.001, 0.005],
+            "model__batch_size": [128, 256, 512],
         }
     else:
         raise ValueError(f"Unknown model name: {model_name}")

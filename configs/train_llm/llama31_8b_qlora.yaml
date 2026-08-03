@@ -19,7 +19,7 @@ data:
   eval_split: "validation"
   text_field: "text"
   max_sequence_length: 1024
-  max_train_samples: null # cap for smoke tests
+  max_train_samples: 100 # null
 
 quantization:
   # "4bit" | "8bit" | "none". The original notebook set 4bit then silently

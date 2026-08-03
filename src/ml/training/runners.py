@@ -1,3 +1,4 @@
+import inspect
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -66,6 +67,15 @@ def train_model_with_config(
         random_state=random_state,
         config_param_grid=config_param_grid,
     )
+
+    if (
+        sample_weight is not None
+        and "sample_weight" not in inspect.signature(model.fit).parameters
+    ):
+        logger.warning(
+            f"{model_name} does not support sample_weight; training unweighted."
+        )
+        sample_weight = None
 
     pipeline = Pipeline([("preprocessor", preprocessor), ("model", model)])
 
