@@ -29,11 +29,17 @@ Do all of this from your laptop. Every minute spent fixing credentials on a runn
    / `test` splits. It's built and uploaded by:
 
    ```bash
-   uv run python -m src.etl.specialized.hf_datasets
+   make build-llm-dataset
    ```
 
    Run this from the laptop if the features have changed. Don't do it on the pod — the pod has no
    `data/processed/` files.
+
+   The schema is load-bearing: each split must have exactly `game_id`, `prompt` and `completion`, and
+   **no `text` column**. trl picks its collator by inspecting column names, so a stray `text` column
+   silently switches training to language modeling over the prompt — where the answer never appears.
+   `completion` values are signed integers with no leading space (`+7`, `-24`), which the Llama
+   tokenizer splits into exactly two tokens: the sign and the magnitude.
 
 4. **Push your branch.** You'll `git clone` on the pod, so anything uncommitted locally won't be
    there.
@@ -154,7 +160,7 @@ cap. Run it as-is before committing to a multi-hour job:
 
 ```bash
 cd /workspace/nba_bets
-uv run python -m src.ml.scripts.train_llm \
+uv run python -m src.cli.train_llm \
   --config configs/train_llm/llama31_8b_qlora.yaml \
   --run-name smoke-test \
   --max-train-samples 100
@@ -242,7 +248,7 @@ Found checkpoint-1500 in fformenti/nba-bets-2026-07-30; downloading to resume.
 To deliberately start over into the same repo name:
 
 ```bash
-uv run python -m src.ml.scripts.train_llm \
+uv run python -m src.cli.train_llm \
   --config configs/train_llm/llama31_8b_qlora.yaml \
   --run-name nba-bets-2026-07-30 \
   --resume never
@@ -289,7 +295,8 @@ Don't leave a 4090 idling overnight because evaluation finished at 2am.
 | CUDA OOM | Set `per_device_train_batch_size: 1` and `gradient_accumulation_steps: 8` to hold the effective batch size at 8. Failing that, lower `data.max_sequence_length` from 1024 |
 | `element 0 of tensors does not require grad` | Gradient checkpointing interacting with the k-bit model. As a fallback set `training.gradient_checkpointing: false` (costs memory) |
 | First step takes forever | 16 GB base-model download. Check `echo $HF_HOME` points at `/workspace` |
-| Training loss looks wrong / prompt not masked | `training.train_on_completion_only: true` is a **no-op on this branch** — the completion-only collator was removed from `run_training()`. Loss is over the whole sequence regardless |
+| `ValueError: completion_only_loss ... not supported for language modeling datasets` | The dataset has a `text` column, so trl took the language-modeling path. Rebuild it with `make build-llm-dataset` — the schema must be `game_id` / `prompt` / `completion` |
+| `KeyError: Unexpected input keys in examples` | Same root cause, opposite symptom: neither a text field nor both of `prompt`/`completion` were found |
 
 ---
 
@@ -303,7 +310,7 @@ cd /workspace && git clone <repo> && cd nba_bets && git checkout feature/train_L
 uv sync --extra gpu
 
 # smoke test
-uv run python -m src.ml.scripts.train_llm --config configs/train_llm/llama31_8b_qlora.yaml \
+uv run python -m src.cli.train_llm --config configs/train_llm/llama31_8b_qlora.yaml \
   --run-name smoke-test --max-train-samples 100
 
 # real run (max_train_samples: null in the config first)

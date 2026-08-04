@@ -17,7 +17,9 @@ data:
   dataset_name: "fformenti/nba-bets"
   train_split: "train"
   eval_split: "validation"
-  text_field: "text"
+  # Evaluation only. Training deliberately names no text field — see
+  # LLMDataConfig.prompt_field and build_sft_config().
+  prompt_field: "prompt"
   max_sequence_length: 1024
   max_train_samples: 100 # null
 
@@ -25,13 +27,18 @@ data:
   # produced by src/ml/datasets/splits.py from the config below, then serialized
   # to text — same gameIds, same feature columns, only the encoding differs.
   # Point this at the same config you compare against.
-  source_experiment_config: "configs/train/train_all.yaml"
+  # LLM-specific feature set: same pipeline as the sklearn configs, but with
+  # win percentage and streak enabled. Swap back to configs/train/train_all.yaml
+  # for a strict like-for-like comparison against the sklearn models.
+  source_experiment_config: "configs/train/train_llm_features.yaml"
 
-  # json | markdown | prose.
-  # json/markdown follow whatever feature columns the config produces, so new
-  # features reach the prompt automatically. prose is the original hand-written
-  # template, pinned to a fixed column list — use it only to reproduce older runs.
-  serialization_format: "markdown"
+  # labeled | json | markdown | prose.
+  # labeled/json/markdown follow whatever feature columns the config produces,
+  # so new features reach the prompt automatically. labeled additionally renders
+  # human-readable names, which a base (non-instruct) model has more to work
+  # with. prose is the original hand-written template, pinned to a fixed column
+  # list — use it, or markdown, only to reproduce older runs.
+  serialization_format: "labeled"
 
 quantization:
   # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
@@ -66,9 +73,11 @@ training:
   save_steps: 500
   save_total_limit: 10
   seed: 42
-  # false = loss over the whole sequence (what the notebook did).
-  train_on_completion_only: false
-  completion_template: "The home team finished the game with a point differential of"
+  # Loss over the completion only — the signed point differential — instead of
+  # over the whole sequence. The prompt is ~440 tokens and the answer is 2, so
+  # this is the difference between the sign carrying ~1/440 of the gradient and
+  # carrying half of it.
+  train_on_completion_only: true
 
 evaluation:
   split: "test"

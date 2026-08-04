@@ -15,11 +15,24 @@ import pytest
 from src.ml.llm.serialization import (
     LEAKING_COLUMNS,
     PROMPT_SUFFIX,
+    _parse_feature_name,
     serialize_frame,
     serialize_row,
 )
 
-FORMATS = ["json", "markdown"]
+FORMATS = ["json", "markdown", "labeled"]
+
+
+def as_emitted(name: str, fmt: str) -> str:
+    """The form a column name takes in this format's output.
+
+    ``labeled`` renders human-readable labels rather than raw column names, so
+    expectations have to be translated through the same humanizer the serializer
+    uses. Every other format emits the column name verbatim.
+    """
+    if fmt == "labeled":
+        return _parse_feature_name(name)[1]
+    return name
 
 
 def emitted_feature_names(text: str, fmt: str) -> set[str]:
@@ -32,6 +45,11 @@ def emitted_feature_names(text: str, fmt: str) -> set[str]:
     if fmt == "markdown":
         rows = re.findall(r"^\|\s*(\S+)\s*\|\s*.*\|$", text, flags=re.MULTILINE)
         return {name for name in rows if name not in ("feature", "---")}
+
+    if fmt == "labeled":
+        # Feature lines are indented two spaces; section headers and the
+        # preamble sit at column zero.
+        return set(re.findall(r"^ {2}(.+?): ", text, flags=re.MULTILINE))
 
     start = text.index("{")
     payload, _ = json.JSONDecoder().raw_decode(text[start:])
@@ -75,9 +93,9 @@ def meta() -> pd.Series:
 @pytest.mark.parametrize("fmt", FORMATS)
 def test_every_feature_appears(features, meta, fmt):
     """No silent drops — a feature missing from the prompt is invisible damage."""
-    assert emitted_feature_names(serialize_row(features, meta, fmt=fmt)  , fmt) == set(
-        features.index
-    )
+    assert emitted_feature_names(serialize_row(features, meta, fmt=fmt), fmt) == {
+        as_emitted(name, fmt) for name in features.index
+    }
 
 
 @pytest.mark.parametrize("fmt", FORMATS)
@@ -85,7 +103,9 @@ def test_no_outcome_leakage(features, meta, fmt):
     """The prompt must not contain the answer, by column name or by value."""
     text = serialize_row(features, meta, fmt=fmt)
 
-    assert emitted_feature_names(text, fmt).isdisjoint(LEAKING_COLUMNS)
+    assert emitted_feature_names(text, fmt).isdisjoint(
+        {as_emitted(name, fmt) for name in LEAKING_COLUMNS}
+    )
 
     # The scores and margin themselves must not appear either.
     body = text.replace(PROMPT_SUFFIX, "")
@@ -99,9 +119,9 @@ def test_leaking_feature_column_is_stripped(features, meta, fmt):
     contaminated = pd.concat([features, pd.Series({"pts_diff": 13.0})])
     names = emitted_feature_names(serialize_row(contaminated, meta, fmt=fmt), fmt)
 
-    assert "pts_diff" not in names
+    assert as_emitted("pts_diff", fmt) not in names
     # ...while the similarly-named legitimate feature survives.
-    assert "pts_diff_avg_L5_delta" in names
+    assert as_emitted("pts_diff_avg_L5_delta", fmt) in names
 
 
 @pytest.mark.parametrize("fmt", FORMATS)

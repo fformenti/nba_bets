@@ -27,6 +27,7 @@ configs/
 │   ├── _defaults.yaml                  # Shared training defaults
 │   ├── train_all.yaml                  # Overrides: all games
 │   ├── train_different.yaml            # Overrides: cross-conference
+│   ├── train_llm_features.yaml         # Overrides: LLM feature set (adds win % and streak)
 │   └── train_same.yaml                 # Overrides: same conference
 ├── train_llm/
 │   └── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors

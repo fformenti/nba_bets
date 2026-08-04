@@ -149,7 +149,7 @@ def test_every_game_is_serialized_once(experiment_config, llm_config, holdout_pa
     for name in SPLITS:
         ids = [int(g) for g in dataset[name]["game_id"]]
         assert len(ids) == len(set(ids)), f"{name} has duplicate gameIds"
-        assert len(dataset[name]["text"]) == len(ids)
+        assert len(dataset[name]["prompt"]) == len(ids)
 
 
 def test_completion_is_the_signed_point_differential(
@@ -175,7 +175,7 @@ def test_prompts_do_not_contain_the_completion(experiment_config, llm_config, ho
     dataset = build_llm_dataset(llm_config, experiment_config, holdout_path=holdout_path)
 
     for row in dataset["test"]:
-        prompt_body = row["text"].rsplit("point differential of", 1)[0]
+        prompt_body = row["prompt"].rsplit("point differential of", 1)[0]
         assert "| pts_diff |" not in prompt_body
         assert "| winner |" not in prompt_body
         assert "| homeScore |" not in prompt_body

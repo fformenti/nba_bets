@@ -223,7 +223,13 @@ def build_sft_config(config: LLMTrainingConfig, run_name: str, output_dir: Path)
         save_steps=training.save_steps,
         save_total_limit=training.save_total_limit,
         report_to=_report_to(config),
-        dataset_text_field=config.data.text_field,
+        # No dataset_text_field on purpose. trl dispatches on column names, and
+        # checks for a text field *before* prompt/completion: naming one here
+        # that exists in the dataset routes to language modeling, which ignores
+        # the completion column entirely and rejects completion_only_loss. The
+        # dataset ships prompt+completion, so leaving this at its default (which
+        # matches no column) is what selects the prompt-completion path.
+        completion_only_loss=training.train_on_completion_only,
         # The notebook defined MAX_SEQUENCE_LENGTH but never passed it.
         max_length=config.data.max_sequence_length,
         push_to_hub=config.hub.push_checkpoints,

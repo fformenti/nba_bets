@@ -385,7 +385,13 @@ class LLMDataConfig(BaseModel):
     dataset_name: str = "fformenti/nba-bets"
     train_split: str = "train"
     eval_split: str = "validation"
-    text_field: str = "text"
+    prompt_field: str = Field(
+        default="prompt",
+        description="Dataset column holding the prompt text. Used at evaluation "
+        "time only — training never names a text field, because trl selects the "
+        "language-modeling path over the prompt-completion one whenever a "
+        "configured text column exists.",
+    )
     max_sequence_length: int = 1024
     max_train_samples: Optional[int] = Field(
         default=None, description="Cap training rows; useful for smoke tests."
@@ -397,11 +403,14 @@ class LLMDataConfig(BaseModel):
         "makes the two families comparable — same gameIds, same features, only "
         "the encoding differs.",
     )
-    serialization_format: Literal["json", "markdown", "prose"] = Field(
-        default="markdown",
-        description="How a feature row becomes prompt text. 'json' and "
-        "'markdown' are schema-driven off the actual feature columns; 'prose' "
-        "is the original hand-written Game prompt, kept for comparison.",
+    serialization_format: Literal["labeled", "json", "markdown", "prose"] = Field(
+        default="labeled",
+        description="How a feature row becomes prompt text. 'labeled' (default) "
+        "renders human-readable feature names in grouped sections, which suits a "
+        "base model with no instruction tuning. 'json' and 'markdown' are also "
+        "schema-driven off the actual feature columns; 'prose' is the original "
+        "hand-written Game prompt. The latter three are kept unchanged so runs "
+        "already on the Hub stay reproducible.",
     )
 
 
@@ -448,12 +457,10 @@ class LLMTrainerConfig(BaseModel):
     save_total_limit: int = 10
     seed: int = 42
     train_on_completion_only: bool = Field(
-        default=False,
-        description="Mask the prompt so loss is computed only over the answer "
-        "following completion_template.",
-    )
-    completion_template: str = (
-        "The home team finished the game with a point differential of"
+        default=True,
+        description="Compute loss only over the completion, masking the prompt. "
+        "Requires the prompt-completion dataset schema built by "
+        "src/ml/llm/dataset.py; trl rejects it for language-modeling datasets.",
     )
 
 

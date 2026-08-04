@@ -7,10 +7,16 @@ So the splits are not recomputed here — they come from
 ``src/ml/training/experiment.py`` uses. Identical gameIds per split then hold by
 construction.
 
-Each row becomes ``{game_id, text, completion}``: ``text`` is the serialized
+Each row becomes ``{game_id, prompt, completion}``: ``prompt`` is the serialized
 feature row, ``completion`` the signed point differential. Grading is by sign
 (see :class:`src.ml.llm.testers.ClassificationTester`), which is what makes the
 result comparable to the sklearn models' binary home-win prediction.
+
+The column names are load-bearing, not stylistic. trl's SFT collator picks its
+code path by inspecting keys: a ``text`` column routes to language modeling and
+``completion`` is silently ignored, while ``prompt`` + ``completion`` routes to
+the prompt-completion path that ``completion_only_loss`` needs. Renaming either
+column turns completion-only training back off without any error.
 """
 
 from __future__ import annotations
@@ -43,7 +49,13 @@ TARGET_COLUMN = "pts_diff"
 
 
 def _format_completion(point_diff: float) -> str:
-    """Signed point differential, e.g. ``+7`` / ``-3``."""
+    """Signed point differential as an integer, e.g. ``+7`` / ``-3``.
+
+    Deliberately has no leading space and no decimal part: every token in the
+    completion is graded, so the only two things worth spending tokens on are
+    the sign and the magnitude. The sign matters more of the two — it is what
+    :class:`src.ml.llm.testers.ClassificationTester` scores.
+    """
     value = int(round(point_diff))
     return f"{'+' if value >= 0 else '-'}{abs(value)}"
 
@@ -66,14 +78,14 @@ def build_split_dataset(
         )
     target = splits.games_enriched.loc[features.index, TARGET_COLUMN]
 
-    texts = serialize_frame(features, metadata, fmt=serialization_format)
+    prompts = serialize_frame(features, metadata, fmt=serialization_format)
     completions = [_format_completion(v) for v in target]
 
-    logger.info(f"{split_name}: {len(texts)} rows ({serialization_format})")
+    logger.info(f"{split_name}: {len(prompts)} rows ({serialization_format})")
     return Dataset.from_dict(
         {
             "game_id": [int(g) for g in metadata["gameId"]],
-            "text": texts,
+            "prompt": prompts,
             "completion": completions,
         }
     )
@@ -152,7 +164,7 @@ def summarize(dataset: "DatasetDict") -> pd.DataFrame:
             {
                 "split": name,
                 "rows": len(split),
-                "mean_chars": int(pd.Series([len(t) for t in split["text"]]).mean()),
+                "mean_chars": int(pd.Series([len(t) for t in split["prompt"]]).mean()),
             }
             for name, split in dataset.items()
         ]

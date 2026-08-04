@@ -18,6 +18,16 @@ COLOR_MAP = {"red": RED, "orange": YELLOW, "green": GREEN}
 DEFAULT_SIZE = 200
 
 
+def ground_truth(datapoint) -> float:
+    """The true point differential for one dataset row.
+
+    Read from the ``completion`` column — the signed integer the model is
+    trained to produce — so the target has exactly one definition shared by
+    training and scoring. ``int`` parses the leading ``+`` natively.
+    """
+    return float(int(datapoint["completion"]))
+
+
 class RegressionTester:
     def __init__(self, predictor, data, title=None, size=DEFAULT_SIZE):
         self.predictor = predictor
@@ -55,12 +65,10 @@ class RegressionTester:
         datapoint = self.data[i]
         value = self.predictor(datapoint)
         guess = self.post_process(value)
-        truth = float(datapoint["point_diff"])
+        truth = ground_truth(datapoint)
         error = abs(guess - truth)
         color = self.color_for(error, truth)
-        pieces = datapoint["text"].split("Title: ")
-        title = pieces[1].split("\n")[0] if len(pieces) > 1 else pieces[0]
-        title = title if len(title) <= 40 else title[:40] + "..."
+        title = f"game {datapoint['game_id']}"
         return title, guess, truth, error, color
 
     def chart(self, title):
@@ -255,12 +263,10 @@ class ClassificationTester:
         datapoint = self.data[i]
         value = self.predictor(datapoint)
         guess = self.post_process(value)
-        truth = float(datapoint["point_diff"])
+        truth = ground_truth(datapoint)
         correct = self.is_correct(guess, truth)
         color = self.color_for(correct)
-        pieces = datapoint["text"].split("Title: ")
-        title = pieces[1].split("\n")[0] if len(pieces) > 1 else pieces[0]
-        title = title if len(title) <= 40 else title[:40] + "..."
+        title = f"game {datapoint['game_id']}"
         return title, guess, truth, correct, color
 
     def chart(self, title):

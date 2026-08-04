@@ -49,7 +49,7 @@ def build_predictor(config: LLMTrainingConfig, hub_model_id: str, revision=None)
     max_new_tokens = config.evaluation.max_new_tokens
 
     def model_predict(item) -> str:
-        inputs = tokenizer(item[config.data.text_field], return_tensors="pt").to("cuda")
+        inputs = tokenizer(item[config.data.prompt_field], return_tensors="pt").to("cuda")
         with torch.no_grad():
             output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
         prompt_len = inputs["input_ids"].shape[1]
