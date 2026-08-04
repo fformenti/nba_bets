@@ -222,66 +222,6 @@ def plot_feature_importance(
     return fig
 
 
-def plot_learning_curves(
-    train_scores: np.ndarray,
-    val_scores: np.ndarray,
-    train_sizes: np.ndarray,
-    title: str = "Learning Curves",
-    figsize: tuple = (10, 6),
-) -> plt.Figure:
-    """
-    Plot learning curves.
-
-    Parameters
-    ----------
-    train_scores : np.ndarray
-        Training scores for different training set sizes
-    val_scores : np.ndarray
-        Validation scores for different training set sizes
-    train_sizes : np.ndarray
-        Training set sizes
-    title : str, default='Learning Curves'
-        Plot title
-    figsize : tuple, default=(10, 6)
-        Figure size
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        Figure object
-    """
-    fig, ax = plt.subplots(figsize=figsize)
-
-    train_mean = np.mean(train_scores, axis=1)
-    train_std = np.std(train_scores, axis=1)
-    val_mean = np.mean(val_scores, axis=1)
-    val_std = np.std(val_scores, axis=1)
-
-    ax.plot(train_sizes, train_mean, "o-", color="blue", label="Training Score")
-    ax.fill_between(
-        train_sizes,
-        train_mean - train_std,
-        train_mean + train_std,
-        alpha=0.1,
-        color="blue",
-    )
-
-    ax.plot(train_sizes, val_mean, "o-", color="red", label="Validation Score")
-    ax.fill_between(
-        train_sizes, val_mean - val_std, val_mean + val_std, alpha=0.1, color="red"
-    )
-
-    ax.set_xlabel("Training Set Size")
-    ax.set_ylabel("Score")
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-
-    return fig
-
-
 def plot_roc_curve(
     y_true: pd.Series,
     y_pred_proba: np.ndarray,

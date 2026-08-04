@@ -16,7 +16,8 @@ def parse_schedule(df):
     return df
 
 
-def main():
+def build_processed_schedule() -> None:
+    """Parse the league schedule CSV into its processed form."""
     raw_schedule = pd.read_csv(
         LEAGUE_SCHEDULE_PATH, parse_dates=["gameDateTimeEst"], low_memory=False
     )
@@ -25,7 +26,3 @@ def main():
     logger.info(
         f"Saved {len(parsed_schedule)} parsed games to {PROCESSED_LEAGUE_SCHEDULE_PATH}"
     )
-
-
-if __name__ == "__main__":
-    main()

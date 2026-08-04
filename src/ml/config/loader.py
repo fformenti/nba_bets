@@ -198,27 +198,3 @@ def get_nested_config(
     return value
 
 
-def validate_config(config: Dict[str, Any], required_keys: list[str]) -> None:
-    """
-    Validate that required configuration keys are present.
-
-    Parameters
-    ----------
-    config : dict
-        Configuration dictionary
-    required_keys : list
-        List of required key paths (dot notation)
-
-    Raises
-    ------
-    ValueError
-        If any required keys are missing
-    """
-    missing_keys = []
-
-    for key_path in required_keys:
-        if get_nested_config(config, key_path) is None:
-            missing_keys.append(key_path)
-
-    if missing_keys:
-        raise ValueError(f"Missing required configuration keys: {missing_keys}")

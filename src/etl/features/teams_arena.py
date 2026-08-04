@@ -1,7 +1,5 @@
 """Build per-team home arena lookup and derive the neutral_court game flag."""
 
-import ast
-
 import pandas as pd
 
 
@@ -92,12 +90,3 @@ def add_neutral_court(games: pd.DataFrame, teams_arena: pd.DataFrame) -> pd.Data
 
     merged["neutral_court"] = merged.apply(_flag, axis=1)
     return merged.drop(columns=["team_id", "home_arena_ids"])
-
-
-def load_teams_arena(path) -> pd.DataFrame:
-    """Load teams_arena CSV, parsing the ``home_arena_ids`` string column back to list."""
-    df = pd.read_csv(path)
-    df["home_arena_ids"] = df["home_arena_ids"].apply(
-        lambda v: ast.literal_eval(v) if isinstance(v, str) else v
-    )
-    return df

@@ -21,6 +21,18 @@ data:
   max_sequence_length: 1024
   max_train_samples: 100 # null
 
+  # The LLM trains on exactly the games the sklearn models train on. Splits are
+  # produced by src/ml/datasets/splits.py from the config below, then serialized
+  # to text — same gameIds, same feature columns, only the encoding differs.
+  # Point this at the same config you compare against.
+  source_experiment_config: "configs/train/train_all.yaml"
+
+  # json | markdown | prose.
+  # json/markdown follow whatever feature columns the config produces, so new
+  # features reach the prompt automatically. prose is the original hand-written
+  # template, pinned to a fixed column list — use it only to reproduce older runs.
+  serialization_format: "markdown"
+
 quantization:
   # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
   # overwrote it with 8bit, so 8bit reproduces what actually ran.

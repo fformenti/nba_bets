@@ -1,4 +1,25 @@
-.PHONY: teams-history etl incremental train train-all train-llm evaluate-llm get-upcoming-games lint lint-fix format test
+.PHONY: lint lint-fix format test \
+        build-teams-history build-teams-locations build-distances-table \
+        build-polymarket-teams build-holdout-set build-game-slug-lookup \
+        ingest-raw-games parse-league-schedule process-ingested-games build-features \
+        fetch-upcoming-games fetch-game-results append-game-results \
+        predict-upcoming score-predictions bet-polymarket \
+        train train-all build-llm-dataset train-llm evaluate-llm \
+        delete-experiment delete-model plot-home-win-ratio \
+        historical-etl full-rebuild predict-upcoming-games \
+        process-results-pipeline daily-cycle
+
+TRAIN_CONFIG      ?= train_same
+PREDICTION_CONFIG ?= predict_classifier
+LLM_CONFIG        ?= llama31_8b_qlora
+LLM_RUN           ?=
+# Where finished-game outcomes come from: nba_api | placeholder.
+# See src/etl/collectors/results/ — 'placeholder' reads hand-dropped files.
+SOURCE            ?= nba_api
+# Game date for bet placement, as YYYY-MM-DD.
+GAME_DATE         ?=
+
+# ─── Quality ────────────────────────────────────────────────────────────────
 
 lint:
 	uv run ruff check .
@@ -12,100 +33,135 @@ format:
 test:
 	uv run pytest
 
+# ─── Reference tables (rebuilt rarely) ──────────────────────────────────────
 
-TRAIN_CONFIG ?= train_same
-PREDICTION_CONFIG ?= predict_classifier
-LLM_CONFIG ?= llama31_8b_qlora
-LLM_RUN ?=
+build-teams-history:
+	uv run python -m src.cli.build_teams_history
 
-teams-history:
-	uv run python -m src.etl.ingestion.teams_history
+build-teams-locations:
+	uv run python -m src.cli.build_teams_locations
 
-teams-locations:
-	uv run python -m src.etl.collectors.fetch_game.get_teams_locations
+build-distances-table:
+	uv run python -m src.cli.build_distances_table
 
-make-distances-table:
-	uv run python -m src.etl.collectors.fetch_game.make_distances_table
+build-polymarket-teams:
+	uv run python -m src.cli.build_polymarket_teams
 
-polymarket-teams-abrev:
-	uv run python -m src.data_creation.polymarket_teams_abrev
-
-make-holdout-set:
-	uv run python -m src.data_creation.make_holdout_set
-
-make-game-slug-lookup:
-	uv run python -m src.data_creation.make_game_slug_lookup
+# ─── Historical ETL ─────────────────────────────────────────────────────────
 
 ingest-raw-games:
-	uv run python -m src.etl.ingestion.raw_games
+	uv run python -m src.cli.ingest_raw_games
 
-get-upcoming-games-results:
-	uv run python src/etl/collectors/upcoming_games_results.py
-
-append-games-results:
-	uv run python src/etl/ingestion/append_games_results.py
+parse-league-schedule:
+	uv run python -m src.cli.parse_league_schedule
 
 process-ingested-games:
-	uv run python src/etl/process_ingested_games.py
+	uv run python -m src.cli.process_ingested_games
 
-process-league-schedule:
-	uv run python -m src.etl.ingestion.parse_league_schedule
+build-features:
+	uv run python -m src.cli.build_features --config configs/features.yaml
 
-get-upcoming-games:
-	uv run python src/etl/collectors/upcoming_games.py
+# Freeze the evaluation boundary. Run once: every model, sklearn and LLM alike,
+# is scored against this same set of games.
+build-holdout-set:
+	uv run python -m src.cli.build_holdout_set
+
+# ─── Incremental: upcoming games and their results ──────────────────────────
+
+fetch-upcoming-games:
+	uv run python -m src.cli.fetch_upcoming_games
+
+fetch-game-results:
+	uv run python -m src.cli.fetch_game_results --source $(SOURCE)
+
+append-game-results:
+	uv run python -m src.cli.append_game_results
+
+# ─── Prediction and monitoring ──────────────────────────────────────────────
 
 predict-upcoming:
-	uv run python -m src.ml.scripts.predict_classifier --config configs/predict/$(PREDICTION_CONFIG).yaml
+	uv run python -m src.cli.predict_upcoming --config configs/predict/$(PREDICTION_CONFIG).yaml
 
-make-features:
-	uv run python -m src.etl.make_features --config configs/features.yaml
+# How the emitted predictions actually did, once the games were played.
+score-predictions:
+	uv run python -m src.cli.score_predictions
+
+# ─── Training ───────────────────────────────────────────────────────────────
 
 train:
-	uv run python -m src.ml.scripts.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml
+	uv run python -m src.cli.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml
 
 train-all:
-	uv run python -m src.ml.scripts.run_experiments --config configs/train/*.yaml
+	uv run python -m src.cli.run_experiments configs/train/train_all.yaml configs/train/train_same.yaml configs/train/train_different.yaml
+
+# Build the LLM dataset from the ML models' splits, so both families are scored
+# on the same games. Add --push to upload to the Hub.
+build-llm-dataset:
+	uv run python -m src.cli.build_llm_dataset --config configs/train_llm/$(LLM_CONFIG).yaml
 
 # LLM fine-tuning (needs `uv sync --extra gpu` on a CUDA box).
 # Pass LLM_RUN=<name> to resume an interrupted run from its Hub checkpoint.
 train-llm:
-	uv run python -m src.ml.scripts.train_llm --config configs/train_llm/$(LLM_CONFIG).yaml $(if $(LLM_RUN),--run-name $(LLM_RUN),)
+	uv run python -m src.cli.train_llm --config configs/train_llm/$(LLM_CONFIG).yaml $(if $(LLM_RUN),--run-name $(LLM_RUN),)
 
 evaluate-llm:
-	uv run python -m src.ml.scripts.evaluate_llm --config configs/train_llm/$(LLM_CONFIG).yaml --run-name $(LLM_RUN)
+	uv run python -m src.cli.evaluate_llm --config configs/train_llm/$(LLM_CONFIG).yaml --run-name $(LLM_RUN)
+
+# ─── Betting ────────────────────────────────────────────────────────────────
 
 bet-polymarket:
-	uv run python src/ml/scripts/place_bets.py
+	uv run python -m src.cli.place_bets $(GAME_DATE)
 
-historical-etl:
-	make teams-history
-	make teams-locations
-	make make-distances-table
-	make ingest-raw-games
-	make append-games-results
-	make process-league-schedule
-	make process-ingested-games
-	make make-features
+build-game-slug-lookup:
+	uv run python -m src.cli.build_game_slug_lookup
+
+# ─── Ops and analysis ───────────────────────────────────────────────────────
+
+delete-experiment:
+	uv run python -m src.cli.delete_experiment $(EXPERIMENT)
+
+delete-model:
+	uv run python -m src.cli.delete_model $(ARGS)
+
+plot-home-win-ratio:
+	uv run python -m src.cli.plot_home_win_ratio
+
+# ─── Composite pipelines ────────────────────────────────────────────────────
 
 full-rebuild:
-	make teams-history
-	make teams-locations
-	make make-distances-table
-	make ingest-raw-games
-	make append-games-results
-	make process-ingested-games
-	make make-features
+	$(MAKE) build-teams-history
+	$(MAKE) build-teams-locations
+	$(MAKE) build-distances-table
+	$(MAKE) ingest-raw-games
+	$(MAKE) append-game-results
+	$(MAKE) process-ingested-games
+	$(MAKE) build-features
+
+# full-rebuild plus the league schedule, which only changes between seasons.
+historical-etl:
+	$(MAKE) parse-league-schedule
+	$(MAKE) full-rebuild
 
 predict-upcoming-games:
-	make get-upcoming-games
-	make predict-upcoming
+	$(MAKE) fetch-upcoming-games
+	$(MAKE) predict-upcoming
 
+# Ingest half only: pull results in and rebuild features.
 process-results-pipeline:
-	make get-upcoming-games-results
-	make append-games-results
-	make process-ingested-games
-	make make-features
+	$(MAKE) fetch-game-results
+	$(MAKE) score-predictions
+	$(MAKE) append-game-results
+	$(MAKE) process-ingested-games
+	$(MAKE) build-features
 
-
-
-
+# The full loop: predict → play → score → fold into history → predict again off
+# the updated history. Run with SOURCE=placeholder to exercise it without a
+# live results feed.
+daily-cycle:
+	$(MAKE) fetch-upcoming-games
+	$(MAKE) predict-upcoming
+	$(MAKE) fetch-game-results
+	$(MAKE) score-predictions
+	$(MAKE) append-game-results
+	$(MAKE) process-ingested-games
+	$(MAKE) build-features

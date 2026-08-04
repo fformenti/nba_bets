@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from src.etl.utils.common import read_json
 
 
 UPCOMING_RENAMES = {
@@ -24,14 +25,7 @@ REQUIRED_UPCOMING_COLUMNS = {
 }
 
 
-def _load_json(path: Path) -> dict:
-    with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def load_upcoming_games(
-    input_path: Path, max_files: Optional[int] = None
-) -> pd.DataFrame:
+def load_upcoming_games(input_path: Path, max_files: Optional[int] = None) -> pd.DataFrame:
     """
     Load upcoming games from a JSON file or directory of JSON files.
     """
@@ -40,9 +34,9 @@ def load_upcoming_games(
         files = sorted(input_path.glob("*.json"))
         if max_files is not None:
             files = files[:max_files]
-        payloads = [_load_json(path) for path in files]
+        payloads = [read_json(path) for path in files]
     elif input_path.is_file():
-        payloads = [_load_json(input_path)]
+        payloads = [read_json(input_path)]
     else:
         raise FileNotFoundError(f"Upcoming games path not found: {input_path}")
 
@@ -63,17 +57,3 @@ def load_upcoming_games(
 
     df = df.dropna(subset=["gameId", "hometeamId", "awayteamId", "gameDate"]).copy()
     return df.reset_index(drop=True)
-
-
-def load_historical_features(features_path: Path) -> pd.DataFrame:
-    """
-    Load historical features used to build inference rows.
-    """
-    features_path = Path(features_path)
-    if not features_path.exists():
-        raise FileNotFoundError(f"Historical features not found: {features_path}")
-
-    df = pd.read_csv(features_path, parse_dates=["gameDate"])
-    if df.empty:
-        raise ValueError(f"Historical features file is empty: {features_path}")
-    return df

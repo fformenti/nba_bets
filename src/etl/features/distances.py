@@ -2,11 +2,9 @@ from typing import Optional
 
 import pandas as pd
 
-from src.etl.utils.common import save_feature_table
 from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     LOCATIONS_DISTANCES_PATH,
-    TEAMS_DISTANCES_PATH,
 )
 
 
@@ -219,8 +217,3 @@ def make_teams_distances_table_season(
         distances_season.append(full_calendar_teams[keep_cols])
 
     return pd.concat(distances_season, ignore_index=True)
-
-
-if __name__ == "__main__":
-    teams_distances = make_teams_distances_table_season(lags=[1, 3, 7, 14])
-    save_feature_table(teams_distances, TEAMS_DISTANCES_PATH)

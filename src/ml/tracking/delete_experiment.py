@@ -10,7 +10,6 @@ Examples:
     uv run python -m src.ml.tracking.delete_experiment my_experiment_name
 """
 
-import sys
 from pathlib import Path
 
 import mlflow
@@ -74,18 +73,3 @@ def delete_experiment_by_name(
         print(f"Error: {e}")
     except Exception as e:
         print(f"Unexpected error: {e}")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(
-            "Usage: uv run python -m src.ml.tracking.delete_experiment "
-            "<experiment_id_or_name>"
-        )
-        sys.exit(1)
-
-    arg = sys.argv[1]
-    if arg.isdigit():
-        delete_experiment(arg)
-    else:
-        delete_experiment_by_name(arg)

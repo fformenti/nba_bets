@@ -52,7 +52,7 @@ dev = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["mlruns", "outputs", "data", "old", "sandbox", "notebooks"]
+extend-exclude = ["mlruns", "outputs", "data", "old", "sandbox", "notebooks", "dead_code"]
 
 [tool.ruff.lint]
 select = [

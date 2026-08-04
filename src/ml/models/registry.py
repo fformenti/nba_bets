@@ -140,41 +140,6 @@ class ModelRegistry:
         return self.metadata[model_name]
 
 
-def save_model(
-    model: BaseEstimator,
-    file_path: Path,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Path:
-    """
-    Save a model to disk.
-
-    Parameters
-    ----------
-    model : BaseEstimator
-        Trained model to save
-    file_path : Path
-        Path to save the model
-    metadata : dict, optional
-        Additional metadata to save alongside model
-
-    Returns
-    -------
-    Path
-        Path to saved model file
-    """
-    file_path = Path(file_path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    joblib.dump(model, file_path)
-
-    if metadata:
-        metadata_path = file_path.with_suffix(".json")
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-
-    return file_path
-
-
 def load_model(file_path: Path) -> BaseEstimator:
     """
     Load a model from disk.

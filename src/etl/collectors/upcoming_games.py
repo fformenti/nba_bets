@@ -14,7 +14,7 @@ from src.config.paths import (
     INGESTED_GAMES_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
 )
-from src.etl.ingestion.teams_history import load_teams_history_table
+from src.etl.reference.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
 from src.etl.utils.common import get_nba_season, add_neutral_court_game_flag
 from src.utils.logging_config import get_logger, setup_logging
@@ -159,24 +159,3 @@ def get_upcoming_games() -> None:
 
     _save_upcoming_games(upcoming_games, UPCOMING_GAMES_DIR)
     return
-
-
-def main() -> None:
-    # parser = argparse.ArgumentParser(
-    #     description="Get upcoming games from the schedule."
-    # )
-    # parser.add_argument("games_path", type=Path, nargs="?")
-    # parser.add_argument("schedule_path", type=Path, nargs="?")
-    # args = parser.parse_args()
-
-    # if args.games_path is None:
-    #     args.games_path = INGESTED_GAMES_PATH
-    # if args.schedule_path is None:
-    #     args.schedule_path = LEAGUE_SCHEDULE_PATH
-
-    # get_upcoming_games(args.games_path, args.schedule_path)
-    get_upcoming_games()
-
-
-if __name__ == "__main__":
-    main()

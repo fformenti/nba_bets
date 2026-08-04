@@ -605,3 +605,33 @@ def get_rested_days(games: pd.DataFrame, rested_days: pd.DataFrame, is_hometeam:
             "back_to_back": f"back_to_back_{suffix}",
         }
     )
+
+
+def create_features_tables_from_config(games: pd.DataFrame, features_config) -> None:
+    """Build every feature table using the ETL features config.
+
+    The single place the ``configs/features.yaml`` lag settings are unpacked
+    into a ``create_features_tables`` call. Both the historical build
+    (``src/etl/make_features.py``) and the inference-time rebuild
+    (``src/ml/prediction/features.py``) go through here, so upcoming games get
+    exactly the feature tables the historical rows got.
+
+    Passing an *ML experiment* config here instead was a real bug: that config
+    carries feature-*selection* lags, which an experiment may set to ``[]``
+    while still enabling a derived group. The mismatch surfaced as
+    ``KeyError: 'record_L5'`` deep inside the SOS-adjusted record builder.
+    """
+    create_features_tables(
+        games,
+        features_config.record_lags,
+        features_config.point_differential_lags,
+        features_config.location_lags,
+        features_config.norm_point_differential_lags,
+        features_config.distances_lags,
+        features_config.sos_lags,
+        sos_adj_alpha=features_config.sos_adj_alpha,
+        sos_adj_location_lags=features_config.features.sos_adj_record.location_lags,
+        gds_lags=features_config.gds_lags,
+        gds_location_lags=features_config.gds_location_lags,
+        gds_beta=features_config.gds_beta,
+    )

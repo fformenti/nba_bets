@@ -67,19 +67,18 @@ def filter_regular_season_games(games) -> DataFrame:
     return pd.concat([games_before_2024_2025, games_2024_2025, games_after_2025])
 
 
-if __name__ == "__main__":
+def process_ingested_games() -> None:
+    """Split ingested games into postponed and played regular-season sets."""
     ingested_games = pd.read_csv(
         INGESTED_GAMES_UPDATED_HISTORY_PATH, parse_dates=["gameDate"], low_memory=False
     )
 
-    # save postponed games
     df_postponed = ingested_games[ingested_games["postponed"] == 1].copy()
     df_postponed.to_csv(POSTPONED_GAMES_PATH, index=False)
 
     parsed_played_games = ingested_games[ingested_games["postponed"] == 0]
     regular_season_games = filter_regular_season_games(parsed_played_games)
     regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)
-    # add logger info
     logger.info(
         f"Saved {len(regular_season_games)} regular season games to {REGULAR_SEASON_GAMES_PATH}"
     )

@@ -3,6 +3,7 @@ scratchpad
 notebooks
 sandbox
 .env
+.direnv/
 old
 .vscode
 

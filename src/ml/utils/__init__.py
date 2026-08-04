@@ -8,7 +8,6 @@ from .validation import (
     validate_split_sizes,
 )
 from .shap import extract_binary_shap_values
-from .polymarket import slugify, get_game_slug
 
 __all__ = [
     "validate_data_shapes",
@@ -17,6 +16,4 @@ __all__ = [
     "check_for_missing_values",
     "validate_split_sizes",
     "extract_binary_shap_values",
-    "slugify",
-    "get_game_slug",
 ]

@@ -1,5 +1,10 @@
-# """Prediction pipeline for NBA betting models."""
+"""Prediction pipeline for upcoming NBA games.
 
-# from .pipeline import run_prediction_pipeline
+``pipeline.run_prediction_pipeline`` is the entry point; ``features`` mirrors
+the training-time feature construction and ``io`` loads the fetched
+upcoming-game JSON.
+"""
 
-# __all__ = ["run_prediction_pipeline"]
+from .pipeline import run_prediction_pipeline
+
+__all__ = ["run_prediction_pipeline"]

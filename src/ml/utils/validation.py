@@ -231,7 +231,6 @@ def validate_split_sizes(
         )
 
     train_pct = train_size / total_size * 100
-    val_pct = val_size / total_size * 100
     test_pct = test_size / total_size * 100
 
     if train_pct < 50:

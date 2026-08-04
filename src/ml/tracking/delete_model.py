@@ -16,7 +16,6 @@ Usage:
     uv run python -m src.ml.tracking.delete_model --all
 """
 
-import sys
 
 import mlflow
 from mlflow.exceptions import MlflowException
@@ -189,31 +188,3 @@ def delete_all_models(tracking_uri: str = DEFAULT_TRACKING_URI):
         print(f"  Deleted '{rm.name}'")
 
     print(f"\nAll {len(models)} models deleted successfully!")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(
-            "Usage:\n"
-            "  uv run python -m src.ml.tracking.delete_model <model_name>\n"
-            "  uv run python -m src.ml.tracking.delete_model --version <model_name> <version>\n"
-            "  uv run python -m src.ml.tracking.delete_model --experiment <experiment_name>\n"
-            "  uv run python -m src.ml.tracking.delete_model --all"
-        )
-        sys.exit(1)
-
-    arg = sys.argv[1]
-    if arg == "--all":
-        delete_all_models()
-    elif arg == "--experiment":
-        if len(sys.argv) != 3:
-            print("Usage: uv run python -m src.ml.tracking.delete_model --experiment <experiment_name>")
-            sys.exit(1)
-        delete_models_by_experiment(sys.argv[2])
-    elif arg == "--version":
-        if len(sys.argv) != 4:
-            print("Usage: uv run python -m src.ml.tracking.delete_model --version <model_name> <version>")
-            sys.exit(1)
-        delete_model_version(sys.argv[2], sys.argv[3])
-    else:
-        delete_model(arg)

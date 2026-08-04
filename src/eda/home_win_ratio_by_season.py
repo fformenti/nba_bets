@@ -68,12 +68,9 @@ def plot(win_ratio: pd.Series) -> None:
     logger.info("Saved plot to %s", HOME_WIN_RATIO_BY_SEASON_PNG_PATH)
 
 
-def main() -> None:
+def plot_home_win_ratio() -> None:
+    """Chart the home-team win ratio per season."""
     df = load_data()
     win_ratio = compute_home_win_ratio(df)
     logger.info("Overall home win ratio: %.3f", win_ratio.mean())
     plot(win_ratio)
-
-
-if __name__ == "__main__":
-    main()

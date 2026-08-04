@@ -22,6 +22,9 @@ DEFAULT_FEATURES_CONFIG_PATH = CONFIGS_DIR / "features.yaml"
 CONFIGS_TRAIN_LLM_DIR = CONFIGS_DIR / "train_llm"
 # Aligns with Makefile LLM_CONFIG ?= llama31_8b_qlora / make train-llm
 DEFAULT_TRAIN_LLM_CONFIG_PATH = CONFIGS_TRAIN_LLM_DIR / "llama31_8b_qlora.yaml"
+# Aligns with Makefile PREDICTION_CONFIG ?= predict_classifier / make predict-upcoming
+CONFIGS_PREDICT_DIR = CONFIGS_DIR / "predict"
+DEFAULT_PREDICT_CONFIG_PATH = CONFIGS_PREDICT_DIR / "predict_classifier.yaml"
 
 # ===== Base data directories =====
 DATA_DIR = PROJECT_ROOT / "data"
@@ -59,6 +62,9 @@ RAW_INCREMENTAL_DIR = RAW_DIR / "incremental"
 RAW_INCREMENTAL_ARCHIVE_DIR = RAW_INCREMENTAL_DIR / "archive"
 UPCOMING_GAMES_DIR = RAW_INCREMENTAL_DIR / "upcoming_games"
 UPCOMING_GAMES_RESULTS_DIR = RAW_INCREMENTAL_DIR / "upcoming_games_results"
+# Hand-dropped outcomes read by the placeholder results source, until a real
+# provider is chosen. See src/etl/collectors/results/placeholder_source.py.
+MANUAL_RESULTS_DIR = RAW_INCREMENTAL_DIR / "manual_results"
 
 # ===== Ingested =====
 INGESTED_GAMES_PATH = INGESTED_DIR / "historical" / "games.csv"
@@ -125,6 +131,9 @@ HOLDOUT_TEST_METADATA_PATH = HOLDOUT_DIR / "test_metadata.csv"
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"
 POLYMARKET_DAILY_BETS_DIR = PREDICTIONS_DIR / "daily_bets"
+# Live model accuracy: predictions joined against games that have been played.
+PREDICTION_SCORECARD_PATH = PREDICTIONS_DIR / "prediction_scorecard.csv"
+PREDICTION_SCORED_GAMES_PATH = PREDICTIONS_DIR / "prediction_scored_games.csv"
 
 # Polymarket analysis
 GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"

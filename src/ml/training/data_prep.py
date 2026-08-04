@@ -9,13 +9,6 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def filter_minimum_games_played(df: pd.DataFrame, minimum_games: int = 15) -> pd.DataFrame:
-    return df[
-        (df["games_played_HT"] > minimum_games)
-        & (df["games_played_VT"] > minimum_games)
-    ]
-
-
 def load_and_validate_data(
     data_path: Path,
     target_column: str,

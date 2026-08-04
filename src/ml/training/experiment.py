@@ -8,12 +8,11 @@ import pandas as pd
 
 from src.config.paths import (
     CONFIGS_TRAIN_DIR,
-    HOLDOUT_TEST_METADATA_PATH,
     REGULAR_SEASON_GAMES_FEATURES_PATH,
 )
 from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
-from src.ml.datasets.splitters import fixed_holdout_split, temporal_split
+from src.ml.datasets.splits import build_splits
 from sklearn.calibration import CalibratedClassifierCV
 
 from src.ml.evaluation.metrics import (
@@ -34,18 +33,12 @@ from src.ml.evaluation.visualization import (
     plot_roc_curve,
 )
 from src.ml.features.selection import run_feature_selection
-from src.ml.features.engineering import (
-    apply_conference_features,
-    create_delta_features,
-    identify_feature_types,
-    resolve_feature_columns,
-)
+from src.ml.features.engineering import identify_feature_types
 from src.ml.features.preprocessing import create_preprocessing_pipeline
 from src.ml.models.baseline import RecordDifferenceBaseline
 from src.ml.models.registry import ModelRegistry
 from src.utils.logging_config import get_logger
 
-from .data_prep import filter_minimum_games_played, load_and_validate_data, prepare_data
 from .model_factory import clean_feature_names
 from .runners import train_baseline_model, train_model_with_config
 
@@ -138,10 +131,6 @@ def train_single_model(
         else Path(REGULAR_SEASON_GAMES_FEATURES_PATH)
     )
     target_column = data_config.target_column
-    date_column = data_config.date_column
-
-    metadata_columns = feat_eng_config.metadata_columns
-    intermediate_columns = feat_eng_config.intermediate_columns
 
     minimum_games_train = filters_config.minimum_games_train
     minimum_games_test = filters_config.minimum_games_test
@@ -191,158 +180,24 @@ def train_single_model(
     if config.description:
         tracker.set_tags({"mlflow.note.content": config.description})
 
-    games_enriched = load_and_validate_data(
-        data_path=data_path, target_column=target_column, date_column=date_column
-    )
+    splits = build_splits(config)
 
-    if min_season is not None:
-        if "season" not in games_enriched.columns:
-            raise ValueError(
-                "DataFrame must contain 'season' column for min_season filtering"
-            )
-        games_enriched = games_enriched[games_enriched["season"] >= min_season].copy()
-        logger.info(
-            f"Filtered to {len(games_enriched)} games (min_season: {min_season})"
+    games_enriched = splits.games_enriched
+    metadata = splits.metadata
+    y = splits.y
+    X_train, X_val, X_test = splits.X_train, splits.X_val, splits.X_test
+    y_train, y_val, y_test = splits.y_train, splits.y_val, splits.y_test
+    X_test_baseline, y_test_baseline = splits.X_test_baseline, splits.y_test_baseline
+    metadata_test = splits.metadata_test
+
+    if splits.date_range_name:
+        tracker.log_dataset(
+            df=games_enriched,
+            source=str(data_path),
+            name=splits.date_range_name,
+            targets=target_column,
+            context="training",
         )
-
-    if conference_filter == "different":
-        games_enriched = games_enriched[
-            games_enriched["hometeamConference"] != games_enriched["awayteamConference"]
-        ].copy()
-        logger.info(f"Filtered to {len(games_enriched)} games (different conferences)")
-    elif conference_filter == "same":
-        games_enriched = games_enriched[
-            games_enriched["hometeamConference"] == games_enriched["awayteamConference"]
-        ].copy()
-        logger.info(f"Filtered to {len(games_enriched)} games (same conference)")
-    else:
-        logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
-
-    date_range_name = None
-    if date_column and date_column in games_enriched.columns:
-        dates = pd.to_datetime(games_enriched[date_column], errors="coerce").dropna()
-        if not dates.empty:
-            date_range_name = f"{dates.min().strftime('%Y-%m-%d')} to {dates.max().strftime('%Y-%m-%d')}"
-            tracker.log_dataset(
-                df=games_enriched,
-                source=str(data_path),
-                name=date_range_name,
-                targets=target_column,
-                context="training",
-            )
-
-    df, y, metadata = prepare_data(
-        df=games_enriched,
-        target_column=target_column,
-        drop_na=data_config.drop_na,
-        metadata_columns=metadata_columns,
-    )
-
-    # Resolve holdout indices once — used for both baseline and main splits
-    _use_fixed_holdout = HOLDOUT_TEST_METADATA_PATH.exists()
-    if _use_fixed_holdout:
-        _holdout_meta = pd.read_csv(HOLDOUT_TEST_METADATA_PATH, usecols=["gameId"])
-        _holdout_game_ids = set(_holdout_meta["gameId"].astype(int))
-        _holdout_indices = metadata[metadata["gameId"].isin(_holdout_game_ids)].index
-        logger.info(
-            f"Using fixed holdout: {len(_holdout_indices)} games "
-            f"({len(_holdout_game_ids)} in file, {len(_holdout_indices)} matched)"
-        )
-    else:
-        logger.warning(
-            f"Fixed holdout not found at {HOLDOUT_TEST_METADATA_PATH}. "
-            "Falling back to temporal split — test set will shift as new games are added. "
-            "Run `make make-holdout-set` to freeze the holdout."
-        )
-
-    # Special Dataframe for baseline models
-    if _use_fixed_holdout:
-        X_test_baseline = df.loc[_holdout_indices].copy()
-        y_test_baseline = y.loc[_holdout_indices].copy()
-    else:
-        _, _, X_test_baseline, _, _, y_test_baseline = temporal_split(
-            df, y, date_column=date_column, test_size=test_size, val_size=val_size
-        )
-    X_test_baseline["record_L82_delta"] = (
-        X_test_baseline["record_L82_HT"] - X_test_baseline["record_L82_VT"]
-    )
-    X_test_baseline["pts_diff_avg_L82_delta"] = (
-        X_test_baseline["pts_diff_avg_L82_HT"] - X_test_baseline["pts_diff_avg_L82_VT"]
-    )
-
-    df = create_delta_features(df, feat_eng_config.features)
-    df = apply_conference_features(df, conference_filter)
-    # if config.feature_engineering.momentum_pairs:
-    #     df = create_momentum_features(df, config.feature_engineering.momentum_pairs)
-
-    if feat_eng_config.selection_mode == "inclusion":
-        feature_columns = resolve_feature_columns(
-            feat_eng_config.features,
-            conference_filter,
-            momentum_pairs=config.feature_engineering.momentum_pairs or None,
-        )
-        keep_cols = feature_columns + [date_column]
-        available = [c for c in keep_cols if c in df.columns]
-        missing_features = [c for c in feature_columns if c not in df.columns]
-        if missing_features:
-            formatted_missing = "\n".join(
-                f"  - MISSING FEATURE: {feature}" for feature in missing_features
-            )
-            logger.warning(
-                "\n"
-                + "!" * 90
-                + "\n"
-                + "!!! CRITICAL WARNING: EXPECTED FEATURE COLUMNS WERE NOT FOUND IN DATA !!!\n"
-                + "This will likely degrade model quality and should be investigated immediately.\n"
-                + formatted_missing
-                + "\n"
-                + "!" * 90
-            )
-        X = df[available]
-    else:
-        exclude_cols = metadata_columns + intermediate_columns + [target_column]
-        cols_to_drop = [col for col in exclude_cols if col in df.columns]
-        X = df.drop(columns=cols_to_drop)
-
-    if date_column not in X.columns:
-        raise ValueError(f"Date column '{date_column}' required for temporal split")
-    if _use_fixed_holdout:
-        X_train, X_val, X_test, y_train, y_val, y_test = fixed_holdout_split(
-            X, y, holdout_indices=_holdout_indices, date_column=date_column, val_size=val_size
-        )
-    else:
-        X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
-            X, y, date_column=date_column, test_size=test_size, val_size=val_size
-        )
-    X_train = cast(pd.DataFrame, X_train.drop(columns=[date_column]))
-    X_val = X_val.drop(columns=[date_column])
-    X_test = X_test.drop(columns=[date_column])
-
-    train_gp = games_enriched.loc[X_train.index]
-    train_mask = (train_gp["games_played_HT"] > minimum_games_train) & (
-        train_gp["games_played_VT"] > minimum_games_train
-    )
-    X_train = X_train.loc[train_mask]
-    y_train = cast(pd.Series, y_train.loc[train_mask])
-
-    val_gp = games_enriched.loc[X_val.index]
-    val_mask = (val_gp["games_played_HT"] > minimum_games_train) & (
-        val_gp["games_played_VT"] > minimum_games_train
-    )
-    X_val = cast(pd.DataFrame, X_val.loc[val_mask])
-    y_val = cast(pd.Series, y_val.loc[val_mask])
-
-    test_gp = games_enriched.loc[X_test.index]
-    test_mask = (test_gp["games_played_HT"] > minimum_games_test) & (
-        test_gp["games_played_VT"] > minimum_games_test
-    )
-    X_test = X_test.loc[test_mask]
-    y_test = cast(pd.Series, y_test.loc[test_mask])
-
-    X_test_baseline = X_test_baseline.loc[X_test.index]
-    y_test_baseline = y_test_baseline.loc[X_test.index]
-
-    metadata_test = metadata.loc[X_test.index].copy()
 
     # --- Sample weight computation ---
     train_sample_weight = None
@@ -974,7 +829,7 @@ def train_single_model(
         artifact_path=artifact_path,
         registered_model_name=registered_model_name,
         input_example=X_train.head(5),
-        dataset_name=date_range_name,
+        dataset_name=splits.date_range_name,
     )
 
     run_id = tracker.get_run_id()

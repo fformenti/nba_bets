@@ -1,215 +1,237 @@
 # Project Structure
 
+## The layering rules
+
+**Libraries never have `__main__`; CLI modules never have logic.** Every entry
+point is a thin argparse shell in `src/cli/`, one per Makefile target. Enforced
+by `tests/test_imports_smoke.py`.
+
+**One split definition.** `src/ml/datasets/splits.py::build_splits` decides which
+games are train/validation/test. The sklearn path and the LLM dataset builder
+both call it, so the two model families are always scored on the same gameIds.
+
+**Two configs, two jobs.** `configs/features.yaml` decides which feature *tables*
+get built (ETL). `configs/train/*.yaml` decides which of those columns a model
+*consumes* (ML). Passing an experiment config where an ETL one belongs is a bug —
+it used to break `predict-upcoming`.
+
+**`winner` is the winning teamId, not a 0/1 flag.** Models predict 1 = home win.
+`src/monitoring/scoring.py` does that conversion in one place.
+
+## configs/
+
 ```
-nba_bets/
-├── configs/                                    # YAML configuration files
-│   ├── features.yaml                           # ETL feature params (lags, location_lags, alpha); ML delta/drop in train/_defaults.yaml
-│   ├── ingestion/
-│   │   └── incremental_ingestion.yaml          # Incremental ingestion config
-│   ├── train/
-│   │   ├── _defaults.yaml                      # Shared training defaults (model, preprocessing, etc.)
-│   │   ├── train_all.yaml                      # Training overrides: all games
-│   │   ├── train_different.yaml                # Training overrides: cross-conference
-│   │   └── train_same.yaml                     # Training overrides: same conference
-│   ├── train_llm/                              # Separate dir: train-all globs configs/train/*.yaml
-│   │   └── llama31_8b_qlora.yaml               # QLoRA SFT config (model, LoRA, hub, tracking)
-│   └── predict/
-│       └── predict_classifier.yaml             # Prediction config
+configs/
+├── features.yaml                       # ETL: which feature tables to build (lags, alpha, beta)
+├── train/
+│   ├── _defaults.yaml                  # Shared training defaults
+│   ├── train_all.yaml                  # Overrides: all games
+│   ├── train_different.yaml            # Overrides: cross-conference
+│   └── train_same.yaml                 # Overrides: same conference
+├── train_llm/
+│   └── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
+└── predict/
+    └── predict_classifier.yaml         # Model URIs per conference filter
+```
+
+## src/
+
+```
+src/
+├── cli/                                # EVERY entry point. One module per make target.
+│   ├── ingest_raw_games.py             # make ingest-raw-games
+│   ├── build_teams_history.py          # make build-teams-history
+│   ├── build_teams_locations.py        # make build-teams-locations
+│   ├── build_distances_table.py        # make build-distances-table
+│   ├── build_polymarket_teams.py       # make build-polymarket-teams
+│   ├── parse_league_schedule.py        # make parse-league-schedule
+│   ├── process_ingested_games.py       # make process-ingested-games
+│   ├── build_features.py               # make build-features
+│   ├── build_holdout_set.py            # make build-holdout-set (run once)
+│   ├── fetch_upcoming_games.py         # make fetch-upcoming-games
+│   ├── fetch_game_results.py           # make fetch-game-results SOURCE=nba_api|placeholder
+│   ├── append_game_results.py          # make append-game-results
+│   ├── predict_upcoming.py             # make predict-upcoming
+│   ├── score_predictions.py            # make score-predictions
+│   ├── train_classifier.py             # make train
+│   ├── run_experiments.py              # make train-all
+│   ├── build_llm_dataset.py            # make build-llm-dataset
+│   ├── train_llm.py                    # make train-llm
+│   ├── evaluate_llm.py                 # make evaluate-llm
+│   ├── place_bets.py                   # make bet-polymarket GAME_DATE=...
+│   ├── build_game_slug_lookup.py       # make build-game-slug-lookup
+│   ├── delete_experiment.py            # make delete-experiment EXPERIMENT=...
+│   ├── delete_model.py                 # make delete-model ARGS=...
+│   └── plot_home_win_ratio.py          # make plot-home-win-ratio
 │
-├── data/                                       # All data (gitignored)
-│   ├── raw/
-│   │   ├── historical/
-│   │   │   ├── games/                          # Source Games.csv
-│   │   │   └── handmade/                       # Manual reference data (league schedule, etc.)
-│   │   └── incremental/
-│   │       ├── upcoming_games/                 # Fetched upcoming games (CSVs)
-│   │       └── upcoming_games_results/         # Fetched game results (CSVs)
-│   ├── ingested/
-│   │   ├── historical/                         # Parsed & filtered historical games
-│   │   └── incremental/                        # Parsed incremental games
-│   ├── processed/
-│   │   ├── holdout/
-│   │   │   └── test_metadata.csv               # Fixed holdout set (frozen once via make-holdout-set)
-│   │   ├── game_slug_lookup.csv                # game_id → Polymarket slug (via make-game-slug-lookup)
-│   │   └── regular_season/
-│   │       └── features/                       # Feature tables + games_features.csv
-│   └── predictions/
-│       └── daily_bets/                         # Prediction outputs
+├── config/
+│   ├── paths.py                        # All data path constants
+│   ├── constants.py                    # Dates, team maps, neutral court labels
+│   ├── secrets.py                      # require_env(): the only way to read a key
+│   └── aws.py                          # AWS config
 │
-├── src/
-│   ├── config/
-│   │   ├── paths.py                            # All data path constants
-│   │   ├── constants.py                        # Dates, team maps, neutral court labels
-│   │   └── aws.py                              # AWS config
+├── etl/
+│   ├── make_features.py                # build_features(): the historical feature build
+│   ├── process_ingested_games.py       # Split postponed vs played regular season
 │   │
-│   ├── data_creation/
-│   │   ├── polymarket_teams_abrev.py           # Team abbreviation mapping for Polymarket
-│   │   ├── make_holdout_set.py                 # Freeze holdout test set from games_features.csv (run once)
-│   │   └── make_game_slug_lookup.py            # Generate game_id → Polymarket slug lookup from holdout
+│   ├── ingestion/                      # raw → ingested
+│   │   ├── raw_games.py                # Parse Games.csv
+│   │   ├── parse_league_schedule.py    # Parse the league schedule CSV
+│   │   └── append_games_results.py     # Merge played results into history
 │   │
-│   ├── etl/
-│   │   ├── ingestion/
-│   │   │   ├── raw_games.py                    # Parse Games.csv → ingested format
-│   │   │   ├── teams_history.py                # Load NBA teams metadata
-│   │   │   ├── parse_league_schedule.py        # Parse league schedule CSV
-│   │   │   ├── append_games_results.py         # Merge results into historical data
-│   │   │   └── incremental/                    # Agent-based incremental ingestion
-│   │   │       ├── agents.py                   # OpenAI agents for data fetching
-│   │   │       ├── pipeline.py                 # Incremental ingestion orchestrator
-│   │   │       ├── schema.py                   # Pydantic schemas for incremental data
-│   │   │       ├── config.py                   # Incremental ingestion configuration
-│   │   │       └── io.py                       # I/O helpers for incremental data
-│   │   │
-│   │   ├── collectors/
-│   │   │   ├── upcoming_games.py               # Fetch upcoming games from schedule
-│   │   │   ├── upcoming_games_results.py       # Fetch results for played games
-│   │   │   └── fetch_game/
-│   │   │       ├── get_teams_locations.py      # Fetch team GPS coordinates
-│   │   │       ├── make_distances_table.py     # Build team-to-team distance table
-│   │   │       └── find_distances.ipynb        # Notebook: distance exploration
-│   │   │
-│   │   ├── features/
-│   │   │   ├── aggregator.py                   # create_features_tables() + merge_features()
-│   │   │   ├── winning_percentage.py           # Rolling win % (home/away/total)
-│   │   │   ├── point_differential.py           # Rolling point differential
-│   │   │   ├── east_vs_west.py                 # Conference win/loss records
-│   │   │   ├── rest_days.py                    # Days since last game
-│   │   │   ├── distances.py                    # Rolling travel distance
-│   │   │   ├── last_season_record.py           # Last season's win percentage record; SOS-adjusted variant (adjusted_last_season_record)
-│   │   │   ├── streaks.py                      # Consecutive win/loss streak per team
-│   │   │   ├── strength_of_schedule.py         # Rolling strength of schedule
-│   │   │   ├── sos_adjusted_record.py          # SOS-adjusted winning percentage
-│   │   │   ├── game_difficulty_score.py        # Per-game quality score (outcome × opponent strength × location)
-│   │   │   ├── playoff_standings.py            # Conference standings, GB, and clinching flags per (team, game)
-│   │   │   └── teams_arena.py                  # Home arena lookup per (team, season); derives neutral_court flag
-│   │   │
-│   │   ├── transformation/
-│   │   │   └── add_conference.py               # Add conference column to games
-│   │   │
-│   │   ├── utils/
-│   │   │   └── common.py                       # Shared ETL utility functions
-│   │   │
-│   │   ├── make_features.py                    # Entry point: build + merge all features
-│   │   ├── process_ingested_games.py           # Entry point: ingested → processed
-│   │   └── full_pipeline.py                    # High-level pipeline orchestrator
+│   ├── collectors/                     # External fetches
+│   │   ├── upcoming_games.py           # Next slate from the processed schedule
+│   │   ├── upcoming_games_results.py   # Stamp outcomes onto game payloads
+│   │   └── results/                    # PLUGGABLE outcome retrieval
+│   │       ├── base.py                 # GameResult + ResultsSource protocol
+│   │       ├── nba_api_source.py       # stats.nba.com (default)
+│   │       └── placeholder_source.py   # TODO: stand-in reading manual_results/
 │   │
-│   ├── ml/
-│   │   ├── README.md                           # ML module documentation
-│   │   ├── config/
-│   │   │   ├── schema.py                       # ExperimentConfig and Pydantic schemas
-│   │   │   └── loader.py                       # Load YAML into config objects
-│   │   │
-│   │   ├── datasets/
-│   │   │   ├── loaders.py                      # Load games_features.csv as DataFrame
-│   │   │   └── splitters.py                    # Temporal / random / stratified / fixed-holdout splits
-│   │   │
-│   │   ├── features/
-│   │   │   ├── engineering.py                  # Delta features, conference features
-│   │   │   ├── preprocessing.py                # Scaling, imputation, outlier handling
-│   │   │   └── selection.py                    # Boruta-SHAP feature selection
-│   │   │
-│   │   ├── models/
-│   │   │   ├── trainer.py                      # ModelTrainer (train, evaluate, CV)
-│   │   │   ├── registry.py                     # ModelRegistry (save/load sklearn models)
-│   │   │   └── baseline.py                     # Naive baseline models
-│   │   │
-│   │   ├── training/                           # Training orchestration
-│   │   │   ├── data_prep.py                    # Data preparation helpers
-│   │   │   ├── experiment.py                   # Experiment definition and execution
-│   │   │   ├── model_factory.py                # Build models from config
-│   │   │   ├── runners.py                      # High-level training runners
-│   │   │   ├── llm_finetune.py                 # QLoRA SFT: preflight, Hub checkpoint resume, SFTTrainer
-│   │   │   ├── llm_eval.py                     # Score a fine-tuned LoRA adapter as a sign classifier
-│   │   │   └── utils.py                        # Tester_Regressors / Tester_Classifiers (headless plotly charts)
-│   │   │
-│   │   ├── evaluation/
-│   │   │   ├── metrics.py                      # Classification metrics
-│   │   │   ├── visualization.py                # Confusion matrix, ROC, feature importance
-│   │   │   └── analysis.py                     # Prediction error pattern analysis
-│   │   │
-│   │   ├── tracking/
-│   │   │   ├── mlflow_tracker.py               # MLflowTracker (log params, metrics, model)
-│   │   │   ├── delete_experiment.py            # Delete MLflow experiments by name
-│   │   │   └── delete_model.py                 # Delete MLflow registered models
-│   │   │
-│   │   ├── prediction/
-│   │   │   └── io.py                           # Load upcoming games DataFrames
-│   │   │
-│   │   ├── scripts/                            # Entry points (called by Makefile)
-│   │   │   ├── train_classifier.py             # Train model from YAML config
-│   │   │   ├── predict_classifier.py           # Predict upcoming games from config
-│   │   │   ├── predict_upcoming.py             # Wrapper for predict_classifier
-│   │   │   ├── run_experiments.py              # Run multiple experiments in batch
-│   │   │   ├── train_llm.py                    # QLoRA fine-tune an LLM (resumable; make train-llm)
-│   │   │   ├── evaluate_llm.py                 # Evaluate a fine-tuned adapter (make evaluate-llm)
-│   │   │   └── place_bets.py                   # Place bets via Polymarket API
-│   │   │
-│   │   └── utils/
-│   │       ├── validation.py                   # Data validation utilities
-│   │       ├── shap.py                         # SHAP output compatibility helpers
-│   │       └── polymarket.py                   # Slug generation: slugify(), get_game_slug()
+│   ├── reference/                      # Slow-moving lookup tables
+│   │   ├── teams_history.py            # Team/city/conference per season
+│   │   ├── teams_locations.py          # Team GPS coordinates
+│   │   ├── distances.py                # City-to-city distances
+│   │   └── polymarket_teams.py         # teamId → Polymarket abbreviation
 │   │
-│   ├── eda/
-│   │   └── home_win_ratio_by_season.py         # Home win ratio bar chart by season
+│   ├── features/                       # Feature table builders
+│   │   ├── aggregator.py               # create_features_tables_from_config() + merge_features()
+│   │   ├── winning_percentage.py       # Rolling win % (home/away/total)
+│   │   ├── point_differential.py       # Rolling point differential
+│   │   ├── east_vs_west.py             # Conference win/loss records
+│   │   ├── rest_days.py                # Days since last game
+│   │   ├── distances.py                # Rolling travel distance
+│   │   ├── last_season_record.py       # Last season's record; SOS-adjusted variant
+│   │   ├── streaks.py                  # Consecutive win/loss streak
+│   │   ├── strength_of_schedule.py     # Rolling strength of schedule
+│   │   ├── sos_adjusted_record.py      # SOS-adjusted winning percentage
+│   │   ├── game_difficulty_score.py    # Per-game quality score
+│   │   ├── playoff_standings.py        # Conference standings, GB, clinching flags
+│   │   └── teams_arena.py              # Home arena lookup; derives neutral_court
+│   │
+│   ├── transformation/
+│   │   └── add_conference.py           # Add conference columns
 │   │
 │   └── utils/
-│       └── logging_config.py                   # Shared logging setup
+│       └── common.py                   # read_json, save_feature_table, get_nba_season, …
 │
-├── outputs/                                    # Training artifacts (gitignored)
-│   ├── enriched_games/
-│   │   └── viz/                                # EDA visualizations on enriched games
-│   ├── all/                                    # Outputs for train_all experiment
-│   │   ├── tables/                             # Tables for plotting
-│   │   ├── analysis/                           # Error analysis outputs
-│   │   ├── cv_results/                         # Cross Validation results
-│   │   ├── feature_selection/                  # Boruta-SHAP outputs
-│   │   └── visualizations/                     # Plots (ROC, confusion matrix, etc.)
-│   ├── different/                              # Outputs for train_different experiment
-│   │   ├── tables/
-│   │   ├── analysis/
-│   │   ├── cv_results/                         
-│   │   ├── feature_selection/
-│   │   └── visualizations/
-│   └── same/                                   # Outputs for train_same experiment
-│   │   ├── tables/
-│   │   ├── analysis/
-│   │   ├── cv_results/                         
-│   │   ├── feature_selection/
-│   │   └── visualizations/
-|
-├── .claude/                                    # Claude Code configuration
-│   ├── docs/
-│   │   └── PROJECT_STRUCTURE.md                # This file
-│   ├── experts/
-│   │   ├── software-dev.md                     # Software dev expert persona
-│   │   └── data-scientist.md                   # Data scientist expert persona
-│   ├── hooks/
-│   │   └── check-structure-drift.sh            # Stop hook: detects file tree drift
-│   ├── skills/
-│   │   ├── data-analyst/
-│   │   │   ├── SKILL.md                        # Data analyst skill definition
-│   │   │   └── references/                     # Quality, outliers, audit, features, leakage
-│   │   ├── ml-pipeline/
-│   │   │   ├── SKILL.md                        # ML pipeline skill definition
-│   │   │   └── references/                     # Config schema
-│   │   ├── mlflow/
-│   │   │   ├── SKILL.md                        # MLflow skill definition
-│   │   │   └── references/                     # Naming and registry conventions
-│   │   ├── simplify/
-│   │   │   ├── SKILL.md                        # Simplify skill definition
-│   │   │   └── references/                     # Pythonic style references
-│   │   └── sklearn/
-│   │       ├── SKILL.md                        # Sklearn skill definition
-│   │       └── references/                     # Pipelines, preprocessing, transformers
-│   ├── settings.json                           # Claude Code project settings
-│   └── settings.local.json                     # Local overrides (gitignored)
+├── ml/
+│   ├── README.md                       # Modelling guide: the two invariants, training, LLM
+│   │
+│   ├── config/
+│   │   ├── schema.py                   # Pydantic configs (Experiment, Prediction, LLM)
+│   │   └── loader.py                   # YAML → config objects, with includes
+│   │
+│   ├── datasets/
+│   │   ├── splits.py                   # build_splits(): THE split definition
+│   │   ├── holdout.py                  # Freeze the holdout (run once)
+│   │   ├── loaders.py                  # Load games_features.csv
+│   │   └── splitters.py                # Temporal / random / fixed-holdout primitives
+│   │
+│   ├── features/
+│   │   ├── engineering.py              # Delta features, conference features, column resolution
+│   │   ├── preprocessing.py            # Scaling, imputation, outlier handling
+│   │   └── selection.py                # Boruta-SHAP feature selection
+│   │
+│   ├── models/
+│   │   ├── trainer.py                  # ModelTrainer (train, evaluate, CV)
+│   │   ├── registry.py                 # ModelRegistry (local persistence)
+│   │   └── baseline.py                 # Naive baseline models
+│   │
+│   ├── training/
+│   │   ├── classifier.py               # train_classifier(): one experiment end to end
+│   │   ├── experiment.py               # train_single_model(): the training body
+│   │   ├── data_prep.py                # Load, validate, prepare
+│   │   ├── model_factory.py            # Build models from config
+│   │   └── runners.py                  # Baseline and configured-model runners
+│   │
+│   ├── llm/                            # The LLM is a second ENCODING of the same experiment
+│   │   ├── serialization.py            # serialize_row(): the ONLY table→text boundary
+│   │   ├── dataset.py                  # build_llm_dataset() from build_splits()
+│   │   ├── prompts.py                  # Legacy prose template (lazy tokenizer)
+│   │   ├── finetune.py                 # QLoRA SFT: preflight, Hub resume, SFTTrainer
+│   │   ├── train.py                    # Run orchestration + tracking
+│   │   ├── evaluate.py                 # Score an adapter as a sign classifier
+│   │   └── testers.py                  # RegressionTester / ClassificationTester
+│   │
+│   ├── prediction/
+│   │   ├── pipeline.py                 # run_prediction_pipeline() + upsert_predictions()
+│   │   ├── features.py                 # Inference-time feature construction
+│   │   └── io.py                       # Load upcoming-game JSON
+│   │
+│   ├── evaluation/
+│   │   ├── metrics.py                  # Classification metrics, Brier, ECE
+│   │   ├── visualization.py            # Confusion matrix, ROC, calibration, SHAP
+│   │   └── analysis.py                 # Prediction error pattern analysis
+│   │
+│   ├── tracking/
+│   │   ├── mlflow_tracker.py           # MLflowTracker context manager
+│   │   ├── delete_experiment.py        # Ops: delete experiments
+│   │   └── delete_model.py             # Ops: delete registered models
+│   │
+│   └── utils/
+│       ├── validation.py               # Data validation helpers
+│       └── shap.py                     # SHAP output compatibility
 │
-├── tests/                                      # Tests
-├── sandbox/                                    # Notebooks for exploration
-├── mlruns/                                     # MLflow run tracking data
-├── mlflow.db                                   # MLflow backend database
-├── Makefile
-├── pyproject.toml
-├── .python-version
-└── CLAUDE.md
+├── betting/                            # Polymarket — consumes model output, not modelling
+│   ├── slugs.py                        # slugify(), get_game_slug()
+│   ├── polymarket_client.py            # Gamma/CLOB HTTP; MarketSide; get_market_prices() seam
+│   ├── sizing.py                       # Edge-proportional stake sizing
+│   ├── bets.py                         # Build and save a daily buying strategy
+│   └── game_slugs.py                   # gameId → slug lookup for the holdout
+│
+├── monitoring/
+│   └── scoring.py                      # score_predictions(): live accuracy vs played games
+│
+├── eda/
+│   └── home_win_ratio_by_season.py     # Home win ratio bar chart by season
+│
+└── utils/
+    └── logging_config.py               # Shared logging setup
 ```
+
+## Everything else
+
+- `data/` (gitignored) — `raw/historical/` holds the source `Games.csv`;
+  `raw/incremental/` holds `upcoming_games/` (fetched, not yet played),
+  `upcoming_games_results/` (played, enriched) and `manual_results/`
+  (hand-dropped outcomes for the placeholder source). `ingested/` holds
+  `games_updated_history.csv`, the durable record of every played game.
+  `processed/` holds the feature tables, `games_features.csv`, the frozen
+  `holdout/test_metadata.csv` and the Polymarket slug lookup. `predictions/`
+  holds `upcoming_games_predictions.csv` (deduped on gameId + conference_filter),
+  the accuracy scorecard, the per-game scored file and the daily bet strategies.
+- `tests/` — feature-level unit tests plus the invariant tests:
+  imports smoke (every module imports; no `__main__` outside `src/cli/`), LLM
+  split parity, LLM serialization, prediction upsert, prediction scoring, and
+  the results-source contract.
+- `dead_code/` — code removed because nothing referenced it, kept rather than
+  deleted. See its README.
+- `outputs/` (gitignored) — training artifacts: per-experiment plots, CV results,
+  feature selection, and LLM evaluation charts.
+- `docs/` — `RUNPOD_TRAINING.md`, GPU box setup for LLM fine-tuning.
+- `sandbox/` (gitignored) — exploratory notebooks.
+- `mlruns/`, `mlflow.db` (gitignored) — MLflow tracking.
+- `.claude/` — project settings, hooks, skills, and this doc.
+
+## Pipelines
+
+```
+Historical (make historical-etl / full-rebuild):
+  Games.csv → ingest-raw-games → process-ingested-games → build-features
+                                                            ↓
+                                                 games_features.csv
+
+The daily loop (make daily-cycle):
+  fetch-upcoming-games   league schedule → upcoming_games/
+  predict-upcoming       → upcoming_games_predictions.csv  (deduped)
+        ⋯ games are played ⋯
+  fetch-game-results     ResultsSource → upcoming_games_results/
+  score-predictions      predictions ⋈ outcomes → prediction_scorecard.csv + MLflow
+  append-game-results    → games_updated_history.csv
+  process-ingested-games
+  build-features         history now includes the games just played
+```
+
+Run the loop without a live results feed using
+`make daily-cycle SOURCE=placeholder`, after dropping `{gameId}.json` files into
+`data/raw/incremental/manual_results/`.

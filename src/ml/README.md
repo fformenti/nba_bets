@@ -1,151 +1,122 @@
-# Machine Learning Module
+# `src/ml` — modelling
 
-This module provides a comprehensive, production-ready structure for training and evaluating scikit-learn models following best practices.
+Training, prediction, and the LLM track. Entry points live in `src/cli/`; nothing
+in here has a `__main__`.
 
-## Structure
+## Layout
 
 ```
 src/ml/
-├── datasets/       # Data loading and partitioning
-├── features/        # Feature engineering pipelines
-├── models/          # Model training and persistence
-├── evaluation/      # Metrics and visualization
-├── config/          # Configuration management
-└── scripts/         # Example training scripts
+├── config/      Pydantic schemas + YAML loading (with includes)
+├── datasets/    splits.py is THE split definition; holdout.py freezes it
+├── features/    Delta features, conference features, preprocessing, selection
+├── models/      ModelTrainer, registry, baselines
+├── training/    train_classifier() → train_single_model() → runners
+├── llm/         Same experiment, text encoding
+├── prediction/  Inference on upcoming games
+├── evaluation/  Metrics and plots
+├── tracking/    MLflow wrapper + ops tools
+└── utils/       Validation, SHAP compatibility
 ```
 
-## Quick Start
+## The two invariants
 
-### Regression Example
+### One split definition
+
+`datasets/splits.py::build_splits(config)` decides which games are train,
+validation and test. It is called by `training/experiment.py` **and** by
+`llm/dataset.py`. That is deliberate: the sklearn models and the LLM must be
+scored on the same games, or comparing them is meaningless.
 
 ```python
-from src.ml.datasets.loaders import load_features
-from src.ml.datasets.splitters import train_val_test_split
-from src.ml.models.trainer import ModelTrainer
-from sklearn.ensemble import RandomForestRegressor
+from src.ml.config.loader import load_experiment_config
+from src.ml.datasets.splits import build_splits
 
-# Load data
-X, y = load_features(target_column="homeScore")
-
-# Split data
-X_train, X_val, X_test, y_train, y_val, y_test = train_val_test_split(
-    X, y, test_size=0.2, val_size=0.2
-)
-
-# Train model
-trainer = ModelTrainer(RandomForestRegressor(), task_type="regression")
-trainer.train(X_train, y_train, X_val, y_val)
-
-# Evaluate
-metrics = trainer.evaluate(X_test, y_test)
+splits = build_splits(load_experiment_config("configs/train/train_all.yaml"))
+splits.X_train, splits.y_train        # the table the sklearn models consume
+splits.game_ids("test")               # the gameIds the LLM must mirror
 ```
 
-### Classification Example
+The test split comes from `data/processed/holdout/test_metadata.csv`, frozen
+once by `make build-holdout-set`. Without that file `build_splits` falls back to
+a temporal split and warns — the test set would then drift as games are added.
 
-```python
-from src.ml.datasets.loaders import load_features
-from src.ml.datasets.splitters import train_val_test_split
-from src.ml.models.trainer import ModelTrainer
-from sklearn.ensemble import RandomForestClassifier
+`tests/test_llm_split_parity.py` asserts set-equality of gameIds per split
+between the two paths.
 
-# Load data
-X, y = load_features(target_column="homeWin")
+### Two configs, two jobs
 
-# Split data (stratified)
-X_train, X_val, X_test, y_train, y_val, y_test = train_val_test_split(
-    X, y, test_size=0.2, val_size=0.2, stratify=y
-)
+| Config | Decides | Used by |
+|---|---|---|
+| `configs/features.yaml` | which feature *tables* get built | ETL, and inference-time rebuilds |
+| `configs/train/*.yaml` | which columns a model *consumes* | training, feature selection |
 
-# Train model
-trainer = ModelTrainer(RandomForestClassifier(), task_type="classification")
-trainer.train(X_train, y_train, X_val, y_val)
+An experiment may set `record.lags: []` while leaving a derived group like
+`sos_adj_record` enabled — coherent as feature *selection*, incoherent as an ETL
+instruction. Passing the experiment config to the ETL builder is what used to
+break `predict-upcoming` with `KeyError: 'record_L5'`.
+`etl/features/aggregator.py::create_features_tables_from_config` is now the one
+place the ETL config is unpacked.
 
-# Evaluate
-metrics = trainer.evaluate(X_test, y_test)
-```
-
-## Key Features
-
-### Data Partitioning
-
-- **Random Split**: Standard train/val/test split
-- **Temporal Split**: Time-aware splitting for time series data
-- **Stratified Split**: Maintains class distribution across splits
-
-### Feature Engineering
-
-- **Preprocessing Pipeline**: Automated handling of numerical and categorical features
-- **Missing Value Imputation**: Multiple strategies (mean, median, most_frequent)
-- **Outlier Handling**: Clipping or removal based on percentiles
-- **Scaling**: Standard, Robust, or MinMax scaling
-
-### Model Training
-
-- **Cross-Validation**: Built-in CV support
-- **Hyperparameter Tuning**: Grid search and random search
-- **Model Persistence**: Save and load models with metadata
-
-### Evaluation
-
-- **Comprehensive Metrics**: Regression (MSE, RMSE, MAE, R²) and Classification (Accuracy, Precision, Recall, F1, ROC-AUC)
-- **Visualizations**: Residual plots, confusion matrices, feature importance, learning curves
-
-## Best Practices
-
-1. **Always use train/val/test splits** - Never evaluate on training data
-2. **Use temporal splits for time series** - Maintains temporal order
-3. **Stratify splits for classification** - Maintains class distribution
-4. **Save models with metadata** - Track model versions and performance
-5. **Use pipelines** - Combine preprocessing and modeling for consistency
-6. **Cross-validate** - Get robust performance estimates
-
-## Running Training Scripts
-
-### Regression
+## Training
 
 ```bash
-uv run python -m src.ml.scripts.train_regression
+make train TRAIN_CONFIG=train_same     # one experiment
+make train-all                         # all three conference variants
 ```
 
-### Classification
+`training/classifier.py::train_classifier` opens an MLflow run, calls
+`train_single_model`, and writes the winning model URI back into
+`configs/predict/predict_classifier.yaml` so prediction picks it up.
+
+## Prediction
 
 ```bash
-uv run python -m src.ml.scripts.train_classifier --config configs/my_experiment.yaml
+make predict-upcoming
 ```
 
-## Predictions (MLflow)
+`prediction/pipeline.py` routes each game to the model for its conference
+matchup ('same', 'different', 'all'), reading each model's training config back
+from its MLflow run so the inference feature set matches the training one.
 
-Run predictions for upcoming games stored in `data/raw/incremental/upcoming_games`:
+Output goes to `data/predictions/upcoming_games_predictions.csv` via
+`upsert_predictions`, keyed on `(gameId, conference_filter)`. Re-running a slate
+replaces rows rather than appending — the accuracy scorecard counts these rows,
+so duplicates would corrupt it.
+
+## The LLM track
+
+The LLM is not a separate experiment; it is the same experiment in a different
+encoding.
 
 ```bash
-uv run python -m src.ml.scripts.predict_upcoming --config configs/predict_upcoming.yaml
+make build-llm-dataset          # splits → text, summarised (add --push to upload)
+make train-llm                  # QLoRA fine-tune (needs a CUDA box)
+make evaluate-llm LLM_RUN=...   # score the adapter
 ```
 
-Predictions are saved to `data/predictions/upcoming_games_predictions.csv`.
+- `llm/dataset.py` gets its splits from `build_splits`, never its own.
+- `llm/serialization.py::serialize_row` is the **only** place a feature row
+  becomes text — used for training, validation, testing and inference alike.
+  Formats: `markdown` (default), `json`, `prose`.
+- `markdown`/`json` follow whatever feature columns the config produces, so a
+  new feature reaches the prompt with no code change. `prose` is the original
+  hand-written template pinned to a fixed column list; use it only to reproduce
+  older runs.
+- The serializer strips outcome-bearing columns, so the prompt cannot leak the
+  answer even if one reaches the feature frame
+  (`tests/test_llm_serialization.py`).
 
-## Model Registry
+GPU dependencies are an optional extra: `uv sync --extra gpu`. Every torch/peft/
+trl import in this package is lazy, so importing it on a laptop is safe.
 
-Models are saved to the `models/` directory with:
-- Model file (`.joblib`)
-- Metadata (`.json`) with metrics, feature names, timestamps
+## Evaluation vs monitoring
 
-Load a saved model:
+- `evaluation/` scores a model against the frozen holdout at training time.
+- `src/monitoring/scoring.py` scores the predictions the pipeline actually
+  emitted, against games that were actually played (`make score-predictions`).
 
-```python
-from src.ml.models.registry import ModelRegistry
-
-registry = ModelRegistry("models")
-model, metadata = registry.load("nba_regression")
-```
-
-## Configuration
-
-Use the Pydantic `ExperimentConfig` schema to validate YAML configs:
-
-```python
-from pathlib import Path
-from src.ml.config import load_experiment_config
-
-config = load_experiment_config(Path("configs/my_experiment.yaml"))
-print(config.model_dump())
-```
+Note `winner` in the data is the winning **teamId**, not a 0/1 flag, while
+models predict 1 = home win. `monitoring/scoring.py` does that conversion in one
+place; comparing the two directly yields a plausible-looking but badly wrong
+accuracy.

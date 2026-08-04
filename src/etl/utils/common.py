@@ -1,8 +1,22 @@
 """Common utility functions for data processing."""
 
+import json
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
+
 from src.config.constants import CSV_FLOAT_FORMAT, NEUTRAL_COURT_GAME_LABELS
 from src.config.paths import TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH
+
+
+def read_json(file_path: Path) -> dict[str, Any]:
+    """Read a UTF-8 JSON file.
+
+    Shared because three modules had grown their own copy of this.
+    """
+    with Path(file_path).open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def save_feature_table(df: pd.DataFrame, path, **kwargs) -> None:

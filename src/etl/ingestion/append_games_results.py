@@ -1,7 +1,6 @@
 """Add game results from upcoming games results to historical raw games."""
 
 from __future__ import annotations
-import json
 from pathlib import Path
 from typing import Any
 
@@ -17,16 +16,11 @@ from src.etl.utils.common import (
     coerce_numeric_columns,
     deduplicate_games,
     enrich_games_locations,
+    read_json,
 )
-from src.utils.logging_config import get_logger, setup_logging
+from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-
-def _read_json_file(file_path: Path) -> dict[str, Any]:
-    """Read a JSON file and return its contents."""
-    with file_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def _transform_game_result_to_dataframe_row(
@@ -113,7 +107,7 @@ def load_upcoming_game_results(
     rows = []
     for json_file in json_files:
         try:
-            game_data = _read_json_file(json_file)
+            game_data = read_json(json_file)
             row = _transform_game_result_to_dataframe_row(game_data)
             rows.append(row)
         except Exception as e:
@@ -221,14 +215,3 @@ def add_game_results_to_historical(
     logger.info(f"Added {len(upcoming_df)} new games to historical data")
 
     return combined_df
-
-
-def main() -> None:
-    """Main entry point for the script."""
-    setup_logging(level="INFO")
-    keep_old_ids = False
-    add_game_results_to_historical(keep_old_ids=keep_old_ids)
-
-
-if __name__ == "__main__":
-    main()

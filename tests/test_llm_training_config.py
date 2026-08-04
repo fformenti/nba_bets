@@ -16,7 +16,7 @@ def test_default_llm_config_loads():
 
 
 def test_run_name_resolution_prefers_cli_then_config():
-    from src.ml.training.llm_finetune import build_hub_model_id, resolve_run_name
+    from src.ml.llm.finetune import build_hub_model_id, resolve_run_name
 
     config = load_llm_training_config(DEFAULT_TRAIN_LLM_CONFIG_PATH)
 
@@ -32,11 +32,11 @@ def test_run_name_resolution_prefers_cli_then_config():
 
 
 def test_classifier_scores_by_sign_agreement():
-    """Tester_Classifiers grades a point-diff prediction on which team it picks."""
-    from src.ml.training.utils import Tester_Classifiers
+    """ClassificationTester grades a point-diff prediction on which team it picks."""
+    from src.ml.llm.testers import ClassificationTester
 
-    assert Tester_Classifiers.is_correct(guess=3.0, truth=5.0) == 1
-    assert Tester_Classifiers.is_correct(guess=-3.0, truth=-5.0) == 1
-    assert Tester_Classifiers.is_correct(guess=3.0, truth=-5.0) == 0
+    assert ClassificationTester.is_correct(guess=3.0, truth=5.0) == 1
+    assert ClassificationTester.is_correct(guess=-3.0, truth=-5.0) == 1
+    assert ClassificationTester.is_correct(guess=3.0, truth=-5.0) == 0
     # A zero-margin truth counts as a home loss, so a positive guess is wrong.
-    assert Tester_Classifiers.is_correct(guess=3.0, truth=0.0) == 0
+    assert ClassificationTester.is_correct(guess=3.0, truth=0.0) == 0

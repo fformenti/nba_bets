@@ -59,12 +59,9 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
     return df
 
 
-def main():
+def ingest_raw_games() -> None:
+    """Parse the raw Games.csv into the ingested format."""
     raw_games = pd.read_csv(RAW_GAMES_PATH, parse_dates=["gameDate"], low_memory=False)
     parsed_games = parse_raw_games(raw_games)
     parsed_games.to_csv(INGESTED_GAMES_PATH, index=False)
     logger.info(f"Saved {len(parsed_games)} parsed games to {INGESTED_GAMES_PATH}")
-
-
-if __name__ == "__main__":
-    main()

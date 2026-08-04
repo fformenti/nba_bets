@@ -390,6 +390,19 @@ class LLMDataConfig(BaseModel):
     max_train_samples: Optional[int] = Field(
         default=None, description="Cap training rows; useful for smoke tests."
     )
+    source_experiment_config: str = Field(
+        default="configs/train/train_all.yaml",
+        description="Experiment config whose train/val/test splits the LLM "
+        "dataset mirrors. Using the same config as the sklearn models is what "
+        "makes the two families comparable — same gameIds, same features, only "
+        "the encoding differs.",
+    )
+    serialization_format: Literal["json", "markdown", "prose"] = Field(
+        default="markdown",
+        description="How a feature row becomes prompt text. 'json' and "
+        "'markdown' are schema-driven off the actual feature columns; 'prose' "
+        "is the original hand-written Game prompt, kept for comparison.",
+    )
 
 
 class QuantizationConfig(BaseModel):
