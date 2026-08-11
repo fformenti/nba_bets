@@ -1,0 +1,1567 @@
+teamId,teamCity,teamName,teamAbbrev,season,Conference,teamFullName,city,state
+1610612737,Atlanta,Hawks,ATL,1968/69,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1969/70,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1970/71,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1971/72,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1972/73,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1973/74,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1974/75,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1975/76,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1976/77,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1977/78,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1978/79,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1979/80,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1980/81,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1981/82,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1982/83,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1983/84,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1984/85,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1985/86,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1986/87,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1987/88,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1988/89,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1989/90,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1990/91,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1991/92,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1992/93,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1993/94,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1994/95,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1995/96,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1996/97,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1997/98,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1998/99,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,1999/00,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2000/01,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2001/02,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2002/03,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2003/04,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2004/05,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2005/06,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2006/07,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2007/08,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2008/09,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2009/10,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2010/11,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2011/12,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2012/13,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2013/14,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2014/15,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2015/16,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2016/17,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2017/18,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2018/19,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2019/20,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2020/21,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2021/22,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2022/23,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2023/24,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2024/25,East,Atlanta Hawks,Atlanta,Georgia
+1610612737,Atlanta,Hawks,ATL,2025/26,East,Atlanta Hawks,Atlanta,Georgia
+1610612738,Boston,Celtics,BOS,1949/50,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1950/51,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1951/52,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1952/53,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1953/54,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1954/55,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1955/56,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1956/57,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1957/58,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1958/59,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1959/60,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1960/61,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1961/62,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1962/63,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1963/64,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1964/65,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1965/66,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1966/67,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1967/68,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1968/69,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1969/70,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1970/71,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1971/72,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1972/73,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1973/74,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1974/75,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1975/76,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1976/77,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1977/78,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1978/79,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1979/80,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1980/81,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1981/82,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1982/83,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1983/84,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1984/85,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1985/86,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1986/87,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1987/88,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1988/89,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1989/90,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1990/91,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1991/92,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1992/93,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1993/94,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1994/95,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1995/96,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1996/97,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1997/98,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1998/99,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,1999/00,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2000/01,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2001/02,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2002/03,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2003/04,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2004/05,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2005/06,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2006/07,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2007/08,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2008/09,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2009/10,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2010/11,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2011/12,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2012/13,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2013/14,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2014/15,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2015/16,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2016/17,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2017/18,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2018/19,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2019/20,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2020/21,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2021/22,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2022/23,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2023/24,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2024/25,East,Boston Celtics,Boston,Massachusetts
+1610612738,Boston,Celtics,BOS,2025/26,East,Boston Celtics,Boston,Massachusetts
+1610612739,Cleveland,Cavaliers,CLE,1970/71,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1971/72,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1972/73,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1973/74,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1974/75,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1975/76,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1976/77,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1977/78,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1978/79,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1979/80,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1980/81,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1981/82,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1982/83,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1983/84,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1984/85,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1985/86,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1986/87,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1987/88,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1988/89,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1989/90,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1990/91,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1991/92,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1992/93,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1993/94,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1994/95,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1995/96,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1996/97,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1997/98,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1998/99,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,1999/00,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2000/01,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2001/02,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2002/03,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2003/04,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2004/05,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2005/06,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2006/07,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2007/08,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2008/09,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2009/10,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2010/11,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2011/12,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2012/13,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2013/14,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2014/15,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2015/16,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2016/17,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2017/18,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2018/19,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2019/20,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2020/21,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2021/22,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2022/23,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2023/24,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2024/25,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612739,Cleveland,Cavaliers,CLE,2025/26,East,Cleveland Cavaliers,Cleveland,Ohio
+1610612740,New Orleans,Hornets,NOH,2002/03,East,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2003/04,East,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2004/05,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,Oklahoma City,Hornets,NOK,2005/06,West,Oklahoma City Hornets,Oklahoma City,Oklahoma
+1610612740,Oklahoma City,Hornets,NOK,2006/07,West,Oklahoma City Hornets,Oklahoma City,Oklahoma
+1610612740,New Orleans,Hornets,NOH,2007/08,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2008/09,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2009/10,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2010/11,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2011/12,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Hornets,NOH,2012/13,West,New Orleans Hornets,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2013/14,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2014/15,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2015/16,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2016/17,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2017/18,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2018/19,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2019/20,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2020/21,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2021/22,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2022/23,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2023/24,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2024/25,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612740,New Orleans,Pelicans,NOP,2025/26,West,New Orleans Pelicans,New Orleans,Louisiana
+1610612741,Chicago,Bulls,CHI,1966/67,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1967/68,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1968/69,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1969/70,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1970/71,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1971/72,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1972/73,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1973/74,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1974/75,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1975/76,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1976/77,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1977/78,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1978/79,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1979/80,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1980/81,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1981/82,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1982/83,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1983/84,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1984/85,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1985/86,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1986/87,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1987/88,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1988/89,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1989/90,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1990/91,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1991/92,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1992/93,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1993/94,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1994/95,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1995/96,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1996/97,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1997/98,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1998/99,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,1999/00,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2000/01,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2001/02,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2002/03,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2003/04,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2004/05,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2005/06,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2006/07,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2007/08,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2008/09,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2009/10,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2010/11,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2011/12,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2012/13,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2013/14,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2014/15,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2015/16,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2016/17,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2017/18,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2018/19,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2019/20,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2020/21,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2021/22,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2022/23,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2023/24,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2024/25,East,Chicago Bulls,Chicago,Illinois
+1610612741,Chicago,Bulls,CHI,2025/26,East,Chicago Bulls,Chicago,Illinois
+1610612742,Dallas,Mavericks,DAL,1980/81,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1981/82,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1982/83,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1983/84,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1984/85,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1985/86,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1986/87,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1987/88,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1988/89,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1989/90,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1990/91,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1991/92,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1992/93,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1993/94,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1994/95,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1995/96,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1996/97,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1997/98,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1998/99,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,1999/00,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2000/01,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2001/02,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2002/03,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2003/04,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2004/05,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2005/06,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2006/07,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2007/08,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2008/09,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2009/10,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2010/11,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2011/12,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2012/13,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2013/14,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2014/15,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2015/16,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2016/17,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2017/18,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2018/19,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2019/20,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2020/21,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2021/22,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2022/23,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2023/24,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2024/25,West,Dallas Mavericks,Dallas,Texas
+1610612742,Dallas,Mavericks,DAL,2025/26,West,Dallas Mavericks,Dallas,Texas
+1610612743,Denver,Nuggets,DEN,1976/77,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1977/78,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1978/79,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1979/80,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1980/81,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1981/82,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1982/83,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1983/84,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1984/85,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1985/86,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1986/87,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1987/88,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1988/89,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1989/90,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1990/91,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1991/92,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1992/93,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1993/94,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1994/95,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1995/96,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1996/97,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1997/98,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1998/99,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,1999/00,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2000/01,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2001/02,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2002/03,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2003/04,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2004/05,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2005/06,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2006/07,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2007/08,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2008/09,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2009/10,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2010/11,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2011/12,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2012/13,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2013/14,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2014/15,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2015/16,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2016/17,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2017/18,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2018/19,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2019/20,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2020/21,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2021/22,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2022/23,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2023/24,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2024/25,West,Denver Nuggets,Denver,Colorado
+1610612743,Denver,Nuggets,DEN,2025/26,West,Denver Nuggets,Denver,Colorado
+1610612744,San Francisco,Warriors,SF,1962/63,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1963/64,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1964/65,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1965/66,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1966/67,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1967/68,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1968/69,West,San Francisco Warriors,San Francisco,California
+1610612744,San Francisco,Warriors,SF,1969/70,West,San Francisco Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1971/72,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1972/73,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1973/74,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1974/75,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1975/76,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1976/77,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1977/78,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1978/79,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1979/80,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1980/81,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1981/82,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1982/83,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1983/84,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1984/85,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1985/86,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1986/87,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1987/88,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1988/89,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1989/90,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1990/91,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1991/92,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1992/93,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1993/94,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1994/95,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1995/96,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1996/97,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1997/98,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1998/99,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,1999/00,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2000/01,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2001/02,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2002/03,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2003/04,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2004/05,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2005/06,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2006/07,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2007/08,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2008/09,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2009/10,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2010/11,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2011/12,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2012/13,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2013/14,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2014/15,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2015/16,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2016/17,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2017/18,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2018/19,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2019/20,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2020/21,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2021/22,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2022/23,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2023/24,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2024/25,West,Golden State Warriors,San Francisco,California
+1610612744,Golden State,Warriors,GSW,2025/26,West,Golden State Warriors,San Francisco,California
+1610612745,San Diego,Rockets,SD,1967/68,West,San Diego Rockets,Houston,Texas
+1610612745,San Diego,Rockets,SD,1968/69,West,San Diego Rockets,Houston,Texas
+1610612745,San Diego,Rockets,SD,1969/70,West,San Diego Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1971/72,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1972/73,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1973/74,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1974/75,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1975/76,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1976/77,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1977/78,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1978/79,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1979/80,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1980/81,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1981/82,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1982/83,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1983/84,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1984/85,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1985/86,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1986/87,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1987/88,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1988/89,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1989/90,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1990/91,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1991/92,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1992/93,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1993/94,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1994/95,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1995/96,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1996/97,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1997/98,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1998/99,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,1999/00,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2000/01,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2001/02,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2002/03,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2003/04,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2004/05,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2005/06,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2006/07,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2007/08,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2008/09,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2009/10,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2010/11,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2011/12,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2012/13,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2013/14,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2014/15,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2015/16,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2016/17,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2017/18,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2018/19,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2019/20,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2020/21,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2021/22,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2022/23,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2023/24,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2024/25,West,Houston Rockets,Houston,Texas
+1610612745,Houston,Rockets,HOU,2025/26,West,Houston Rockets,Houston,Texas
+1610612746,Buffalo,Braves,BUF,1970/71,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1971/72,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1972/73,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1973/74,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1974/75,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1975/76,East,Buffalo Braves,Buffalo,New York
+1610612746,Buffalo,Braves,BUF,1976/77,East,Buffalo Braves,Buffalo,New York
+1610612746,San Diego,Clippers,SDC,1978/79,West,San Diego Clippers,San Diego,California
+1610612746,San Diego,Clippers,SDC,1979/80,West,San Diego Clippers,San Diego,California
+1610612746,San Diego,Clippers,SDC,1980/81,West,San Diego Clippers,San Diego,California
+1610612746,San Diego,Clippers,SDC,1981/82,West,San Diego Clippers,San Diego,California
+1610612746,San Diego,Clippers,SDC,1982/83,West,San Diego Clippers,San Diego,California
+1610612746,San Diego,Clippers,SDC,1983/84,West,San Diego Clippers,San Diego,California
+1610612746,Los Angeles,Clippers,LAC,1984/85,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1985/86,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1986/87,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1987/88,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1988/89,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1989/90,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1990/91,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1991/92,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1992/93,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1993/94,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1994/95,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1995/96,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1996/97,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1997/98,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1998/99,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,1999/00,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2000/01,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2001/02,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2002/03,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2003/04,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2004/05,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2005/06,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2006/07,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2007/08,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2008/09,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2009/10,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2010/11,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2011/12,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2012/13,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2013/14,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2014/15,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2015/16,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2016/17,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2017/18,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2018/19,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2019/20,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2020/21,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2021/22,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2022/23,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2023/24,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2024/25,West,Los Angeles Clippers,Los Angeles,California
+1610612746,Los Angeles,Clippers,LAC,2025/26,West,Los Angeles Clippers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1960/61,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1961/62,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1962/63,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1963/64,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1964/65,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1965/66,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1966/67,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1967/68,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1968/69,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1969/70,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1970/71,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1971/72,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1972/73,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1973/74,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1974/75,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1975/76,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1976/77,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1977/78,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1978/79,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1979/80,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1980/81,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1981/82,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1982/83,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1983/84,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1984/85,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1985/86,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1986/87,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1987/88,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1988/89,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1989/90,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1990/91,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1991/92,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1992/93,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1993/94,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1994/95,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1995/96,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1996/97,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1997/98,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1998/99,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,1999/00,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2000/01,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2001/02,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2002/03,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2003/04,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2004/05,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2005/06,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2006/07,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2007/08,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2008/09,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2009/10,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2010/11,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2011/12,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2012/13,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2013/14,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2014/15,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2015/16,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2016/17,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2017/18,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2018/19,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2019/20,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2020/21,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2021/22,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2022/23,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2023/24,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2024/25,West,Los Angeles Lakers,Los Angeles,California
+1610612747,Los Angeles,Lakers,LAL,2025/26,West,Los Angeles Lakers,Los Angeles,California
+1610612748,Miami,Heat,MIA,1988/89,West,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1989/90,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1990/91,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1991/92,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1992/93,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1993/94,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1994/95,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1995/96,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1996/97,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1997/98,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1998/99,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,1999/00,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2000/01,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2001/02,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2002/03,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2003/04,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2004/05,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2005/06,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2006/07,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2007/08,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2008/09,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2009/10,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2010/11,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2011/12,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2012/13,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2013/14,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2014/15,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2015/16,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2016/17,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2017/18,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2018/19,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2019/20,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2020/21,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2021/22,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2022/23,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2023/24,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2024/25,East,Miami Heat,Miami,Florida
+1610612748,Miami,Heat,MIA,2025/26,East,Miami Heat,Miami,Florida
+1610612749,Milwaukee,Bucks,MIL,1968/69,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1969/70,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1970/71,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1971/72,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1972/73,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1973/74,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1974/75,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1975/76,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1976/77,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1977/78,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1978/79,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1979/80,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1980/81,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1981/82,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1982/83,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1983/84,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1984/85,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1985/86,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1986/87,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1987/88,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1988/89,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1989/90,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1990/91,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1991/92,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1992/93,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1993/94,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1994/95,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1995/96,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1996/97,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1997/98,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1998/99,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,1999/00,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2000/01,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2001/02,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2002/03,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2003/04,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2004/05,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2005/06,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2006/07,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2007/08,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2008/09,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2009/10,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2010/11,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2011/12,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2012/13,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2013/14,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2014/15,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2015/16,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2016/17,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2017/18,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2018/19,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2019/20,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2020/21,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2021/22,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2022/23,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2023/24,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2024/25,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612749,Milwaukee,Bucks,MIL,2025/26,East,Milwaukee Bucks,Milwaukee,Wisconsin
+1610612750,Minnesota,Timberwolves,MIN,1989/90,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1990/91,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1991/92,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1992/93,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1993/94,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1994/95,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1995/96,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1996/97,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1997/98,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1998/99,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,1999/00,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2000/01,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2001/02,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2002/03,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2003/04,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2004/05,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2005/06,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2006/07,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2007/08,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2008/09,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2009/10,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2010/11,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2011/12,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2012/13,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2013/14,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2014/15,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2015/16,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2016/17,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2017/18,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2018/19,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2019/20,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2020/21,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2021/22,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2022/23,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2023/24,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2024/25,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612750,Minnesota,Timberwolves,MIN,2025/26,West,Minnesota Timberwolves,Minneapolis,Minnesota
+1610612751,New Jersey,Nets,NJ,1977/78,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1978/79,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1979/80,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1980/81,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1981/82,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1982/83,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1983/84,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1984/85,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1985/86,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1986/87,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1987/88,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1988/89,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1989/90,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1990/91,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1991/92,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1992/93,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1993/94,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1994/95,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1995/96,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1996/97,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1997/98,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1998/99,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,1999/00,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2000/01,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2001/02,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2002/03,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2003/04,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2004/05,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2005/06,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2006/07,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2007/08,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2008/09,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2009/10,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2010/11,East,New Jersey Nets,Brooklyn,New York
+1610612751,New Jersey,Nets,NJ,2011/12,East,New Jersey Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2012/13,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2013/14,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2014/15,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2015/16,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2016/17,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2017/18,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2018/19,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2019/20,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2020/21,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2021/22,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2022/23,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2023/24,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2024/25,East,Brooklyn Nets,Brooklyn,New York
+1610612751,Brooklyn,Nets,BKN,2025/26,East,Brooklyn Nets,Brooklyn,New York
+1610612752,New York,Knicks,NYK,1949/50,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1950/51,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1951/52,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1952/53,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1953/54,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1954/55,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1955/56,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1956/57,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1957/58,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1958/59,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1959/60,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1960/61,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1961/62,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1962/63,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1963/64,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1964/65,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1965/66,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1966/67,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1967/68,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1968/69,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1969/70,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1970/71,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1971/72,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1972/73,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1973/74,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1974/75,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1975/76,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1976/77,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1977/78,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1978/79,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1979/80,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1980/81,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1981/82,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1982/83,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1983/84,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1984/85,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1985/86,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1986/87,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1987/88,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1988/89,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1989/90,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1990/91,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1991/92,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1992/93,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1993/94,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1994/95,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1995/96,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1996/97,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1997/98,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1998/99,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,1999/00,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2000/01,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2001/02,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2002/03,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2003/04,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2004/05,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2005/06,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2006/07,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2007/08,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2008/09,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2009/10,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2010/11,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2011/12,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2012/13,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2013/14,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2014/15,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2015/16,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2016/17,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2017/18,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2018/19,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2019/20,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2020/21,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2021/22,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2022/23,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2023/24,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2024/25,East,New York Knicks,New York,New York
+1610612752,New York,Knicks,NYK,2025/26,East,New York Knicks,New York,New York
+1610612753,Orlando,Magic,ORL,1989/90,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1990/91,West,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1991/92,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1992/93,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1993/94,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1994/95,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1995/96,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1996/97,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1997/98,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1998/99,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,1999/00,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2000/01,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2001/02,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2002/03,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2003/04,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2004/05,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2005/06,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2006/07,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2007/08,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2008/09,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2009/10,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2010/11,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2011/12,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2012/13,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2013/14,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2014/15,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2015/16,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2016/17,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2017/18,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2018/19,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2019/20,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2020/21,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2021/22,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2022/23,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2023/24,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2024/25,East,Orlando Magic,Orlando,Florida
+1610612753,Orlando,Magic,ORL,2025/26,East,Orlando Magic,Orlando,Florida
+1610612754,Indiana,Pacers,IND,1976/77,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1977/78,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1978/79,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1979/80,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1980/81,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1981/82,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1982/83,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1983/84,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1984/85,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1985/86,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1986/87,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1987/88,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1988/89,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1989/90,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1990/91,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1991/92,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1992/93,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1993/94,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1994/95,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1995/96,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1996/97,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1997/98,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1998/99,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,1999/00,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2000/01,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2001/02,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2002/03,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2003/04,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2004/05,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2005/06,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2006/07,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2007/08,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2008/09,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2009/10,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2010/11,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2011/12,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2012/13,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2013/14,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2014/15,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2015/16,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2016/17,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2017/18,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2018/19,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2019/20,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2020/21,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2021/22,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2022/23,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2023/24,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2024/25,East,Indiana Pacers,Indianapolis,Indiana
+1610612754,Indiana,Pacers,IND,2025/26,East,Indiana Pacers,Indianapolis,Indiana
+1610612755,Philadelphia,76ers,PHI,1963/64,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1964/65,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1965/66,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1966/67,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1967/68,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1968/69,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1969/70,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1970/71,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1971/72,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1972/73,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1973/74,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1974/75,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1975/76,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1976/77,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1977/78,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1978/79,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1979/80,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1980/81,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1981/82,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1982/83,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1983/84,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1984/85,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1985/86,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1986/87,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1987/88,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1988/89,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1989/90,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1990/91,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1991/92,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1992/93,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1993/94,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1994/95,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1995/96,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1996/97,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1997/98,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1998/99,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,1999/00,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2000/01,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2001/02,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2002/03,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2003/04,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2004/05,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2005/06,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2006/07,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2007/08,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2008/09,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2009/10,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2010/11,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2011/12,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2012/13,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2013/14,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2014/15,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2015/16,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2016/17,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2017/18,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2018/19,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2019/20,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2020/21,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2021/22,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2022/23,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2023/24,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2024/25,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612755,Philadelphia,76ers,PHI,2025/26,East,Philadelphia 76ers,Philadelphia,Pennsylvania
+1610612756,Phoenix,Suns,PHX,1968/69,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1969/70,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1970/71,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1971/72,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1972/73,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1973/74,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1974/75,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1975/76,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1976/77,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1977/78,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1978/79,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1979/80,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1980/81,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1981/82,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1982/83,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1983/84,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1984/85,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1985/86,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1986/87,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1987/88,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1988/89,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1989/90,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1990/91,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1991/92,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1992/93,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1993/94,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1994/95,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1995/96,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1996/97,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1997/98,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1998/99,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,1999/00,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2000/01,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2001/02,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2002/03,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2003/04,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2004/05,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2005/06,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2006/07,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2007/08,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2008/09,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2009/10,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2010/11,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2011/12,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2012/13,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2013/14,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2014/15,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2015/16,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2016/17,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2017/18,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2018/19,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2019/20,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2020/21,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2021/22,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2022/23,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2023/24,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2024/25,West,Phoenix Suns,Phoenix,Arizona
+1610612756,Phoenix,Suns,PHX,2025/26,West,Phoenix Suns,Phoenix,Arizona
+1610612757,Portland,Trail Blazers,POR,1970/71,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1971/72,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1972/73,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1973/74,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1974/75,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1975/76,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1976/77,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1977/78,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1978/79,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1979/80,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1980/81,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1981/82,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1982/83,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1983/84,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1984/85,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1985/86,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1986/87,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1987/88,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1988/89,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1989/90,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1990/91,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1991/92,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1992/93,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1993/94,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1994/95,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1995/96,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1996/97,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1997/98,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1998/99,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,1999/00,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2000/01,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2001/02,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2002/03,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2003/04,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2004/05,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2005/06,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2006/07,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2007/08,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2008/09,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2009/10,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2010/11,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2011/12,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2012/13,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2013/14,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2014/15,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2015/16,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2016/17,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2017/18,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2018/19,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2019/20,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2020/21,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2021/22,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2022/23,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2023/24,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2024/25,West,Portland Trail Blazers,Portland,Oregon
+1610612757,Portland,Trail Blazers,POR,2025/26,West,Portland Trail Blazers,Portland,Oregon
+1610612758,Kansas City,Kings,KC,1975/76,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1976/77,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1977/78,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1978/79,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1979/80,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1980/81,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1981/82,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1982/83,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1983/84,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Kansas City,Kings,KC,1984/85,West,Kansas City Kings,Kansas City,Missouri
+1610612758,Sacramento,Kings,SAC,1985/86,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1986/87,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1987/88,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1988/89,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1989/90,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1990/91,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1991/92,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1992/93,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1993/94,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1994/95,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1995/96,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1996/97,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1997/98,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1998/99,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,1999/00,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2000/01,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2001/02,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2002/03,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2003/04,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2004/05,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2005/06,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2006/07,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2007/08,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2008/09,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2009/10,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2010/11,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2011/12,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2012/13,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2013/14,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2014/15,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2015/16,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2016/17,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2017/18,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2018/19,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2019/20,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2020/21,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2021/22,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2022/23,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2023/24,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2024/25,West,Sacramento Kings,Sacramento,California
+1610612758,Sacramento,Kings,SAC,2025/26,West,Sacramento Kings,Sacramento,California
+1610612759,San Antonio,Spurs,SAN,1976/77,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1977/78,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1978/79,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1979/80,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1980/81,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1981/82,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1982/83,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1983/84,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1984/85,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1985/86,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1986/87,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1987/88,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1988/89,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1989/90,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1990/91,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1991/92,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1992/93,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1993/94,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1994/95,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1995/96,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1996/97,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1997/98,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1998/99,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,1999/00,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2000/01,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2001/02,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2002/03,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2003/04,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2004/05,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2005/06,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2006/07,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2007/08,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2008/09,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2009/10,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2010/11,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2011/12,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2012/13,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2013/14,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2014/15,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2015/16,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2016/17,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2017/18,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2018/19,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2019/20,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2020/21,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2021/22,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2022/23,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2023/24,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2024/25,West,San Antonio Spurs,San Antonio,Texas
+1610612759,San Antonio,Spurs,SAN,2025/26,West,San Antonio Spurs,San Antonio,Texas
+1610612760,Seattle,SuperSonics,SEA,1967/68,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1968/69,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1969/70,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1970/71,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1971/72,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1972/73,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1973/74,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1974/75,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1975/76,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1976/77,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1977/78,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1978/79,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1979/80,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1980/81,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1981/82,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1982/83,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1983/84,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1984/85,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1985/86,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1986/87,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1987/88,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1988/89,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1989/90,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1990/91,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1991/92,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1992/93,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1993/94,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1994/95,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1995/96,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1996/97,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1997/98,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1998/99,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,1999/00,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2000/01,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2001/02,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2002/03,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2003/04,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2004/05,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2005/06,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2006/07,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Seattle,SuperSonics,SEA,2007/08,West,Seattle SuperSonics,Seattle,Washington
+1610612760,Oklahoma City,Thunder,OKC,2008/09,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2009/10,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2010/11,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2011/12,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2012/13,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2013/14,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2014/15,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2015/16,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2016/17,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2017/18,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2018/19,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2019/20,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2020/21,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2021/22,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2022/23,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2023/24,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2024/25,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612760,Oklahoma City,Thunder,OKC,2025/26,West,Oklahoma City Thunder,Oklahoma City,Oklahoma
+1610612761,Toronto,Raptors,TOR,1995/96,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,1996/97,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,1997/98,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,1998/99,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,1999/00,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2000/01,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2001/02,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2002/03,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2003/04,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2004/05,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2005/06,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2006/07,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2007/08,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2008/09,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2009/10,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2010/11,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2011/12,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2012/13,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2013/14,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2014/15,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2015/16,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2016/17,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2017/18,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2018/19,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2019/20,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2020/21,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2021/22,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2022/23,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2023/24,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2024/25,East,Toronto Raptors,Toronto,Ontario
+1610612761,Toronto,Raptors,TOR,2025/26,East,Toronto Raptors,Toronto,Ontario
+1610612762,New Orleans,Jazz,NEO,1974/75,West,New Orleans Jazz,New Orleans,Louisiana
+1610612762,New Orleans,Jazz,NEO,1975/76,West,New Orleans Jazz,New Orleans,Louisiana
+1610612762,New Orleans,Jazz,NEO,1976/77,West,New Orleans Jazz,New Orleans,Louisiana
+1610612762,New Orleans,Jazz,NEO,1977/78,West,New Orleans Jazz,New Orleans,Louisiana
+1610612762,Utah,Jazz,UTA,1979/80,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1980/81,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1981/82,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1982/83,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1983/84,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1984/85,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1985/86,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1986/87,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1987/88,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1988/89,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1989/90,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1990/91,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1991/92,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1992/93,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1993/94,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1994/95,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1995/96,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1996/97,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1997/98,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1998/99,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,1999/00,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2000/01,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2001/02,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2002/03,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2003/04,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2004/05,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2005/06,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2006/07,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2007/08,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2008/09,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2009/10,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2010/11,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2011/12,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2012/13,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2013/14,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2014/15,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2015/16,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2016/17,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2017/18,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2018/19,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2019/20,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2020/21,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2021/22,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2022/23,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2023/24,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2024/25,West,Utah Jazz,Salt Lake City,Utah
+1610612762,Utah,Jazz,UTA,2025/26,West,Utah Jazz,Salt Lake City,Utah
+1610612763,Vancouver,Grizzlies,VAN,1995/96,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Vancouver,Grizzlies,VAN,1996/97,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Vancouver,Grizzlies,VAN,1997/98,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Vancouver,Grizzlies,VAN,1998/99,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Vancouver,Grizzlies,VAN,1999/00,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Vancouver,Grizzlies,VAN,2000/01,West,Vancouver Grizzlies,Vancouver,British Columbia
+1610612763,Memphis,Grizzlies,MEM,2001/02,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2002/03,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2003/04,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2004/05,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2005/06,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2006/07,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2007/08,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2008/09,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2009/10,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2010/11,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2011/12,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2012/13,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2013/14,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2014/15,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2015/16,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2016/17,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2017/18,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2018/19,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2019/20,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2020/21,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2021/22,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2022/23,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2023/24,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2024/25,West,Memphis Grizzlies,Memphis,Tennessee
+1610612763,Memphis,Grizzlies,MEM,2025/26,West,Memphis Grizzlies,Memphis,Tennessee
+1610612764,Washington,Bullets,WAS,1974/75,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1975/76,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1976/77,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1977/78,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1978/79,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1979/80,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1980/81,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1981/82,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1982/83,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1983/84,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1984/85,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1985/86,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1986/87,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1987/88,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1988/89,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1989/90,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1990/91,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1991/92,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1992/93,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1993/94,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1994/95,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1995/96,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Bullets,WAS,1996/97,East,Washington Bullets,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,1997/98,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,1998/99,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,1999/00,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2000/01,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2001/02,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2002/03,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2003/04,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2004/05,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2005/06,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2006/07,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2007/08,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2008/09,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2009/10,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2010/11,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2011/12,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2012/13,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2013/14,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2014/15,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2015/16,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2016/17,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2017/18,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2018/19,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2019/20,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2020/21,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2021/22,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2022/23,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2023/24,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2024/25,East,Washington Wizards,Washington,District of Columbia
+1610612764,Washington,Wizards,WAS,2025/26,East,Washington Wizards,Washington,District of Columbia
+1610612765,Detroit,Pistons,DET,1957/58,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1958/59,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1959/60,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1960/61,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1961/62,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1962/63,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1963/64,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1964/65,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1965/66,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1966/67,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1967/68,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1968/69,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1969/70,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1970/71,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1971/72,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1972/73,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1973/74,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1974/75,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1975/76,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1976/77,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1977/78,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1978/79,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1979/80,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1980/81,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1981/82,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1982/83,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1983/84,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1984/85,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1985/86,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1986/87,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1987/88,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1988/89,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1989/90,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1990/91,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1991/92,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1992/93,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1993/94,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1994/95,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1995/96,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1996/97,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1997/98,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1998/99,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,1999/00,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2000/01,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2001/02,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2002/03,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2003/04,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2004/05,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2005/06,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2006/07,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2007/08,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2008/09,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2009/10,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2010/11,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2011/12,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2012/13,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2013/14,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2014/15,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2015/16,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2016/17,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2017/18,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2018/19,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2019/20,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2020/21,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2021/22,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2022/23,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2023/24,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2024/25,East,Detroit Pistons,Detroit,Michigan
+1610612765,Detroit,Pistons,DET,2025/26,East,Detroit Pistons,Detroit,Michigan
+1610612766,Charlotte,Hornets,CHA,1988/89,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1989/90,West,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1990/91,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1991/92,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1992/93,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1993/94,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1994/95,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1995/96,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1996/97,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1997/98,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1998/99,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,1999/00,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2000/01,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2001/02,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2004/05,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2005/06,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2006/07,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2007/08,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2008/09,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2009/10,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2010/11,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2011/12,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2012/13,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Bobcats,CHA,2013/14,East,Charlotte Bobcats,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2014/15,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2015/16,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2016/17,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2017/18,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2018/19,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2019/20,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2020/21,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2021/22,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2022/23,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2023/24,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2024/25,East,Charlotte Hornets,Charlotte,North Carolina
+1610612766,Charlotte,Hornets,CHA,2025/26,East,Charlotte Hornets,Charlotte,North Carolina

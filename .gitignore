@@ -1,4 +1,17 @@
-/data
+# data/ is not versioned, with three exceptions below. Those are *inputs*, not
+# build artifacts: nothing in the pipeline regenerates them offline, so without
+# them a fresh clone cannot run `make historical-etl` at all. Everything else
+# under data/ is derived and stays out. See docs/PIPELINE_AUDIT.md.
+/data/*
+!/data/raw/
+/data/raw/*
+# LLM/Serper-generated lookups: team locations and city-pair distances.
+!/data/raw/reference/
+!/data/raw/historical/
+/data/raw/historical/*
+# Typed by hand: team → conference history, Polymarket ticker map.
+!/data/raw/historical/handmade/
+
 scratchpad
 notebooks
 sandbox

@@ -1,0 +1,562 @@
+from,to,straight_line_distance,driving_distance
+"Sacramento, California","Houston, Texas",1608.0,1929.0
+"Sacramento, California","Kansas City, Missouri",1447.0,1716.0
+"Sacramento, California","Dallas, Texas",1726.2,1726.2
+"Sacramento, California","Denver, Colorado",1182.5,1164.0
+"Sacramento, California","Seattle, Washington",752.0,753.0
+"Sacramento, California","Buffalo, New York",0.0,2566.0
+"Sacramento, California","New York, New York",2499.74,2815.77
+"Sacramento, California","Philadelphia, Pennsylvania",2451.94,2785.0
+"Sacramento, California","Chicago, Illinois",1816.0,2051.7
+"Sacramento, California","Vancouver, British Columbia",1207.0,1436.6
+"Sacramento, California","Minneapolis, Minnesota",1515.0,1888.0
+"Sacramento, California","San Antonio, Texas",1489.0,1736.0
+"Sacramento, California","Toronto, Ontario",2191.7,2552.0
+"Sacramento, California","Oklahoma City, Oklahoma",0.0,1621.0
+"Sacramento, California","Atlanta, Georgia",2119.0,2462.7
+"Sacramento, California","Milwaukee, Wisconsin",0.0,2095.4
+"Sacramento, California","San Diego, California",472.0,504.0
+"Sacramento, California","San Francisco, California",75.0,87.0
+"Sacramento, California","Cleveland, Ohio",2127.0,2381.7
+"Sacramento, California","Brooklyn, New York",2499.74,2815.77
+"Sacramento, California","Los Angeles, California",361.44,384.0
+"Sacramento, California","Memphis, Tennessee",0.0,2086.0
+"Sacramento, California","Boston, Massachusetts",3074.0,3037.4
+"Sacramento, California","Phoenix, Arizona",634.25,755.0
+"Sacramento, California","Orlando, Florida",2890.0,2833.9
+"Sacramento, California","New Orleans, Louisiana",2054.0,2238.7
+"Sacramento, California","Miami, Florida",2547.35,3114.0
+"Sacramento, California","Charlotte, North Carolina",0.0,2675.0
+"Sacramento, California","Indianapolis, Indiana",2185.0,2185.0
+"Sacramento, California","Portland, Oregon",0.0,580.0
+"Sacramento, California","Washington, District of Columbia",0.0,2733.0
+"Sacramento, California","Detroit, Michigan",307.0,2307.0
+"Sacramento, California","Salt Lake City, Utah",533.0,652.0
+"Houston, Texas","Kansas City, Missouri",646.63,744.0
+"Houston, Texas","Dallas, Texas",224.0,239.0
+"Houston, Texas","Denver, Colorado",878.27,1031.0
+"Houston, Texas","Seattle, Washington",2348.0,2328.9
+"Houston, Texas","Buffalo, New York",0.0,1486.0
+"Houston, Texas","New York, New York",1417.18,1624.1
+"Houston, Texas","Philadelphia, Pennsylvania",1340.0,1547.0
+"Houston, Texas","Chicago, Illinois",939.33,1080.43
+"Houston, Texas","Vancouver, British Columbia",1981.14,2481.2
+"Houston, Texas","Minneapolis, Minnesota",1197.0,1179.0
+"Houston, Texas","San Antonio, Texas",189.52,211.3
+"Houston, Texas","Toronto, Ontario",1301.6,1522.17
+"Houston, Texas","Oklahoma City, Oklahoma",413.0,444.0
+"Houston, Texas","Atlanta, Georgia",700.63,792.0
+"Houston, Texas","Milwaukee, Wisconsin",1005.0,1171.0
+"Houston, Texas","San Diego, California",1312.6,1468.0
+"Houston, Texas","San Francisco, California",1642.57,1925.95
+"Houston, Texas","Cleveland, Ohio",0.0,1275.3
+"Houston, Texas","Brooklyn, New York",0.0,1636.0
+"Houston, Texas","Los Angeles, California",1371.22,1546.1
+"Houston, Texas","Memphis, Tennessee",0.0,567.0
+"Houston, Texas","Boston, Massachusetts",1603.45,1819.5
+"Houston, Texas","Phoenix, Arizona",1014.92,1183.74
+"Houston, Texas","Orlando, Florida",850.0,963.0
+"Houston, Texas","New Orleans, Louisiana",317.41,347.0
+"Houston, Texas","Miami, Florida",966.61,1186.16
+"Houston, Texas","Charlotte, North Carolina",1492.0,927.0
+"Houston, Texas","Indianapolis, Indiana",865.0,1013.0
+"Houston, Texas","Portland, Oregon",1835.0,2242.4
+"Houston, Texas","Washington, District of Columbia",1219.0,1410.0
+"Houston, Texas","Detroit, Michigan",1105.44,1329.3
+"Houston, Texas","Salt Lake City, Utah",1199.21,1482.45
+"Kansas City, Missouri","Dallas, Texas",453.0,507.0
+"Kansas City, Missouri","Denver, Colorado",0.0,608.1
+"Kansas City, Missouri","Seattle, Washington",1535.0,1842.8
+"Kansas City, Missouri","Buffalo, New York",860.0,985.0
+"Kansas City, Missouri","New York, New York",1096.0,1192.0
+"Kansas City, Missouri","Philadelphia, Pennsylvania",1117.0,1125.0
+"Kansas City, Missouri","Chicago, Illinois",410.57,510.0
+"Kansas City, Missouri","Vancouver, British Columbia",1570.0,1976.0
+"Kansas City, Missouri","Minneapolis, Minnesota",0.0,438.0
+"Kansas City, Missouri","San Antonio, Texas",704.71,816.0
+"Kansas City, Missouri","Toronto, Ontario",849.0,999.0
+"Kansas City, Missouri","Oklahoma City, Oklahoma",298.0,353.0
+"Kansas City, Missouri","Atlanta, Georgia",0.0,801.0
+"Kansas City, Missouri","Milwaukee, Wisconsin",468.0,568.0
+"Kansas City, Missouri","San Diego, California",0.0,1564.0
+"Kansas City, Missouri","San Francisco, California",1503.63,1803.0
+"Kansas City, Missouri","Cleveland, Ohio",1279.0,797.0
+"Kansas City, Missouri","Brooklyn, New York",1213.0,1213.0
+"Kansas City, Missouri","Los Angeles, California",1354.29,1617.77
+"Kansas City, Missouri","Memphis, Tennessee",0.0,451.0
+"Kansas City, Missouri","Boston, Massachusetts",1251.0,1430.0
+"Kansas City, Missouri","Phoenix, Arizona",1150.0,1212.7
+"Kansas City, Missouri","Orlando, Florida",1050.0,1238.0
+"Kansas City, Missouri","New Orleans, Louisiana",732.0,803.7
+"Kansas City, Missouri","Miami, Florida",1240.94,1461.0
+"Kansas City, Missouri","Charlotte, North Carolina",959.0,959.0
+"Kansas City, Missouri","Indianapolis, Indiana",0.0,482.0
+"Kansas City, Missouri","Portland, Oregon",1522.0,1788.2
+"Kansas City, Missouri","Washington, District of Columbia",954.0,1058.0
+"Kansas City, Missouri","Detroit, Michigan",676.0,764.0
+"Kansas City, Missouri","Salt Lake City, Utah",1076.6,1071.0
+"Dallas, Texas","Denver, Colorado",662.03,760.5
+"Dallas, Texas","Seattle, Washington",1679.6,2108.0
+"Dallas, Texas","Buffalo, New York",2199.0,1370.0
+"Dallas, Texas","New York, New York",1368.34,1546.0
+"Dallas, Texas","Philadelphia, Pennsylvania",1473.0,1479.0
+"Dallas, Texas","Chicago, Illinois",1556.0,967.0
+"Dallas, Texas","Vancouver, British Columbia",1767.77,2244.07
+"Dallas, Texas","Minneapolis, Minnesota",863.0,942.0
+"Dallas, Texas","San Antonio, Texas",254.74,275.0
+"Dallas, Texas","Toronto, Ontario",1194.0,1419.0
+"Dallas, Texas","Oklahoma City, Oklahoma",189.0,205.0
+"Dallas, Texas","Atlanta, Georgia",754.0,781.0
+"Dallas, Texas","Milwaukee, Wisconsin",857.0,1002.0
+"Dallas, Texas","San Diego, California",1168.5,1358.0
+"Dallas, Texas","San Francisco, California",1481.71,1731.51
+"Dallas, Texas","Cleveland, Ohio",1026.0,1183.0
+"Dallas, Texas","Brooklyn, New York",1369.92,1557.0
+"Dallas, Texas","Los Angeles, California",1239.0,1439.8
+"Dallas, Texas","Memphis, Tennessee",420.0,452.0
+"Dallas, Texas","Boston, Massachusetts",1551.0,1767.0
+"Dallas, Texas","Phoenix, Arizona",886.0,1064.0
+"Dallas, Texas","Orlando, Florida",959.83,1081.18
+"Dallas, Texas","New Orleans, Louisiana",442.0,506.0
+"Dallas, Texas","Miami, Florida",1120.9,1313.0
+"Dallas, Texas","Charlotte, North Carolina",930.0,1025.0
+"Dallas, Texas","Indianapolis, Indiana",761.24,905.0
+"Dallas, Texas","Portland, Oregon",1633.0,2034.0
+"Dallas, Texas","Washington, District of Columbia",1179.6,1350.6
+"Dallas, Texas","Detroit, Michigan",1064.0,1140.4
+"Dallas, Texas","Salt Lake City, Utah",1018.0,1211.0
+"Denver, Colorado","Seattle, Washington",1019.74,1317.09
+"Denver, Colorado","Buffalo, New York",0.0,1522.8
+"Denver, Colorado","New York, New York",1627.11,1777.37
+"Denver, Colorado","Philadelphia, Pennsylvania",1574.57,1728.0
+"Denver, Colorado","Chicago, Illinois",916.76,1004.0
+"Denver, Colorado","Vancouver, British Columbia",1105.85,1451.13
+"Denver, Colorado","Minneapolis, Minnesota",915.0,905.6
+"Denver, Colorado","San Antonio, Texas",1502.0,933.0
+"Denver, Colorado","Toronto, Ontario",1342.42,1492.3
+"Denver, Colorado","Oklahoma City, Oklahoma",530.0,610.2
+"Denver, Colorado","Atlanta, Georgia",1212.0,1408.2
+"Denver, Colorado","Milwaukee, Wisconsin",929.0,1046.0
+"Denver, Colorado","San Diego, California",832.89,1078.72
+"Denver, Colorado","San Francisco, California",1250.0,949.0
+"Denver, Colorado","Cleveland, Ohio",1223.73,1333.4
+"Denver, Colorado","Brooklyn, New York",1781.61,1790.0
+"Denver, Colorado","Los Angeles, California",830.12,1017.3
+"Denver, Colorado","Memphis, Tennessee",877.18,1093.19
+"Denver, Colorado","Boston, Massachusetts",1770.0,1971.0
+"Denver, Colorado","Phoenix, Arizona",585.75,864.0
+"Denver, Colorado","Orlando, Florida",1838.0,1840.0
+"Denver, Colorado","New Orleans, Louisiana",1079.63,1295.16
+"Denver, Colorado","Miami, Florida",1726.0,2064.0
+"Denver, Colorado","Charlotte, North Carolina",0.0,1561.0
+"Denver, Colorado","Indianapolis, Indiana",1019.0,1086.5
+"Denver, Colorado","Portland, Oregon",981.39,1256.0
+"Denver, Colorado","Washington, District of Columbia",1489.03,1650.7
+"Denver, Colorado","Detroit, Michigan",1330.85,1265.96
+"Denver, Colorado","Salt Lake City, Utah",370.87,530.7
+"Seattle, Washington","Buffalo, New York",0.0,2608.0
+"Seattle, Washington","New York, New York",2401.88,2852.0
+"Seattle, Washington","Philadelphia, Pennsylvania",2373.25,2811.5
+"Seattle, Washington","Chicago, Illinois",1732.8,2099.46
+"Seattle, Washington","Vancouver, British Columbia",120.33,152.8
+"Seattle, Washington","Minneapolis, Minnesota",1391.26,1656.92
+"Seattle, Washington","San Antonio, Texas",1785.78,2142.3
+"Seattle, Washington","Toronto, Ontario",2072.0,2586.0
+"Seattle, Washington","Oklahoma City, Oklahoma",1522.65,1986.3
+"Seattle, Washington","Atlanta, Georgia",2174.0,2656.4
+"Seattle, Washington","Milwaukee, Wisconsin",1683.96,1986.3
+"Seattle, Washington","San Diego, California",1063.9,1255.65
+"Seattle, Washington","San Francisco, California",810.0,807.0
+"Seattle, Washington","Cleveland, Ohio",2020.5,2440.18
+"Seattle, Washington","Brooklyn, New York",0.0,2868.0
+"Seattle, Washington","Los Angeles, California",959.0,1135.0
+"Seattle, Washington","Memphis, Tennessee",1907.0,2288.0
+"Seattle, Washington","Boston, Massachusetts",2485.54,2946.8
+"Seattle, Washington","Phoenix, Arizona",1114.48,1409.0
+"Seattle, Washington","Orlando, Florida",2546.37,3097.5
+"Seattle, Washington","New Orleans, Louisiana",0.0,2578.4
+"Seattle, Washington","Miami, Florida",2730.92,3309.2
+"Seattle, Washington","Charlotte, North Carolina",2345.0,2795.0
+"Seattle, Washington","Indianapolis, Indiana",1867.82,2237.8
+"Seattle, Washington","Portland, Oregon",145.0,173.0
+"Seattle, Washington","Washington, District of Columbia",2327.0,2751.1
+"Seattle, Washington","Detroit, Michigan",1938.0,2317.8
+"Seattle, Washington","Salt Lake City, Utah",699.82,826.45
+"Buffalo, New York","New York, New York",471.0,599.0
+"Buffalo, New York","Philadelphia, Pennsylvania",279.48,380.0
+"Buffalo, New York","Chicago, Illinois",0.0,536.0
+"Buffalo, New York","Vancouver, British Columbia",3542.0,2743.0
+"Buffalo, New York","Minneapolis, Minnesota",731.0,953.0
+"Buffalo, New York","San Antonio, Texas",1429.74,1644.0
+"Buffalo, New York","Toronto, Ontario",59.0,98.0
+"Buffalo, New York","Oklahoma City, Oklahoma",1160.0,1241.7
+"Buffalo, New York","Atlanta, Georgia",697.0,896.7
+"Buffalo, New York","Milwaukee, Wisconsin",458.0,627.0
+"Buffalo, New York","San Diego, California",2183.21,2594.55
+"Buffalo, New York","San Francisco, California",0.0,2648.0
+"Buffalo, New York","Cleveland, Ohio",173.0,206.6
+"Buffalo, New York","Brooklyn, New York",298.0,381.0
+"Buffalo, New York","Los Angeles, California",2193.32,2533.13
+"Buffalo, New York","Memphis, Tennessee",1477.0,918.0
+"Buffalo, New York","Boston, Massachusetts",0.0,454.0
+"Buffalo, New York","Phoenix, Arizona",1931.0,2199.6
+"Buffalo, New York","Orlando, Florida",0.0,1198.5
+"Buffalo, New York","New Orleans, Louisiana",1087.0,1250.8
+"Buffalo, New York","Miami, Florida",1030.0,1387.0
+"Buffalo, New York","Charlotte, North Carolina",662.0,660.0
+"Buffalo, New York","Indianapolis, Indiana",434.57,518.6
+"Buffalo, New York","Portland, Oregon",0.0,2641.0
+"Buffalo, New York","Washington, District of Columbia",291.0,384.0
+"Buffalo, New York","Detroit, Michigan",216.0,256.0
+"Buffalo, New York","Salt Lake City, Utah",1799.0,1928.7
+"New York, New York","Philadelphia, Pennsylvania",80.56,94.25
+"New York, New York","Chicago, Illinois",711.99,796.0
+"New York, New York","Vancouver, British Columbia",2426.91,2991.5
+"New York, New York","Minneapolis, Minnesota",1108.98,1220.9
+"New York, New York","San Antonio, Texas",1581.44,1822.0
+"New York, New York","Toronto, Ontario",342.78,490.0
+"New York, New York","Oklahoma City, Oklahoma",1324.33,1474.32
+"New York, New York","Atlanta, Georgia",746.0,864.0
+"New York, New York","Milwaukee, Wisconsin",740.0,889.0
+"New York, New York","San Diego, California",2427.61,2812.8
+"New York, New York","San Francisco, California",2572.0,2902.0
+"New York, New York","Cleveland, Ohio",404.0,469.0
+"New York, New York","Brooklyn, New York",5.32,8.0
+"New York, New York","Los Angeles, California",2445.55,2790.27
+"New York, New York","Memphis, Tennessee",955.0,1106.8
+"New York, New York","Boston, Massachusetts",185.0,210.0
+"New York, New York","Phoenix, Arizona",0.0,2406.0
+"New York, New York","Orlando, Florida",939.04,1080.0
+"New York, New York","New Orleans, Louisiana",1167.73,1302.43
+"New York, New York","Miami, Florida",1090.0,1295.4
+"New York, New York","Charlotte, North Carolina",0.0,626.74
+"New York, New York","Indianapolis, Indiana",733.97,742.2
+"New York, New York","Portland, Oregon",2439.04,2456.0
+"New York, New York","Washington, District of Columbia",229.0,239.0
+"New York, New York","Detroit, Michigan",480.53,613.5
+"New York, New York","Salt Lake City, Utah",1967.64,2173.0
+"Philadelphia, Pennsylvania","Chicago, Illinois",805.0,758.0
+"Philadelphia, Pennsylvania","Vancouver, British Columbia",2402.23,2943.5
+"Philadelphia, Pennsylvania","Minneapolis, Minnesota",985.0,1172.0
+"Philadelphia, Pennsylvania","San Antonio, Texas",1507.0,1742.0
+"Philadelphia, Pennsylvania","Toronto, Ontario",336.0,496.0
+"Philadelphia, Pennsylvania","Oklahoma City, Oklahoma",1256.82,1383.16
+"Philadelphia, Pennsylvania","Atlanta, Georgia",666.0,778.0
+"Philadelphia, Pennsylvania","Milwaukee, Wisconsin",694.0,842.0
+"Philadelphia, Pennsylvania","San Diego, California",2367.66,2724.39
+"Philadelphia, Pennsylvania","San Francisco, California",0.0,2871.0
+"Philadelphia, Pennsylvania","Cleveland, Ohio",358.22,434.3
+"Philadelphia, Pennsylvania","Brooklyn, New York",80.09,100.0
+"Philadelphia, Pennsylvania","Los Angeles, California",2388.29,2731.1
+"Philadelphia, Pennsylvania","Memphis, Tennessee",1016.0,1005.9
+"Philadelphia, Pennsylvania","Boston, Massachusetts",271.0,314.8
+"Philadelphia, Pennsylvania","Phoenix, Arizona",2077.99,2342.0
+"Philadelphia, Pennsylvania","Orlando, Florida",863.0,986.0
+"Philadelphia, Pennsylvania","New Orleans, Louisiana",1087.56,1223.0
+"Philadelphia, Pennsylvania","Miami, Florida",0.0,1183.9
+"Philadelphia, Pennsylvania","Charlotte, North Carolina",367.0,539.0
+"Philadelphia, Pennsylvania","Indianapolis, Indiana",582.78,658.7
+"Philadelphia, Pennsylvania","Portland, Oregon",0.0,2866.0
+"Philadelphia, Pennsylvania","Washington, District of Columbia",123.79,142.0
+"Philadelphia, Pennsylvania","Detroit, Michigan",442.0,594.0
+"Philadelphia, Pennsylvania","Salt Lake City, Utah",1949.0,2142.0
+"Chicago, Illinois","Vancouver, British Columbia",2171.0,2197.0
+"Chicago, Illinois","Minneapolis, Minnesota",355.03,411.2
+"Chicago, Illinois","San Antonio, Texas",1050.62,1195.98
+"Chicago, Illinois","Toronto, Ontario",703.0,520.0
+"Chicago, Illinois","Oklahoma City, Oklahoma",690.44,804.2
+"Chicago, Illinois","Atlanta, Georgia",588.0,716.0
+"Chicago, Illinois","Milwaukee, Wisconsin",83.18,92.0
+"Chicago, Illinois","San Diego, California",1729.96,2077.71
+"Chicago, Illinois","San Francisco, California",2128.76,2141.5
+"Chicago, Illinois","Cleveland, Ohio",308.2,344.0
+"Chicago, Illinois","Brooklyn, New York",817.2622403939208,796.0
+"Chicago, Illinois","Los Angeles, California",1741.01,2015.0
+"Chicago, Illinois","Memphis, Tennessee",480.73,532.0
+"Chicago, Illinois","Boston, Massachusetts",849.83,1013.1
+"Chicago, Illinois","Phoenix, Arizona",1450.21,1753.0
+"Chicago, Illinois","Orlando, Florida",1168.0,1156.0
+"Chicago, Illinois","New Orleans, Louisiana",832.19,925.45
+"Chicago, Illinois","Miami, Florida",1189.13,1345.21
+"Chicago, Illinois","Charlotte, North Carolina",754.0,755.0
+"Chicago, Illinois","Indianapolis, Indiana",163.75,184.0
+"Chicago, Illinois","Portland, Oregon",0.0,2119.1
+"Chicago, Illinois","Washington, District of Columbia",699.0,595.0
+"Chicago, Illinois","Detroit, Michigan",238.38,280.01
+"Chicago, Illinois","Salt Lake City, Utah",1260.0,1400.8
+"Vancouver, British Columbia","Minneapolis, Minnesota",1429.0,1802.0
+"Vancouver, British Columbia","San Antonio, Texas",1884.06,2278.6
+"Vancouver, British Columbia","Toronto, Ontario",2087.39,2648.64
+"Vancouver, British Columbia","Oklahoma City, Oklahoma",1633.0,2117.0
+"Vancouver, British Columbia","Atlanta, Georgia",0.0,2770.0
+"Vancouver, British Columbia","Milwaukee, Wisconsin",1718.0,2125.0
+"Vancouver, British Columbia","San Diego, California",1184.21,1395.99
+"Vancouver, British Columbia","San Francisco, California",794.6,948.32
+"Vancouver, British Columbia","Cleveland, Ohio",2478.0,2548.0
+"Vancouver, British Columbia","Brooklyn, New York",2476.0,2981.0
+"Vancouver, British Columbia","Los Angeles, California",1080.36,1277.0
+"Vancouver, British Columbia","Memphis, Tennessee",1931.86,2439.3
+"Vancouver, British Columbia","Boston, Massachusetts",2501.67,3072.9
+"Vancouver, British Columbia","Phoenix, Arizona",1231.22,1535.0
+"Vancouver, British Columbia","Orlando, Florida",3219.0,3175.5
+"Vancouver, British Columbia","New Orleans, Louisiana",0.0,0.0
+"Vancouver, British Columbia","Miami, Florida",2825.0,3431.0
+"Vancouver, British Columbia","Charlotte, North Carolina",2332.58,2940.0
+"Vancouver, British Columbia","Indianapolis, Indiana",1913.98,2352.0
+"Vancouver, British Columbia","Portland, Oregon",261.0,312.0
+"Vancouver, British Columbia","Washington, District of Columbia",2356.97,2930.31
+"Vancouver, British Columbia","Detroit, Michigan",1964.98,2443.73
+"Vancouver, British Columbia","Salt Lake City, Utah",802.67,960.8
+"Minneapolis, Minnesota","San Antonio, Texas",0.0,1252.0
+"Minneapolis, Minnesota","Toronto, Ontario",678.5,931.0
+"Minneapolis, Minnesota","Oklahoma City, Oklahoma",1270.0,789.0
+"Minneapolis, Minnesota","Atlanta, Georgia",928.0,1104.0
+"Minneapolis, Minnesota","Milwaukee, Wisconsin",298.02,337.0
+"Minneapolis, Minnesota","San Diego, California",0.0,1989.0
+"Minneapolis, Minnesota","San Francisco, California",1585.0,1975.0
+"Minneapolis, Minnesota","Cleveland, Ohio",631.0,751.0
+"Minneapolis, Minnesota","Brooklyn, New York",1023.0,1206.0
+"Minneapolis, Minnesota","Los Angeles, California",1521.52,1927.12
+"Minneapolis, Minnesota","Memphis, Tennessee",829.0,834.6
+"Minneapolis, Minnesota","Boston, Massachusetts",1120.75,1302.5
+"Minneapolis, Minnesota","Phoenix, Arizona",1280.0,1645.0
+"Minneapolis, Minnesota","Orlando, Florida",1308.0,1566.0
+"Minneapolis, Minnesota","New Orleans, Louisiana",1222.0,1249.0
+"Minneapolis, Minnesota","Miami, Florida",1512.0,1791.0
+"Minneapolis, Minnesota","Charlotte, North Carolina",939.0,1168.0
+"Minneapolis, Minnesota","Indianapolis, Indiana",511.0,595.0
+"Minneapolis, Minnesota","Portland, Oregon",1449.0,1729.0
+"Minneapolis, Minnesota","Washington, District of Columbia",1133.0,1106.7
+"Minneapolis, Minnesota","Detroit, Michigan",543.0,673.4
+"Minneapolis, Minnesota","Salt Lake City, Utah",987.0,1233.0
+"San Antonio, Texas","Toronto, Ontario",1440.0,1687.0
+"San Antonio, Texas","Oklahoma City, Oklahoma",429.0,466.6
+"San Antonio, Texas","Atlanta, Georgia",883.0,988.0
+"San Antonio, Texas","Milwaukee, Wisconsin",1108.34,1281.15
+"San Antonio, Texas","San Diego, California",1110.0,1277.0
+"San Antonio, Texas","San Francisco, California",0.0,1734.0
+"San Antonio, Texas","Cleveland, Ohio",1456.0,1441.4
+"San Antonio, Texas","Brooklyn, New York",1582.52,1825.82
+"San Antonio, Texas","Los Angeles, California",1201.59,1354.36
+"San Antonio, Texas","Memphis, Tennessee",0.0,726.0
+"San Antonio, Texas","Boston, Massachusetts",1764.99,2030.2
+"San Antonio, Texas","Phoenix, Arizona",846.69,978.2
+"San Antonio, Texas","Orlando, Florida",1037.0,1158.0
+"San Antonio, Texas","New Orleans, Louisiana",507.0,538.1
+"San Antonio, Texas","Miami, Florida",1158.0,1387.4
+"San Antonio, Texas","Charlotte, North Carolina",1141.0,1232.0
+"San Antonio, Texas","Indianapolis, Indiana",999.0,1173.0
+"San Antonio, Texas","Portland, Oregon",0.0,2074.0
+"San Antonio, Texas","Washington, District of Columbia",1386.0,1603.0
+"San Antonio, Texas","Detroit, Michigan",1238.37,1489.0
+"San Antonio, Texas","Salt Lake City, Utah",0.0,1301.0
+"Toronto, Ontario","Oklahoma City, Oklahoma",1113.6,1285.0
+"Toronto, Ontario","Atlanta, Georgia",734.0,952.0
+"Toronto, Ontario","Milwaukee, Wisconsin",431.0,619.0
+"Toronto, Ontario","San Diego, California",0.0,2575.5
+"Toronto, Ontario","San Francisco, California",2634.0,2640.0
+"Toronto, Ontario","Cleveland, Ohio",190.0,290.0
+"Toronto, Ontario","Brooklyn, New York",347.84,497.0
+"Toronto, Ontario","Los Angeles, California",2148.0,2518.0
+"Toronto, Ontario","Memphis, Tennessee",817.0,978.0
+"Toronto, Ontario","Boston, Massachusetts",431.0,548.0
+"Toronto, Ontario","Phoenix, Arizona",1886.85,2193.3
+"Toronto, Ontario","Orlando, Florida",1051.32,1278.0
+"Toronto, Ontario","New Orleans, Louisiana",1113.0,1294.0
+"Toronto, Ontario","Miami, Florida",1237.33,1484.1
+"Toronto, Ontario","Charlotte, North Carolina",0.0,759.4
+"Toronto, Ontario","Indianapolis, Indiana",440.9,516.0
+"Toronto, Ontario","Portland, Oregon",0.0,2614.4
+"Toronto, Ontario","Washington, District of Columbia",354.0,481.0
+"Toronto, Ontario","Detroit, Michigan",206.71,232.25
+"Toronto, Ontario","Salt Lake City, Utah",1669.0,1901.0
+"Oklahoma City, Oklahoma","Atlanta, Georgia",849.0,849.0
+"Oklahoma City, Oklahoma","Milwaukee, Wisconsin",755.0,871.0
+"Oklahoma City, Oklahoma","San Diego, California",2111.0,1313.0
+"Oklahoma City, Oklahoma","San Francisco, California",1389.0,1626.0
+"Oklahoma City, Oklahoma","Cleveland, Ohio",1050.4,1056.0
+"Oklahoma City, Oklahoma","Brooklyn, New York",1329.0,1454.9
+"Oklahoma City, Oklahoma","Los Angeles, California",1178.44,1327.87
+"Oklahoma City, Oklahoma","Memphis, Tennessee",422.0,467.0
+"Oklahoma City, Oklahoma","Boston, Massachusetts",1519.0,1677.0
+"Oklahoma City, Oklahoma","Phoenix, Arizona",835.0,959.0
+"Oklahoma City, Oklahoma","Orlando, Florida",1982.8,1232.1
+"Oklahoma City, Oklahoma","New Orleans, Louisiana",592.0,709.0
+"Oklahoma City, Oklahoma","Miami, Florida",1448.2,1510.0
+"Oklahoma City, Oklahoma","Charlotte, North Carolina",-1.0,1094.9
+"Oklahoma City, Oklahoma","Indianapolis, Indiana",1108.0,740.0
+"Oklahoma City, Oklahoma","Portland, Oregon",1511.0,1833.6
+"Oklahoma City, Oklahoma","Washington, District of Columbia",1149.0,1341.0
+"Oklahoma City, Oklahoma","Detroit, Michigan",1231.0,1048.0
+"Oklahoma City, Oklahoma","Salt Lake City, Utah",0.0,1189.0
+"Atlanta, Georgia","Milwaukee, Wisconsin",814.0,669.0
+"Atlanta, Georgia","San Diego, California",2140.0,2137.6
+"Atlanta, Georgia","San Francisco, California",2472.0,2472.0
+"Atlanta, Georgia","Cleveland, Ohio",555.0,698.8
+"Atlanta, Georgia","Brooklyn, New York",746.0,866.0
+"Atlanta, Georgia","Los Angeles, California",2175.0,2198.3
+"Atlanta, Georgia","Memphis, Tennessee",337.0,384.0
+"Atlanta, Georgia","Boston, Massachusetts",935.93,1076.76
+"Atlanta, Georgia","Phoenix, Arizona",1592.0,1846.0
+"Atlanta, Georgia","Orlando, Florida",401.53,439.01
+"Atlanta, Georgia","New Orleans, Louisiana",423.63,469.0
+"Atlanta, Georgia","Miami, Florida",662.0,605.0
+"Atlanta, Georgia","Charlotte, North Carolina",227.0,244.0
+"Atlanta, Georgia","Indianapolis, Indiana",427.0,534.0
+"Atlanta, Georgia","Portland, Oregon",2148.55,2607.5
+"Atlanta, Georgia","Washington, District of Columbia",541.79,637.0
+"Atlanta, Georgia","Detroit, Michigan",722.0,596.0
+"Atlanta, Georgia","Salt Lake City, Utah",1584.0,1892.4
+"Milwaukee, Wisconsin","San Diego, California",2103.0,2118.0
+"Milwaukee, Wisconsin","San Francisco, California",1843.0,2168.0
+"Milwaukee, Wisconsin","Cleveland, Ohio",336.0,435.0
+"Milwaukee, Wisconsin","Brooklyn, New York",736.14,882.81
+"Milwaukee, Wisconsin","Los Angeles, California",1745.0,2072.1
+"Milwaukee, Wisconsin","Memphis, Tennessee",895.0,622.0
+"Milwaukee, Wisconsin","Boston, Massachusetts",858.0,969.8
+"Milwaukee, Wisconsin","Phoenix, Arizona",1460.3,1829.0
+"Milwaukee, Wisconsin","Orlando, Florida",1064.0,1251.0
+"Milwaukee, Wisconsin","New Orleans, Louisiana",915.0,1015.0
+"Milwaukee, Wisconsin","Miami, Florida",487.2,1474.0
+"Milwaukee, Wisconsin","Charlotte, North Carolina",1067.0,853.0
+"Milwaukee, Wisconsin","Indianapolis, Indiana",243.57,268.0
+"Milwaukee, Wisconsin","Portland, Oregon",-1.0,2065.0
+"Milwaukee, Wisconsin","Washington, District of Columbia",1179.2,791.0
+"Milwaukee, Wisconsin","Detroit, Michigan",251.63,382.0
+"Milwaukee, Wisconsin","Salt Lake City, Utah",0.0,1439.0
+"San Diego, California","San Francisco, California",458.49,501.25
+"San Diego, California","Cleveland, Ohio",2034.0,2405.0
+"San Diego, California","Brooklyn, New York",2467.0,2778.0
+"San Diego, California","Los Angeles, California",111.0,124.0
+"San Diego, California","Memphis, Tennessee",1587.0,1810.0
+"San Diego, California","Boston, Massachusetts",2578.51,3024.8
+"San Diego, California","Phoenix, Arizona",298.58,354.0
+"San Diego, California","Orlando, Florida",2146.89,2429.0
+"San Diego, California","New Orleans, Louisiana",1814.0,1808.1
+"San Diego, California","Miami, Florida",2267.52,2653.37
+"San Diego, California","Charlotte, North Carolina",0.0,2383.5
+"San Diego, California","Indianapolis, Indiana",1784.98,2051.0
+"San Diego, California","Portland, Oregon",932.5,1083.0
+"San Diego, California","Washington, District of Columbia",2269.69,2684.34
+"San Diego, California","Detroit, Michigan",1968.19,2343.0
+"San Diego, California","Salt Lake City, Utah",627.0,750.0
+"San Francisco, California","Cleveland, Ohio",2453.6,2456.0
+"San Francisco, California","Brooklyn, New York",2620.0,2916.0
+"San Francisco, California","Los Angeles, California",347.42,381.0
+"San Francisco, California","Memphis, Tennessee",1841.0,2090.8
+"San Francisco, California","Boston, Massachusetts",2699.0,3127.4
+"San Francisco, California","Phoenix, Arizona",1052.0,752.0
+"San Francisco, California","Orlando, Florida",2442.0,-1.0
+"San Francisco, California","New Orleans, Louisiana",2004.0,2219.8
+"San Francisco, California","Miami, Florida",2595.0,3111.0
+"San Francisco, California","Charlotte, North Carolina",0.0,2717.0
+"San Francisco, California","Indianapolis, Indiana",1944.97,2267.6
+"San Francisco, California","Portland, Oregon",550.8,634.0
+"San Francisco, California","Washington, District of Columbia",2435.09,2831.5
+"San Francisco, California","Detroit, Michigan",0.0,2396.9
+"San Francisco, California","Salt Lake City, Utah",600.0,736.0
+"Cleveland, Ohio","Brooklyn, New York",407.53,469.0
+"Cleveland, Ohio","Los Angeles, California",2044.81,2344.0
+"Cleveland, Ohio","Memphis, Tennessee",651.0,721.4
+"Cleveland, Ohio","Boston, Massachusetts",549.56,639.0
+"Cleveland, Ohio","Phoenix, Arizona",1745.65,2000.3
+"Cleveland, Ohio","Orlando, Florida",1037.0,1052.9
+"Cleveland, Ohio","New Orleans, Louisiana",924.0,1053.0
+"Cleveland, Ohio","Miami, Florida",1089.89,1240.74
+"Cleveland, Ohio","Charlotte, North Carolina",700.0,515.0
+"Cleveland, Ohio","Indianapolis, Indiana",262.71,315.38
+"Cleveland, Ohio","Portland, Oregon",3858.0,2448.0
+"Cleveland, Ohio","Washington, District of Columbia",373.0,372.8
+"Cleveland, Ohio","Detroit, Michigan",90.0,145.8
+"Cleveland, Ohio","Salt Lake City, Utah",1590.0,1724.0
+"Brooklyn, New York","Los Angeles, California",2454.0,2796.0
+"Brooklyn, New York","Memphis, Tennessee",956.0,1104.0
+"Brooklyn, New York","Boston, Massachusetts",190.51,217.0
+"Brooklyn, New York","Phoenix, Arizona",2147.0,2479.0
+"Brooklyn, New York","Orlando, Florida",936.56,1081.55
+"Brooklyn, New York","New Orleans, Louisiana",1156.57,1313.0
+"Brooklyn, New York","Miami, Florida",0.0,1287.0
+"Brooklyn, New York","Charlotte, North Carolina",854.0,636.0
+"Brooklyn, New York","Indianapolis, Indiana",646.44,730.0
+"Brooklyn, New York","Portland, Oregon",2484.0,2899.0
+"Brooklyn, New York","Washington, District of Columbia",204.0,232.0
+"Brooklyn, New York","Detroit, Michigan",486.0,621.0
+"Brooklyn, New York","Salt Lake City, Utah",1972.0,2185.6
+"Los Angeles, California","Memphis, Tennessee",2433.153,1794.0
+"Los Angeles, California","Boston, Massachusetts",2590.84,2991.3
+"Los Angeles, California","Phoenix, Arizona",356.83,372.21
+"Los Angeles, California","Orlando, Florida",2202.0,2532.0
+"Los Angeles, California","New Orleans, Louisiana",1669.19,1894.0
+"Los Angeles, California","Miami, Florida",2335.14,2748.3
+"Los Angeles, California","Charlotte, North Carolina",2412.0,2411.0
+"Los Angeles, California","Indianapolis, Indiana",1805.89,2061.0
+"Los Angeles, California","Portland, Oregon",826.43,964.0
+"Los Angeles, California","Washington, District of Columbia",2299.0,2669.0
+"Los Angeles, California","Detroit, Michigan",1979.3,2281.0
+"Los Angeles, California","Salt Lake City, Utah",580.0,689.0
+"Memphis, Tennessee","Boston, Massachusetts",1157.0,1315.0
+"Memphis, Tennessee","Phoenix, Arizona",1564.0,1424.0
+"Memphis, Tennessee","Orlando, Florida",822.0,750.4
+"Memphis, Tennessee","New Orleans, Louisiana",358.24,395.0
+"Memphis, Tennessee","Miami, Florida",873.0,1045.0
+"Memphis, Tennessee","Charlotte, North Carolina",125.0,619.0
+"Memphis, Tennessee","Indianapolis, Indiana",383.79,464.0
+"Memphis, Tennessee","Portland, Oregon",3433.0,2245.0
+"Memphis, Tennessee","Washington, District of Columbia",764.0,876.0
+"Memphis, Tennessee","Detroit, Michigan",754.0,623.0
+"Memphis, Tennessee","Salt Lake City, Utah",2445.3,1524.0
+"Boston, Massachusetts","Phoenix, Arizona",2295.12,2647.0
+"Boston, Massachusetts","Orlando, Florida",1115.0,1302.7
+"Boston, Massachusetts","New Orleans, Louisiana",1357.51,1523.0
+"Boston, Massachusetts","Miami, Florida",1257.6,1496.3
+"Boston, Massachusetts","Charlotte, North Carolina",721.0,847.0
+"Boston, Massachusetts","Indianapolis, Indiana",1527.0,949.0
+"Boston, Massachusetts","Portland, Oregon",2532.78,3095.02
+"Boston, Massachusetts","Washington, District of Columbia",394.15,440.24
+"Boston, Massachusetts","Detroit, Michigan",611.58,740.2
+"Boston, Massachusetts","Salt Lake City, Utah",2099.0,2363.0
+"Phoenix, Arizona","Orlando, Florida",2135.0,2135.0
+"Phoenix, Arizona","New Orleans, Louisiana",1320.0,1491.0
+"Phoenix, Arizona","Miami, Florida",2130.0,2357.0
+"Phoenix, Arizona","Charlotte, North Carolina",3412.0,2089.0
+"Phoenix, Arizona","Indianapolis, Indiana",1496.25,1699.0
+"Phoenix, Arizona","Portland, Oregon",1175.0,1335.0
+"Phoenix, Arizona","Washington, District of Columbia",1977.6,2263.57
+"Phoenix, Arizona","Detroit, Michigan",1691.0,2007.0
+"Phoenix, Arizona","Salt Lake City, Utah",505.34,666.0
+"Orlando, Florida","New Orleans, Louisiana",534.0,639.0
+"Orlando, Florida","Miami, Florida",205.0,234.0
+"Orlando, Florida","Charlotte, North Carolina",525.9,524.0
+"Orlando, Florida","Indianapolis, Indiana",821.0,971.0
+"Orlando, Florida","Portland, Oregon",2532.0,3045.0
+"Orlando, Florida","Washington, District of Columbia",757.0,846.0
+"Orlando, Florida","Detroit, Michigan",955.0,1171.0
+"Orlando, Florida","Salt Lake City, Utah",2297.8,2329.9
+"New Orleans, Louisiana","Miami, Florida",668.79,875.2
+"New Orleans, Louisiana","Charlotte, North Carolina",649.0,712.0
+"New Orleans, Louisiana","Indianapolis, Indiana",712.49,839.7
+"New Orleans, Louisiana","Portland, Oregon",0.0,2537.0
+"New Orleans, Louisiana","Washington, District of Columbia",966.0,1096.8
+"New Orleans, Louisiana","Detroit, Michigan",939.0,1058.6
+"New Orleans, Louisiana","Salt Lake City, Utah",1455.0,1744.0
+"Miami, Florida","Charlotte, North Carolina",654.27,729.0
+"Miami, Florida","Indianapolis, Indiana",1026.32,1175.9
+"Miami, Florida","Portland, Oregon",2450.0,3256.0
+"Miami, Florida","Washington, District of Columbia",924.93,1053.78
+"Miami, Florida","Detroit, Michigan",0.0,1394.0
+"Miami, Florida","Salt Lake City, Utah",2086.87,2537.89
+"Charlotte, North Carolina","Indianapolis, Indiana",428.0,576.0
+"Charlotte, North Carolina","Portland, Oregon",0.0,2754.7
+"Charlotte, North Carolina","Washington, District of Columbia",330.0,399.0
+"Charlotte, North Carolina","Detroit, Michigan",655.6,629.0
+"Charlotte, North Carolina","Salt Lake City, Utah",3483.4,2039.5
+"Indianapolis, Indiana","Portland, Oregon",0.0,2263.0
+"Indianapolis, Indiana","Washington, District of Columbia",490.89,576.0
+"Indianapolis, Indiana","Detroit, Michigan",240.1,299.0
+"Indianapolis, Indiana","Salt Lake City, Utah",1357.0,1540.0
+"Portland, Oregon","Washington, District of Columbia",2353.0,2808.0
+"Portland, Oregon","Detroit, Michigan",1970.0,2385.0
+"Portland, Oregon","Salt Lake City, Utah",650.0,770.0
+"Washington, District of Columbia","Detroit, Michigan",394.44,535.0
+"Washington, District of Columbia","Salt Lake City, Utah",1871.0,2084.0
+"Detroit, Michigan","Salt Lake City, Utah",0.0,1654.8
