@@ -31,9 +31,16 @@ Computes cumulative conference vs conference records at the league level.
 
 | Function | Output columns | Join keys |
 |----------|---------------|-----------|
-| `make_east_west_record(games)` | `east_record_adjusted`, `west_record_adjusted`, `games_played_east_vs_west` | `gameDateOnlyStr` |
-| `make_east_west_record(games, location="East")` | `east_record_at_east`, `games_played_at_east` | `gameDateOnlyStr` |
-| `make_east_west_record(games, location="West")` | `west_record_at_west`, `games_played_at_west` | `gameDateOnlyStr` |
+| `make_east_west_record(games)` | `east_record_adjusted`, `west_record_adjusted` | `season`, `gameDateOnlyStr` |
+| `make_east_west_record(games, location="East")` | `east_record_at_east` | `season`, `gameDateOnlyStr` |
+| `make_east_west_record(games, location="West")` | `west_record_at_west` | `season`, `gameDateOnlyStr` |
+
+`location=None` averages the two venues out; the `location=` variants return
+exactly the venue component that average discards. The `games_played_*` columns
+are divisors inside the builder and are not returned — nothing downstream reads
+them. **The join needs `season`**: the right side is one row per (season, date),
+so joining on date alone fans the games frame out for any date shared by two
+seasons. `aggregator.py` passes `validate="m:1"`.
 
 **Leakage prevention**: Cumulative sums use `.shift(1)` so current day's results are excluded.
 
@@ -88,14 +95,27 @@ Computes `home - away` differences. The raw home/away columns are dropped after 
 **Special case:**
 - `days_at_home_delta` = `days_at_home + days_on_road` (sum, not difference)
 
-### Conference Features (`apply_conference_features()`)
-Applied based on `conference_filter` value:
+### Conference Features (`create_conference_features()`)
+Two features, built for every game. There is no conference filter — the
+same/cross-conference model split measured worse and was removed (see
+docs/CONFERENCE_SPLIT.md).
 
-| Filter | Function called | Output columns |
-|--------|----------------|----------------|
-| `same` | None (drops conference columns) | — |
-| `different` | `get_home_conference_vs_away_conference_record()` | `home_conference_vs_away_conference_record`, `games_played_at_home_conference` |
-| `all` | `create_conference_delta()` | `conference_diff_home_advantage_pct` |
+| Column | Meaning | Same-conference value |
+|--------|---------|----------------------|
+| `conference_diff_home_advantage_pct` | venue-balanced East/West gap, signed by who hosts | `0.0` |
+| `conference_home_court_advantage_pct` | home conference's win rate hosting the other conference, minus 0.5 | `0.0` |
+
+Both estimate a quantity defined only on interconference games. Within a
+conference both teams come from the same pool, so the effect cancels *exactly* —
+`0.0` is a known truth, not an imputation guess. The second must be gated: its
+ingredients are conference-season-level and defined on every date, so an
+ungated lookup hands every East home team one value and every West home team
+another, which is a confound rather than noise. Centering is what makes "no
+effect" and "no data" the same number.
+
+The east/west inputs (`east_record_adjusted`, `west_record_adjusted`,
+`east_record_at_east`, `west_record_at_west`) are consumed and dropped — none
+may survive as a feature.
 
 ## Lag Configuration
 

@@ -8,7 +8,12 @@ feed, which lets the whole daily cycle be exercised without one.
 import argparse
 from pathlib import Path
 
-from src.config.paths import UPCOMING_GAMES_DIR, UPCOMING_GAMES_RESULTS_DIR
+from src.config.paths import (
+    POSTPONED_GAMES_DIR,
+    UNRESOLVED_GAMES_DIR,
+    UPCOMING_GAMES_DIR,
+    UPCOMING_GAMES_RESULTS_DIR,
+)
 from src.etl.collectors.results import DEFAULT_SOURCE, SOURCES
 from src.etl.collectors.upcoming_games_results import enrich_upcoming_games_results
 from src.utils.logging_config import setup_logging
@@ -27,6 +32,18 @@ def main() -> None:
     parser.add_argument("--input-dir", type=Path, default=UPCOMING_GAMES_DIR)
     parser.add_argument("--output-dir", type=Path, default=UPCOMING_GAMES_RESULTS_DIR)
     parser.add_argument(
+        "--postponed-dir",
+        type=Path,
+        default=POSTPONED_GAMES_DIR,
+        help="Where postponed games are parked to be watched for a makeup date.",
+    )
+    parser.add_argument(
+        "--unresolved-dir",
+        type=Path,
+        default=UNRESOLVED_GAMES_DIR,
+        help="Where games the source never settles are quarantined.",
+    )
+    parser.add_argument(
         "--delay",
         type=float,
         default=None,
@@ -39,7 +56,12 @@ def main() -> None:
 
     kwargs = {} if args.delay is None else {"delay_seconds": args.delay}
     enrich_upcoming_games_results(
-        args.input_dir, args.output_dir, source=args.source, **kwargs
+        args.input_dir,
+        args.output_dir,
+        source=args.source,
+        postponed_dir=args.postponed_dir,
+        unresolved_dir=args.unresolved_dir,
+        **kwargs,
     )
 
 

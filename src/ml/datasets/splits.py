@@ -9,6 +9,11 @@ LLM serializes those same rows to text via ``src/ml/llm/serialization.py``.
 
 Extracted verbatim from ``train_single_model`` so that guarantee holds by
 construction rather than by convention.
+
+The split boundaries are seasons, not row proportions — see
+:func:`src.ml.datasets.splitters.season_split` for why. Set
+``splitting.test_start_season`` and ``splitting.val_seasons`` in the experiment
+config; without them this falls back to the proportional ``temporal_split``.
 """
 
 from __future__ import annotations
@@ -19,14 +24,11 @@ from typing import Optional, cast
 
 import pandas as pd
 
-from src.config.paths import (
-    HOLDOUT_TEST_METADATA_PATH,
-    REGULAR_SEASON_GAMES_FEATURES_PATH,
-)
+from src.config.paths import REGULAR_SEASON_GAMES_FEATURES_PATH
 from src.ml.config.schema import ExperimentConfig
-from src.ml.datasets.splitters import fixed_holdout_split, temporal_split
+from src.ml.datasets.splitters import season_split, temporal_split
 from src.ml.features.engineering import (
-    apply_conference_features,
+    create_conference_features,
     create_delta_features,
     resolve_feature_columns,
 )
@@ -63,8 +65,12 @@ class Splits:
     # Target over every surviving row, before splitting — the source of truth
     # for the full class set.
     y: pd.Series
-    used_fixed_holdout: bool
     date_range_name: Optional[str]
+
+    # Which splitter actually ran. Callers log this rather than
+    # ``splitting.method``, which reads "temporal" either way and made two runs
+    # with completely different train/val/test sizes indistinguishable in MLflow.
+    split_method: str
 
     def game_ids(self, split: str) -> pd.Series:
         """gameIds for ``split`` in {'train', 'validation', 'test'}."""
@@ -76,31 +82,19 @@ class Splits:
         return self.metadata.loc[index, "gameId"]
 
 
-def build_splits(
-    config: ExperimentConfig,
-    holdout_path: Optional[Path] = None,
-) -> Splits:
+def build_splits(config: ExperimentConfig) -> Splits:
     """Load the feature table and split it according to ``config``.
 
-    Steps, in order: load and validate → filter by ``min_season`` → filter by
-    conference matchup → drop NA and peel off metadata → resolve the frozen
-    holdout → build baseline test frames → engineer delta and conference
-    features → select feature columns → split → apply the minimum-games-played
-    masks.
+    Steps, in order: load and validate → filter by ``min_season`` → drop NA and
+    peel off metadata → build baseline test frames → engineer delta and
+    conference features → select feature columns → split on season boundaries →
+    apply the minimum-games-played masks.
 
     Parameters
     ----------
     config : ExperimentConfig
         Drives every filter, feature and split decision.
-    holdout_path : Path, optional
-        Frozen holdout metadata. Defaults to
-        :data:`src.config.paths.HOLDOUT_TEST_METADATA_PATH`; overridable so
-        tests can pin a holdout without depending on local data. When the file
-        is absent, falls back to a temporal split.
     """
-    if holdout_path is None:
-        holdout_path = HOLDOUT_TEST_METADATA_PATH
-
     data_config = config.data
     split_config = config.splitting
     feat_eng_config = config.feature_engineering
@@ -117,16 +111,13 @@ def build_splits(
 
     minimum_games_train = filters_config.minimum_games_train
     minimum_games_test = filters_config.minimum_games_test
-    conference_filter = filters_config.conference_filter
     min_season = filters_config.min_season
 
     test_size = split_config.test_size
     val_size = split_config.val_size
-
-    if conference_filter not in ["same", "different", "all"]:
-        raise ValueError(
-            f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
-        )
+    test_start_season = split_config.test_start_season
+    val_seasons = split_config.val_seasons
+    use_season_split = test_start_season is not None and val_seasons is not None
 
     games_enriched = load_and_validate_data(
         data_path=data_path, target_column=target_column, date_column=date_column
@@ -137,19 +128,6 @@ def build_splits(
             raise ValueError("DataFrame must contain 'season' column for min_season filtering")
         games_enriched = games_enriched[games_enriched["season"] >= min_season].copy()
         logger.info(f"Filtered to {len(games_enriched)} games (min_season: {min_season})")
-
-    if conference_filter == "different":
-        games_enriched = games_enriched[
-            games_enriched["hometeamConference"] != games_enriched["awayteamConference"]
-        ].copy()
-        logger.info(f"Filtered to {len(games_enriched)} games (different conferences)")
-    elif conference_filter == "same":
-        games_enriched = games_enriched[
-            games_enriched["hometeamConference"] == games_enriched["awayteamConference"]
-        ].copy()
-        logger.info(f"Filtered to {len(games_enriched)} games (same conference)")
-    else:
-        logger.info(f"Using all {len(games_enriched)} games (no conference filter)")
 
     date_range_name = None
     if date_column and date_column in games_enriched.columns:
@@ -166,28 +144,27 @@ def build_splits(
         metadata_columns=metadata_columns,
     )
 
-    # Resolve holdout indices once — used for both baseline and main splits
-    used_fixed_holdout = holdout_path.exists()
-    holdout_indices = None
-    if used_fixed_holdout:
-        holdout_meta = pd.read_csv(holdout_path, usecols=["gameId"])
-        holdout_game_ids = set(holdout_meta["gameId"].astype(int))
-        holdout_indices = metadata[metadata["gameId"].isin(holdout_game_ids)].index
-        logger.info(
-            f"Using fixed holdout: {len(holdout_indices)} games "
-            f"({len(holdout_game_ids)} in file, {len(holdout_indices)} matched)"
-        )
-    else:
+    # Season per surviving row. Captured here because feature selection drops
+    # the column before the split runs, and season_split needs it.
+    seasons = df["season"]
+
+    if not use_season_split:
         logger.warning(
-            f"Fixed holdout not found at {holdout_path}. "
-            "Falling back to temporal split — test set will shift as new games are added. "
-            "Run `make build-holdout-set` to freeze the holdout."
+            "splitting.test_start_season / val_seasons are not both set, so this "
+            "run falls back to a proportional temporal split. The test set will "
+            "then shift as new games are added, and the train ceiling will sit "
+            "decades earlier than expected — see season_split's docstring."
         )
 
     # Special Dataframe for baseline models
-    if used_fixed_holdout:
-        X_test_baseline = df.loc[holdout_indices].copy()
-        y_test_baseline = y.loc[holdout_indices].copy()
+    if use_season_split:
+        _, _, X_test_baseline, _, _, y_test_baseline = season_split(
+            df,
+            y,
+            seasons=seasons,
+            test_start_season=cast(str, test_start_season),
+            val_seasons=cast(int, val_seasons),
+        )
     else:
         _, _, X_test_baseline, _, _, y_test_baseline = temporal_split(
             df, y, date_column=date_column, test_size=test_size, val_size=val_size
@@ -200,12 +177,11 @@ def build_splits(
     )
 
     df = create_delta_features(df, feat_eng_config.features)
-    df = apply_conference_features(df, conference_filter)
+    df = create_conference_features(df)
 
     if feat_eng_config.selection_mode == "inclusion":
         feature_columns = resolve_feature_columns(
             feat_eng_config.features,
-            conference_filter,
             momentum_pairs=config.feature_engineering.momentum_pairs or None,
         )
         keep_cols = feature_columns + [date_column]
@@ -233,9 +209,13 @@ def build_splits(
 
     if date_column not in X.columns:
         raise ValueError(f"Date column '{date_column}' required for temporal split")
-    if used_fixed_holdout:
-        X_train, X_val, X_test, y_train, y_val, y_test = fixed_holdout_split(
-            X, y, holdout_indices=holdout_indices, date_column=date_column, val_size=val_size
+    if use_season_split:
+        X_train, X_val, X_test, y_train, y_val, y_test = season_split(
+            X,
+            y,
+            seasons=seasons,
+            test_start_season=cast(str, test_start_season),
+            val_seasons=cast(int, val_seasons),
         )
     else:
         X_train, X_val, X_test, y_train, y_val, y_test = temporal_split(
@@ -284,6 +264,6 @@ def build_splits(
         metadata_test=metadata_test,
         games_enriched=games_enriched,
         y=y,
-        used_fixed_holdout=used_fixed_holdout,
         date_range_name=date_range_name,
+        split_method="season" if use_season_split else "temporal",
     )

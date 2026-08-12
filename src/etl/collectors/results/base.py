@@ -9,15 +9,45 @@ file plus a line in the factory.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Protocol, runtime_checkable
+
+
+class GameStatus(str, Enum):
+    """What the source says has happened to a game.
+
+    This is read from the provider's status field, never inferred from the
+    scoreline. Inferring it is how a game that had simply not tipped off yet
+    ended up recorded as permanently postponed: a 0-0 scoreline is the normal
+    state of every game before it starts.
+
+    ``UNKNOWN`` is the safe bucket. An ambiguous or unparseable status must
+    leave the game pending rather than commit a guess to the history table.
+    """
+
+    FINAL = "final"
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    POSTPONED = "postponed"
+    UNKNOWN = "unknown"
+
+    @property
+    def is_terminal(self) -> bool:
+        """Whether this status settles the game, one way or the other.
+
+        Terminal statuses move the payload out of the pending directory. The
+        rest leave it there to be asked about again.
+        """
+        return self in (GameStatus.FINAL, GameStatus.POSTPONED)
 
 
 @dataclass
 class GameResult:
-    """Final state of a played game.
+    """State of a game as reported by a results source.
 
-    ``postponed=1`` means the game did not happen; that is distinct from a
-    source returning ``None``, which means "no outcome available yet".
+    ``status`` drives every routing decision downstream. ``postponed`` is kept
+    because the historical backfill uses it as a column, and is derived from
+    ``status`` rather than the other way round.
     """
 
     home_score: int = 0
@@ -27,6 +57,7 @@ class GameResult:
     postponed: int = 0
     attendance: int | None = None
     inactive_players: list[dict[str, Any]] = field(default_factory=list)
+    status: GameStatus = GameStatus.UNKNOWN
 
 
 @runtime_checkable
@@ -42,10 +73,11 @@ class ResultsSource(Protocol):
     name: str
 
     def fetch(self, game_id: str) -> GameResult | None:
-        """Outcome for ``game_id``, or ``None`` if it is not available yet.
+        """Outcome for ``game_id``, or ``None`` if the source cannot be reached.
 
-        ``None`` is the normal answer for a game that has not been played, and
-        must not raise.
+        ``None`` means "ask again later" — a timeout, an outage. A game that
+        simply has not been played yet is a successful answer with a non-final
+        :class:`GameStatus`, not ``None``. Neither case may raise.
         """
         ...
 

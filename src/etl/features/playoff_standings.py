@@ -12,9 +12,14 @@ included (post-game stats) while today's games have not yet been played
 (pre-game stats are used for teams playing today).
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
+from src.config.constants import REGULAR_SEASON_GAME_TYPE
+from src.config.paths import PROCESSED_LEAGUE_SCHEDULE_PATH
+from src.etl.utils.common import game_type_from_id, get_nba_season
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -161,12 +166,73 @@ def _compute_cumulative_stats(team_games: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _merge_games_remaining(team_games: pd.DataFrame) -> pd.DataFrame:
+def season_lengths_from_schedule(
+    schedule_path: Path | None = None,
+) -> dict[str, int]:
+    """Games per team per season, read from the parsed league schedule.
+
+    Counting the games actually present in a frame is only correct once a season
+    is over. Mid-season it is badly wrong: a 2025/26 frame stopping in January
+    holds ~690 games, which reads as a 46-game season, so teams appear to have
+    no games left and start clinching playoff berths in December. The schedule
+    knows the real answer — 1,230 regular-season fixtures, i.e. 82 per team —
+    from the first day of the season.
+
+    Returns an empty mapping when the schedule has not been parsed, so callers
+    fall back to counting. `full-rebuild` does not run `parse-league-schedule`.
+    """
+    path = Path(schedule_path or PROCESSED_LEAGUE_SCHEDULE_PATH)
+    if not path.exists():
+        logger.info(
+            "No parsed league schedule at %s; season lengths will be inferred "
+            "from the games present, which understates an in-progress season.",
+            path,
+        )
+        return {}
+
+    schedule = pd.read_csv(path)
+    if "gameId" not in schedule.columns:
+        return {}
+
+    # Only regular-season fixtures count towards a team's 82: the schedule also
+    # carries playoff and play-in rows.
+    schedule = schedule[
+        schedule["gameId"].map(game_type_from_id) == REGULAR_SEASON_GAME_TYPE
+    ]
+    if schedule.empty:
+        return {}
+
+    if "season" not in schedule.columns:
+        schedule = schedule.assign(
+            season=pd.to_datetime(schedule["gameDateTimeEst"], errors="coerce").apply(
+                get_nba_season
+            )
+        )
+
+    lengths: dict[str, int] = {}
+    for season, group in schedule.groupby("season"):
+        n_teams = pd.unique(
+            pd.concat([group["homeTeamId"], group["awayTeamId"]])
+        ).size
+        if n_teams:
+            lengths[str(season)] = int(2 * group["gameId"].nunique() // n_teams)
+    return lengths
+
+
+def _merge_games_remaining(
+    team_games: pd.DataFrame, season_lengths: dict[str, int] | None = None
+) -> pd.DataFrame:
     """Append ``games_remaining`` and ``post_games_remaining``.
 
     ``total_season_games`` is the league schedule length per season (balanced
     schedule: ``2 * n_unique_games // n_teams``), not per-team row counts, so
     shortened seasons and duplicate input rows are handled consistently.
+
+    That count is only right for a season that has finished. Seasons listed in
+    ``season_lengths`` (from the parsed schedule) use the real fixture count
+    instead; everything else — every completed historical season, including the
+    short 1946/47, 2011/12 and 2019/20 ones — keeps the counted value, which is
+    correct for them.
     """
     season_stats = team_games.groupby("season").agg(
         n_games=("gameId", "nunique"),
@@ -178,6 +244,20 @@ def _merge_games_remaining(team_games: pd.DataFrame) -> pd.DataFrame:
     mask = nt > 0
     total[mask] = (2 * ng[mask]) // nt[mask]
     season_stats["total_season_games"] = total
+
+    for season, scheduled in (season_lengths or {}).items():
+        if season in season_stats.index and scheduled > 0:
+            counted = int(season_stats.loc[season, "total_season_games"])
+            if counted != scheduled:
+                logger.info(
+                    "Season %s: %d games per team scheduled, %d observed — using "
+                    "the schedule, so games_remaining reflects the real season.",
+                    season,
+                    scheduled,
+                    counted,
+                )
+            season_stats.loc[season, "total_season_games"] = scheduled
+
     g = team_games.merge(
         season_stats[["total_season_games"]].reset_index(),
         on="season",
@@ -412,7 +492,9 @@ def _rank_conference_snapshot(
     return ranked
 
 
-def compute_playoff_flags(games: pd.DataFrame) -> pd.DataFrame:
+def compute_playoff_flags(
+    games: pd.DataFrame, season_lengths: dict[str, int] | None = None
+) -> pd.DataFrame:
     """Compute conference standings and playoff status flags for every (team, game).
 
     For each game on date D, standings are built from:
@@ -431,6 +513,10 @@ def compute_playoff_flags(games: pd.DataFrame) -> pd.DataFrame:
         ``gameDateOnlyStr``, ``season``, ``hometeamId``, ``awayteamId``,
         ``winner``, ``homeScore``, ``awayScore``,
         ``hometeamConference``, ``awayteamConference``.
+    season_lengths : dict, optional
+        Games per team per season. Defaults to the parsed league schedule via
+        :func:`season_lengths_from_schedule`; seasons it does not cover fall back
+        to counting the games present. Pass ``{}`` to force the counted value.
 
     Returns
     -------
@@ -442,9 +528,12 @@ def compute_playoff_flags(games: pd.DataFrame) -> pd.DataFrame:
         ``clinched_playoff_berth``, ``eliminated_from_playoffs``,
         ``clinched_final_seed``.
     """
+    if season_lengths is None:
+        season_lengths = season_lengths_from_schedule()
+
     team_games = _build_team_game_rows(games)
     team_games = _compute_cumulative_stats(team_games)
-    team_games = _merge_games_remaining(team_games)
+    team_games = _merge_games_remaining(team_games, season_lengths)
     h2h_df = _compute_h2h_records(team_games)
 
     result_pieces = []

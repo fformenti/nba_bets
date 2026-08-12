@@ -1,0 +1,7 @@
+uv run python -m src.cli.fetch_upcoming_games
+2026-08-11 22:59:04,756 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:59:04,756 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:59:04,959 - src.etl.collectors.upcoming_games - INFO - History frontier: 2026-01-25
+2026-08-11 22:59:04,967 - src.etl.collectors.upcoming_games - INFO - 3 postponed row(s) in history still owe a fixture
+2026-08-11 22:59:04,983 - src.etl.collectors.upcoming_games - INFO - Next date: 2026-01-26, 7 game(s)
+2026-08-11 22:59:05,000 - src.etl.collectors.upcoming_games - INFO - Saved 7 upcoming game(s) to /Users/felipeformenti/dev/fformenti/nba_bets/data/raw/incremental/upcoming_games (0 refreshed)

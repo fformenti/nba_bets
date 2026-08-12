@@ -13,7 +13,6 @@ data:
 
 filters:
   start_date: "1980-08-01"
-  conference_filter: "all"   # ignored during training (both 'same'/'different' always trained)
   minimum_games: 30          # min games played by each team before row is included
 
 splitting:

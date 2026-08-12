@@ -1,0 +1,38 @@
+uv run python -m src.cli.process_ingested_games
+2026-08-12 00:16:35,078 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:35,078 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:35,646 - src.etl.process_ingested_games - INFO - Saved 66046 regular season games to /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games.csv
+uv run python -m src.cli.build_features --config configs/features.yaml
+2026-08-12 00:16:35,986 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:35,986 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:36,103 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:16:36,103 - src.etl.make_features - INFO - 
+[Step 1/4] Adding neutral court game flag and conference information...
+2026-08-12 00:16:36,461 - src.etl.make_features - INFO - ✓ Added conference information to 66046 games
+2026-08-12 00:16:36,461 - src.etl.make_features - INFO - 
+[Step 2/4] Creating feature tables...
+2026-08-12 00:16:40,532 - src.etl.features.rest_days - WARNING - Rest days: clamping league-stoppage outliers (days_at_home>30: 1771 rows -> 30, days_on_road>30: 1808 rows -> 1)
+2026-08-12 00:16:40,717 - src.etl.features.distances - WARNING - Season 1950/51: 23 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,729 - src.etl.features.distances - WARNING - Season 1951/52: 22 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,741 - src.etl.features.distances - WARNING - Season 1952/53: 19 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,752 - src.etl.features.distances - WARNING - Season 1953/54: 6 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,764 - src.etl.features.distances - WARNING - Season 1954/55: 33 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,776 - src.etl.features.distances - WARNING - Season 1955/56: 15 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,788 - src.etl.features.distances - WARNING - Season 1956/57: 23 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,800 - src.etl.features.distances - WARNING - Season 1957/58: 2 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,812 - src.etl.features.distances - WARNING - Season 1958/59: 7 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,823 - src.etl.features.distances - WARNING - Season 1959/60: 29 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,835 - src.etl.features.distances - WARNING - Season 1960/61: 15 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,849 - src.etl.features.distances - WARNING - Season 1961/62: 6 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,862 - src.etl.features.distances - WARNING - Season 1962/63: 36 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,875 - src.etl.features.distances - WARNING - Season 1963/64: 14 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,887 - src.etl.features.distances - WARNING - Season 1964/65: 12 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,900 - src.etl.features.distances - WARNING - Season 1965/66: 20 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,913 - src.etl.features.distances - WARNING - Season 1966/67: 6 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:40,926 - src.etl.features.distances - WARNING - Season 1967/68: 2 team-day(s) have no known location; distance recorded as 0. Check the team-season coverage of TeamsHistoriesLocationsNBALookUpTable.csv.
+2026-08-12 00:16:50,004 - src.etl.features.playoff_standings - INFO - Season 2025/26: 82 games per team scheduled, 46 observed — using the schedule, so games_remaining reflects the real season.
+2026-08-12 00:18:50,321 - src.etl.make_features - INFO - ✓ Created all feature tables
+2026-08-12 00:18:50,322 - src.etl.make_features - INFO - 
+[Step 3/3] Merging features into final table...
+2026-08-12 00:19:02,170 - src.etl.make_features - INFO - ✓ Created final features table with 66046 rows
+2026-08-12 00:19:02,171 - src.etl.make_features - INFO - ✓ Saved to: /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games_features.csv

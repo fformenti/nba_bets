@@ -19,7 +19,7 @@ from typing import Literal, Optional
 
 import pandas as pd
 
-SerializationFormat = Literal["labeled", "json", "markdown", "prose"]
+SerializationFormat = Literal["labeled", "json", "markdown"]
 
 SYSTEM_PROMPT = (
     "You are responsible for predicting the outcome of a basketball game.\n"
@@ -140,6 +140,7 @@ _STEM_LABELS = {
     "days_at_home": "consecutive days at home",
     "days_on_road": "consecutive days on the road",
     "conference_diff_home_advantage_pct": "cross-conference home advantage",
+    "conference_home_court_advantage_pct": "home conference's edge on its own floor",
 }
 
 # (section title, stems). First match wins; anything unmatched lands in "Other",
@@ -158,6 +159,7 @@ _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "adjusted_last_season_record",
             "indifference_flag",
             "conference_diff_home_advantage_pct",
+            "conference_home_court_advantage_pct",
         ),
     ),
 )
@@ -268,23 +270,10 @@ def _as_labeled(features: pd.Series, meta: Optional[pd.Series]) -> str:
     return "\n".join(lines).rstrip()
 
 
-def _as_prose(features: pd.Series, meta: Optional[pd.Series]) -> str:
-    """The original hand-written prompt, via :class:`src.ml.llm.prompts.Game`.
-
-    Retained so runs already on the Hub stay comparable. It requires a fixed
-    set of raw ``*_HT``/``*_VT`` columns, so it only works on feature frames
-    that still carry them — see :func:`src.ml.llm.prompts.build_prose_prompt`.
-    """
-    from src.ml.llm.prompts import build_prose_prompt
-
-    return build_prose_prompt(features, meta)
-
-
 _SERIALIZERS = {
     "labeled": _as_labeled,
     "json": _as_json,
     "markdown": _as_markdown,
-    "prose": _as_prose,
 }
 
 
@@ -302,9 +291,10 @@ def serialize_row(
     meta : pd.Series, optional
         Matching row of the metadata frame (team names, season, date). Only the
         non-leaking columns in ``CONTEXT_META_COLUMNS`` are used.
-    fmt : {'json', 'markdown', 'prose'}
-        Encoding. ``markdown`` and ``json`` follow whatever columns exist;
-        ``prose`` uses the fixed original template.
+    fmt : {'labeled', 'json', 'markdown'}
+        Encoding. All three follow whatever columns exist. ``labeled`` is the
+        default: it additionally renders human-readable feature names, which a
+        base (non-instruct) model has more to work with.
 
     Returns
     -------

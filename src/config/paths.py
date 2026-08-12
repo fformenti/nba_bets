@@ -14,11 +14,21 @@ PROJECT_ROOT = script_dir.parent.parent
 # ===== Config YAML (single source of truth for CLI defaults) =====
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 CONFIGS_TRAIN_DIR = CONFIGS_DIR / "train"
-# Aligns with Makefile EXPERIMENT ?= train_same / make train
-DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH = CONFIGS_TRAIN_DIR / "train_same.yaml"
+# Aligns with Makefile TRAIN_CONFIG ?= xgboost / make train.
+# Swap to all_models.yaml (same features and splits, four model families) with
+# `make train TRAIN_CONFIG=all_models`.
+DEFAULT_TRAIN_CLASSIFIER_CONFIG_PATH = CONFIGS_TRAIN_DIR / "xgboost.yaml"
+# Every train config _includes this one and none override `splitting`, so it is
+# the single declaration of the train/validation/test season boundaries. Read by
+# the Polymarket slug builder, which must cover exactly the test seasons, and by
+# the trainer, for which model hyperparameters were explicitly declared.
+TRAIN_DEFAULTS_CONFIG_PATH = CONFIGS_TRAIN_DIR / "_defaults.yaml"
 DEFAULT_FEATURES_CONFIG_PATH = CONFIGS_DIR / "features.yaml"
-# LLM fine-tuning configs live in their own directory so the `train-all`
-# target (which globs configs/train/*.yaml) does not pick them up.
+# Two directories because they hold two different schemas, not two flavours of
+# one: configs/train/ is ExperimentConfig (features, splits, sklearn models),
+# configs/train_llm/ is LLMTrainingConfig (base model, LoRA, quantization), and
+# each has its own loader. configs/train/llm_features.yaml is an ExperimentConfig
+# despite the name — it defines the columns the LLM dataset is built from.
 CONFIGS_TRAIN_LLM_DIR = CONFIGS_DIR / "train_llm"
 # Aligns with Makefile LLM_CONFIG ?= llama31_8b_qlora / make train-llm
 DEFAULT_TRAIN_LLM_CONFIG_PATH = CONFIGS_TRAIN_LLM_DIR / "llama31_8b_qlora.yaml"
@@ -35,21 +45,28 @@ PREDICTIONS_DIR = DATA_DIR / "predictions"
 
 # ===== Subdirectories =====
 REGULAR_SEASON_DIR = PROCESSED_DIR / "regular_season"
-PLAYOFFS_DIR = PROCESSED_DIR / "playoffs"
 
 # ===== Raw =====
 RAW_HISTORICAL_DIR = RAW_DIR / "historical"
 RAW_GAMES_PATH = RAW_HISTORICAL_DIR / "games" / "Games.csv"
-RAW_DISTANCES_PATH = RAW_DIR / "distances_long.csv"
 LEAGUE_SCHEDULE_PATH = RAW_HISTORICAL_DIR / LEAGUE_SCHEDULE_FILE
-# downaloaded file
-ALL_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistories.csv"
-# filter from file above filter for NBA teams
-NBA_TEAMS_HISTORY_PATH = RAW_HISTORICAL_DIR / "TeamsHistoriesNBA.csv"
-# Conference CSV at historical root (incremental ingestion default; handmade copy: TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH)
-TEAMS_HISTORIES_CONFERENCE_NBA_CSV_PATH = (
-    RAW_HISTORICAL_DIR / "TeamsHistoriesConferenceNBA.csv"
+
+# ===== Reference inputs =====
+# Generated once by an external service rather than derived from anything in
+# this repo, so they are *inputs* and live under raw/ with the other inputs.
+# Nothing in the pipeline can rebuild them offline: losing them stops the ETL at
+# its first step. See docs/PIPELINE_AUDIT.md and the builders in
+# src/etl/reference/.
+RAW_REFERENCE_DIR = RAW_DIR / "reference"
+# teamId × season → city/state. Built by `make build-teams-locations` (OpenAI).
+TEAMS_LOCATIONS_REFERENCE_PATH = (
+    RAW_REFERENCE_DIR / "TeamsHistoriesLocationsNBALookUpTable.csv"
 )
+# City-pair travel distances. Built by `make build-distances-table`
+# (Serper + OpenAI). Holds distinct pairs only — a team staying in the same city
+# has no row here by construction, which is why an unmatched same-city pair
+# means zero travel rather than missing data.
+LOCATIONS_DISTANCES_PATH = RAW_REFERENCE_DIR / "locations_distances.csv"
 
 # ===== Handmade =====
 # Conference added by hand using the NBA_TEAMS_HISTORY_PATH file
@@ -58,34 +75,43 @@ TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH = (
 )
 
 # ===== Collected =====
+# One directory per state a fetched game can be in. A game moves forward through
+# them exactly once, so "where is this file?" answers "what happened to it?".
 RAW_INCREMENTAL_DIR = RAW_DIR / "incremental"
 RAW_INCREMENTAL_ARCHIVE_DIR = RAW_INCREMENTAL_DIR / "archive"
+# Pending: emitted by the selector, no terminal result from the source yet.
 UPCOMING_GAMES_DIR = RAW_INCREMENTAL_DIR / "upcoming_games"
+# Inbox: a final score has been fetched but is not in the history table yet.
 UPCOMING_GAMES_RESULTS_DIR = RAW_INCREMENTAL_DIR / "upcoming_games_results"
+# Consumed: already folded into INGESTED_GAMES_UPDATED_HISTORY_PATH. Kept for
+# audit only — nothing reads these back.
+ARCHIVE_RESULTS_DIR = RAW_INCREMENTAL_ARCHIVE_DIR / "results"
+# Parked: the source reported the game postponed. Watched against a refreshed
+# schedule for a makeup date; never written to history as a played game.
+POSTPONED_GAMES_DIR = RAW_INCREMENTAL_DIR / "postponed"
+# Quarantine: the source never returned a terminal status. Held here so a single
+# unanswerable game cannot block the rest of the pipeline. Needs a human.
+UNRESOLVED_GAMES_DIR = RAW_INCREMENTAL_DIR / "unresolved"
 # Hand-dropped outcomes read by the placeholder results source, until a real
 # provider is chosen. See src/etl/collectors/results/placeholder_source.py.
 MANUAL_RESULTS_DIR = RAW_INCREMENTAL_DIR / "manual_results"
 
 # ===== Ingested =====
-INGESTED_GAMES_PATH = INGESTED_DIR / "historical" / "games.csv"
+# The authoritative game history — the only ingested table, written by exactly
+# two steps and read by everything downstream. `make ingest-raw-games` merges the
+# raw historical archive into it (the archive wins any gameId both hold);
+# `make append-game-results` adds the results inbox to it.
 INGESTED_GAMES_UPDATED_HISTORY_PATH = INGESTED_DIR / "games_updated_history.csv"
-POSTPONED_GAMES_PATH = INGESTED_DIR / "historical" / "postponed_games.csv"
 
 # ===== Processed =====
 TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH = (
     PROCESSED_DIR / "TeamsHistoriesConferenceNBALookUpTable.csv"
 )
-TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH = (
-    PROCESSED_DIR / "TeamsHistoriesLocationsNBALookUpTable.csv"
-)
-LOCATIONS_DISTANCES_PATH = PROCESSED_DIR / "locations_distances.csv"
-
 TEAMS_ARENA_PATH = PROCESSED_DIR / "teams_arena.csv"
 POLYMARKET_TEAMS_ABV_PATH = PROCESSED_DIR / "polymarket_teams_abv.csv"
 PROCESSED_LEAGUE_SCHEDULE_PATH = PROCESSED_DIR / "league_schedule.csv"
 REGULAR_SEASON_GAMES_PATH = REGULAR_SEASON_DIR / "games.csv"
 NON_POSITIVE_SCORE_PATH = REGULAR_SEASON_DIR / "non_positive_score.csv"
-PLAYOFFS_GAMES_PATH = PROCESSED_DIR / "playoffs" / "games"
 
 # Feature tables paths
 REGULAR_SEASON_FEATURES_DIR = PROCESSED_DIR / "regular_season" / "features"
@@ -124,9 +150,12 @@ TEAMS_GDS_HOME_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_home.csv"
 TEAMS_GDS_AWAY_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_away.csv"
 PLAYOFF_STANDINGS_PATH = REGULAR_SEASON_FEATURES_DIR / "playoff_standings.csv"
 
-# Holdout (fixed test set, frozen once)
-HOLDOUT_DIR = PROCESSED_DIR / "holdout"
-HOLDOUT_TEST_METADATA_PATH = HOLDOUT_DIR / "test_metadata.csv"
+# Prediction builds the same tables, under the same filenames, from a much
+# smaller frame: one season of history plus the upcoming slate. It gets its own
+# directory because sharing one left the ETL's full-history tables truncated
+# after every prediction run. Nothing reads these two directories except
+# `merge_features`, which is told which one to use.
+PREDICTION_FEATURES_DIR = PROCESSED_DIR / "prediction" / "features"
 
 # Predictions
 UPCOMING_GAMES_PREDICTIONS_PATH = PREDICTIONS_DIR / "upcoming_games_predictions.csv"

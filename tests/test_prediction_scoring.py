@@ -15,6 +15,8 @@ import json
 import pandas as pd
 import pytest
 
+import src.monitoring.scoring as scoring_module
+from src.ml.prediction.pipeline import PREDICTION_KEY as WRITER_PREDICTION_KEY
 from src.monitoring.scoring import join_predictions_to_outcomes, load_outcomes, score_predictions
 
 HOME_A, AWAY_A = 1610612741, 1610612748
@@ -43,19 +45,19 @@ def predictions_path(tmp_path):
             {
                 "gameId": 1, "hometeamId": HOME_A, "awayteamId": AWAY_A,
                 "gameDateOnlyStr": "2026-02-01", "season": "2025/26",
-                "conference_filter": "all", "prediction": 1,
+                "prediction": 1,
                 "home_win_probability": 0.80, "winner": 0,
             },
             {
                 "gameId": 2, "hometeamId": HOME_B, "awayteamId": AWAY_B,
                 "gameDateOnlyStr": "2026-02-02", "season": "2025/26",
-                "conference_filter": "all", "prediction": 1,
+                "prediction": 1,
                 "home_win_probability": 0.65, "winner": 0,
             },
             {
                 "gameId": 3, "hometeamId": HOME_A, "awayteamId": AWAY_B,
                 "gameDateOnlyStr": "2026-02-03", "season": "2025/26",
-                "conference_filter": "all", "prediction": 0,
+                "prediction": 0,
                 "home_win_probability": 0.40, "winner": 0,
             },
         ]
@@ -145,3 +147,33 @@ def test_no_predictions_file_is_a_clear_error(tmp_path, history_path, empty_resu
             historical_path=history_path,
             results_dir=empty_results_dir,
         )
+
+
+def test_the_scorer_and_the_writer_share_one_prediction_key():
+    """They must be the same object, not two lists that happen to agree.
+
+    While the writer deduped on ["gameId"] and this module separately declared
+    ["gameId", "conference_filter"], a file carrying two rows per game passed
+    the duplicate check below untouched — every pair differed in the second key
+    — and the scorecard reported 26 games for a 13-game slate, averaging two
+    models' probabilities for one event into Brier and ECE.
+    """
+    assert scoring_module.PREDICTION_KEY is WRITER_PREDICTION_KEY
+
+
+def test_duplicate_rows_are_flagged(predictions_path, history_path, empty_results_dir, tmp_path, caplog):
+    """A doubled file must warn, whatever produced the duplicates."""
+    doubled = pd.concat([pd.read_csv(predictions_path)] * 2, ignore_index=True)
+    doubled_path = tmp_path / "doubled.csv"
+    doubled.to_csv(doubled_path, index=False)
+
+    with caplog.at_level("WARNING"):
+        score_predictions(
+            predictions_path=doubled_path,
+            historical_path=history_path,
+            results_dir=empty_results_dir,
+            scorecard_path=tmp_path / "scorecard.csv",
+            scored_games_path=tmp_path / "scored.csv",
+        )
+
+    assert "duplicate prediction row(s) found" in caplog.text

@@ -11,13 +11,12 @@ import pytest
 from src.ml.prediction.pipeline import upsert_predictions
 
 
-def _predictions(game_ids, probability=0.7, conference_filter="all"):
+def _predictions(game_ids, probability=0.7):
     return pd.DataFrame(
         [
             {
                 "gameId": game_id,
                 "gameDate": f"2026-02-{game_id:02d}",
-                "conference_filter": conference_filter,
                 "prediction": 1,
                 "home_win_probability": probability,
             }
@@ -55,12 +54,23 @@ def test_new_games_are_appended(output_path):
     assert upsert_predictions(_predictions([3, 4]), output_path) == 4
 
 
-def test_same_game_under_different_conference_models_both_kept(output_path):
-    """A game routed to two models is two legitimate rows, not a duplicate."""
-    upsert_predictions(_predictions([1], conference_filter="all"), output_path)
-    total = upsert_predictions(_predictions([1], conference_filter="same"), output_path)
+def test_rows_left_by_the_old_three_model_routing_are_collapsed(output_path):
+    """A game is one row.
 
-    assert total == 2
+    Prediction files written under the per-conference split carry a row per
+    model that scored the game, distinguished by a conference_filter column that
+    is no longer written. Re-predicting such a game must leave one row, not a
+    third — the betting path sizes one order plan per row.
+    """
+    stale = _predictions([1], probability=0.60)
+    stale["conference_filter"] = "same"
+    stale.to_csv(output_path, index=False)
+
+    total = upsert_predictions(_predictions([1], probability=0.85), output_path)
+
+    written = pd.read_csv(output_path)
+    assert total == 1
+    assert written.loc[0, "home_win_probability"] == 0.85
 
 
 def test_output_is_sorted_by_date(output_path):
@@ -77,10 +87,28 @@ def test_parent_directory_is_created(tmp_path):
     assert nested.exists()
 
 
-def test_legacy_file_without_conference_filter_still_dedupes(output_path):
-    """Files written before conference_filter existed must still be handled."""
-    legacy = _predictions([1, 2]).drop(columns=["conference_filter"])
+def test_a_file_carrying_the_stale_column_still_dedupes(output_path):
+    """The key is gameId alone, so an extra column changes nothing."""
+    legacy = _predictions([1, 2])
+    legacy["conference_filter"] = "all"
     legacy.to_csv(output_path, index=False)
 
     total = upsert_predictions(legacy, output_path)
     assert total == 2
+
+
+def test_rerunning_a_slate_leaves_the_file_byte_identical(output_path):
+    """Re-running an unchanged slate must not rewrite the file differently.
+
+    Every game in a slate shares a date, so sorting on the date alone left them
+    all tied — and pandas' default quicksort orders ties arbitrarily, so the CSV
+    churned on each run even when nothing about the predictions had changed.
+    """
+    slate = _predictions([1, 2, 3, 4, 5])
+    slate["gameDate"] = "2026-02-09"
+
+    upsert_predictions(slate, output_path)
+    first = output_path.read_bytes()
+    upsert_predictions(slate, output_path)
+
+    assert output_path.read_bytes() == first

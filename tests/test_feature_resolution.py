@@ -2,7 +2,6 @@
 
 import pandas as pd
 import pytest
-from pathlib import Path
 
 from src.ml.config.schema import (
     FeatureEngineeringConfig,
@@ -10,12 +9,17 @@ from src.ml.config.schema import (
     FeaturesMapConfig,
     MomentumPairConfig,
 )
-from src.ml.features.engineering import create_delta_features, resolve_feature_columns
+from src.ml.features.engineering import (
+    CONFERENCE_FEATURES,
+    create_delta_features,
+    resolve_feature_columns,
+)
+from src.config.paths import CONFIGS_TRAIN_DIR, TRAIN_DEFAULTS_CONFIG_PATH
 from src.ml.config.loader import load_experiment_config
 
-TRAIN_SAME = Path("configs/train/train_same.yaml")
-TRAIN_DIFFERENT = Path("configs/train/train_different.yaml")
-TRAIN_ALL = Path("configs/train/train_all.yaml")
+# Absolute, not Path("configs/..."): a cwd-relative constant made these tests
+# pass or fail depending on where pytest was invoked from.
+TRAIN_ALL = CONFIGS_TRAIN_DIR / "xgboost.yaml"
 
 
 def _make_disabled() -> FeatureGroupConfig:
@@ -38,23 +42,38 @@ def _record_only(lags: list[int]) -> FeaturesMapConfig:
     return _all_disabled(record=FeatureGroupConfig(lags=lags, delta=True, enabled=True))
 
 
+def _without_conference(cfg: FeaturesMapConfig, **kwargs) -> list[str]:
+    """Resolved columns minus the conference pair, which is always appended.
+
+    The conference features are not config-gated — every model gets them, and
+    they are 0.0 for same-conference games rather than absent. Group-specific
+    tests below assert about their own group, so they subtract them out;
+    ``test_conference_features_are_always_resolved`` is what pins them.
+    """
+    return [
+        column
+        for column in resolve_feature_columns(cfg, **kwargs)
+        if column not in CONFERENCE_FEATURES
+    ]
+
+
 # ── resolve_feature_columns ─────────────────────────────────────────────────
 
 
 class TestResolveFeatureColumns:
     def test_basic_record_delta(self):
         cfg = _record_only(lags=[10])
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert cols == ["record_L10_delta"]
 
     def test_multiple_lags(self):
         cfg = _record_only(lags=[10, 82])
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert cols == ["record_L10_delta", "record_L82_delta"]
 
     def test_disabled_group_excluded(self):
         cfg = _all_disabled(record=FeatureGroupConfig(enabled=False, lags=[10]))
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert cols == []
 
     def test_sos_adj_record_independent_of_record(self):
@@ -62,7 +81,7 @@ class TestResolveFeatureColumns:
         cfg = _all_disabled(
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[10], delta=True),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "sos_adj_record_L10_delta" in cols
         assert "record_L10_delta" not in cols
 
@@ -72,7 +91,7 @@ class TestResolveFeatureColumns:
             record=FeatureGroupConfig(enabled=True, lags=[82], delta=True),
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[13, 55], delta=True),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "record_L82_delta" in cols
         assert "sos_adj_record_L13_delta" in cols
         assert "sos_adj_record_L55_delta" in cols
@@ -85,7 +104,7 @@ class TestResolveFeatureColumns:
             sos=FeatureGroupConfig(enabled=False, lags=[1, 3, 5, 82]),
             sos_adj_record=FeatureGroupConfig(enabled=True, lags=[13, 55], delta=True),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         # sos_adj_record produces only its declared lags
         assert "sos_adj_record_L13_delta" in cols
         assert "sos_adj_record_L55_delta" in cols
@@ -99,27 +118,25 @@ class TestResolveFeatureColumns:
                 enabled=True, lags=[13], location_lags=[10, 41], delta=True
             ),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "sos_adj_record_L13_delta" in cols
         assert "sos_adj_record_L10_at_location_delta" in cols
         assert "sos_adj_record_L41_at_location_delta" in cols
 
-    def test_conference_same_no_extra_columns(self):
-        cfg = _record_only(lags=[10])
-        cols = resolve_feature_columns(cfg, conference_filter="same")
-        assert "home_conference_vs_away_conference_record" not in cols
-        assert "conference_diff_home_advantage_pct" not in cols
-
-    def test_conference_different_adds_two_columns(self):
-        cfg = _record_only(lags=[10])
-        cols = resolve_feature_columns(cfg, conference_filter="different")
-        assert "home_conference_vs_away_conference_record" in cols
-        assert "games_played_at_home_conference" in cols
-
-    def test_conference_all_adds_one_column(self):
-        cfg = _record_only(lags=[10])
-        cols = resolve_feature_columns(cfg, conference_filter="all")
+    def test_conference_features_are_always_resolved(self):
+        """Both features, unconditionally — there is no filter to gate them on."""
+        cols = resolve_feature_columns(_record_only(lags=[10]))
         assert "conference_diff_home_advantage_pct" in cols
+        assert "conference_home_court_advantage_pct" in cols
+
+    def test_games_played_at_home_conference_is_not_a_feature(self):
+        """It is a divisor inside the east/west ETL, not a model input.
+
+        It reached resolve_feature_columns only under the deleted 'different'
+        filter, so no shipped config ever fed it to a model.
+        """
+        cols = resolve_feature_columns(_record_only(lags=[10]))
+        assert "games_played_at_home_conference" not in cols
 
     def test_location_variants_included(self):
         cfg = _all_disabled(
@@ -127,14 +144,14 @@ class TestResolveFeatureColumns:
                 lags=[10], location_lags=[10], delta=True, enabled=True
             ),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "record_L10_delta" in cols
         assert "record_L10_at_location_delta" in cols
 
     def test_momentum_pair_replaces_source_deltas(self):
         cfg = _record_only(lags=[5, 10])
         pair = MomentumPairConfig(feature="record", short=5, long=10)
-        cols = resolve_feature_columns(cfg, conference_filter="same", momentum_pairs=[pair])
+        cols = _without_conference(cfg, momentum_pairs=[pair])
         assert "record_L5_delta" not in cols
         assert "record_L10_delta" not in cols
         assert "record_momentum_L5_L10_delta" in cols
@@ -143,7 +160,7 @@ class TestResolveFeatureColumns:
         cfg = _all_disabled(
             home_and_road=FeatureGroupConfig(enabled=True, delta=False),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "days_at_home" in cols
         assert "days_on_road" in cols
 
@@ -151,7 +168,7 @@ class TestResolveFeatureColumns:
         cfg = _all_disabled(
             home_and_road=FeatureGroupConfig(enabled=True, delta=True),
         )
-        cols = resolve_feature_columns(cfg, conference_filter="same")
+        cols = _without_conference(cfg)
         assert "days_at_home_delta" in cols
         assert "days_at_home" not in cols
 
@@ -236,5 +253,5 @@ class TestSelectionModeDefault:
 
     def test_defaults_yaml_has_inclusion(self):
         """_defaults.yaml sets selection_mode to 'inclusion'."""
-        config = load_experiment_config(Path("configs/train/_defaults.yaml"))
+        config = load_experiment_config(TRAIN_DEFAULTS_CONFIG_PATH)
         assert config.feature_engineering.selection_mode == "inclusion"

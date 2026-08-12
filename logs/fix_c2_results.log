@@ -1,0 +1,17 @@
+uv run python -m src.cli.fetch_game_results --source nba_api
+2026-08-12 00:16:05,027 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:05,027 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500657 via 'nba_api'
+2026-08-12 00:16:05,331 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500657.json
+2026-08-12 00:16:09,341 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500658 via 'nba_api'
+2026-08-12 00:16:09,748 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500658.json
+2026-08-12 00:16:13,759 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500659 via 'nba_api'
+2026-08-12 00:16:14,022 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500659.json
+2026-08-12 00:16:18,027 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500660 via 'nba_api'
+2026-08-12 00:16:18,276 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500660.json
+2026-08-12 00:16:22,282 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500661 via 'nba_api'
+2026-08-12 00:16:22,541 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500661.json
+2026-08-12 00:16:26,550 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500662 via 'nba_api'
+2026-08-12 00:16:26,848 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500662.json
+2026-08-12 00:16:30,858 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500663 via 'nba_api'
+2026-08-12 00:16:31,102 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500663.json
+2026-08-12 00:16:31,102 - src.etl.collectors.upcoming_games_results - INFO - Resolved 7 pending game(s) using 'nba_api': 7 final, 0 postponed, 0 still pending, 0 quarantined

@@ -21,7 +21,6 @@ column turns completion-only training back off without any error.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
@@ -94,7 +93,6 @@ def build_split_dataset(
 def build_llm_dataset(
     llm_config: LLMTrainingConfig,
     experiment_config: Optional[ExperimentConfig] = None,
-    holdout_path: Optional[Path] = None,
 ) -> "DatasetDict":
     """Build train/validation/test splits for the LLM from the ML splits.
 
@@ -106,8 +104,6 @@ def build_llm_dataset(
     experiment_config : ExperimentConfig, optional
         Pre-loaded experiment config. When omitted it is loaded from
         ``llm_config.data.source_experiment_config``.
-    holdout_path : Path, optional
-        Passed through to :func:`build_splits`; defaults to the frozen holdout.
 
     Returns
     -------
@@ -123,13 +119,7 @@ def build_llm_dataset(
         f"Building LLM dataset from {llm_config.data.source_experiment_config} "
         f"(format={llm_config.data.serialization_format})"
     )
-    splits = build_splits(experiment_config, holdout_path=holdout_path)
-    if not splits.used_fixed_holdout:
-        logger.warning(
-            "The source experiment fell back to a temporal split — the LLM test "
-            "set will drift as new games arrive, and will not match past sklearn "
-            "runs. Run `make build-holdout-set` to freeze the holdout."
-        )
+    splits = build_splits(experiment_config)
 
     dataset = DatasetDict(
         {

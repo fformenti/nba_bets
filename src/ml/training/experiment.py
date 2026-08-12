@@ -1,25 +1,27 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from src.config.paths import (
-    CONFIGS_TRAIN_DIR,
     REGULAR_SEASON_GAMES_FEATURES_PATH,
+    TRAIN_DEFAULTS_CONFIG_PATH,
 )
 from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.datasets.splits import build_splits
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.model_selection import KFold
 
 from src.ml.evaluation.metrics import (
     compute_brier_score,
+    compute_classification_metrics,
     compute_ece,
+    compute_ece_ratio,
     format_metrics_line,
-    get_conference_display_name,
     get_model_display_name,
     print_metrics_summary,
 )
@@ -41,19 +43,79 @@ from src.utils.logging_config import get_logger
 
 from .model_factory import clean_feature_names
 from .runners import train_baseline_model, train_model_with_config
+from .weighting import compute_sample_weights, effective_sample_size
 
 logger = get_logger(__name__)
 
+# Rows the validation split needs before its Brier comparison means anything.
+# Below this, no calibrator is chosen — the alternative is choosing one on test,
+# which is what this replaced.
+MIN_CALIBRATION_PROBE_ROWS = 400
 
-def _extract_explicit_model_param_keys(
-    config_path: Optional[Path],
-) -> dict[str, set[str]]:
-    """Read `_defaults.yaml` and return explicit top-level param keys per model."""
-    defaults_path = (
-        (config_path.parent / "_defaults.yaml")
-        if config_path is not None
-        else (CONFIGS_TRAIN_DIR / "_defaults.yaml")
-    )
+# Folds used to score a calibration method out-of-fold across all of validation.
+CALIBRATION_PROBE_FOLDS = 5
+
+
+def _oof_calibrated_proba(
+    base_pipeline: Any,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    method: Optional[str],
+) -> np.ndarray:
+    """Out-of-fold P(home win) on validation, for scoring a calibration method.
+
+    Every validation row is predicted by a calibrator that never saw it, so the
+    whole split scores the method instead of half of it. This replaced a single
+    positional half-split, which spent 491 of 982 rows and fit the probe on the
+    first half of a season to score it on the second — folding within-season
+    drift into a decision that was already inside the noise.
+
+    ``method=None`` gives the uncalibrated baseline, scored on the identical rows
+    in the identical order so the comparison stays paired.
+    """
+    oof = np.empty(len(X_val), dtype=float)
+    folds = KFold(n_splits=CALIBRATION_PROBE_FOLDS, shuffle=False)
+    for fit_idx, score_idx in folds.split(X_val):
+        X_score = X_val.iloc[score_idx]
+        if method is None:
+            oof[score_idx] = _positive_class_proba(base_pipeline, X_score)
+            continue
+        probe = CalibratedClassifierCV(base_pipeline, method=method, cv="prefit")
+        probe.fit(X_val.iloc[fit_idx], y_val.iloc[fit_idx])
+        oof[score_idx] = _positive_class_proba(probe, X_score)
+    return oof
+
+
+def _paired_brier_margin(
+    y_true: pd.Series, proba_a: np.ndarray, proba_b: np.ndarray
+) -> tuple:
+    """(delta, se) for Brier(a) - Brier(b), paired row by row.
+
+    Brier is a mean of per-row squared errors, so the difference between two
+    models scored on the same rows is a mean of per-row differences and its
+    standard error is exact — no bootstrap needed. Pairing matters: the two
+    models' errors are highly correlated, so the unpaired SE would be far too
+    wide to resolve the difference at all.
+    """
+    y = np.asarray(y_true, dtype=float)
+    d = (np.asarray(proba_a) - y) ** 2 - (np.asarray(proba_b) - y) ** 2
+    return float(d.mean()), float(d.std(ddof=1) / np.sqrt(d.size))
+
+
+def _positive_class_proba(estimator: Any, X: pd.DataFrame) -> np.ndarray:
+    """P(home win) as a 1-D array, whatever shape predict_proba returns."""
+    proba = estimator.predict_proba(X)
+    return proba[:, 1] if proba.ndim > 1 else proba
+
+
+def _extract_explicit_model_param_keys() -> dict[str, set[str]]:
+    """Read `_defaults.yaml` and return explicit top-level param keys per model.
+
+    Always the one shared base. This used to resolve `_defaults.yaml` as a
+    sibling of the experiment config, which pinned train configs to a directory
+    that happens to contain one, for no benefit — there is only ever one.
+    """
+    defaults_path = TRAIN_DEFAULTS_CONFIG_PATH
     try:
         raw_config = load_yaml_config(defaults_path)
     except Exception as exc:
@@ -118,7 +180,7 @@ def train_single_model(
     data_config = config.data
     split_config = config.splitting
     model_config = config.model.model_dump()
-    explicit_param_keys_by_model = _extract_explicit_model_param_keys(config_path)
+    explicit_param_keys_by_model = _extract_explicit_model_param_keys()
     eval_config = config.evaluation
     paths_config = config.paths
     feat_eng_config = config.feature_engineering
@@ -134,34 +196,24 @@ def train_single_model(
 
     minimum_games_train = filters_config.minimum_games_train
     minimum_games_test = filters_config.minimum_games_test
-    conference_filter = filters_config.conference_filter
 
     test_size = split_config.test_size
     val_size = split_config.val_size
     random_state = split_config.random_state
-
-    if conference_filter not in ["same", "different", "all"]:
-        raise ValueError(
-            f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
-        )
 
     min_season = filters_config.min_season
 
     tracker.log_params(
         {
             "target_column": target_column,
-            "split_method": split_config.method,
             "test_size": test_size,
             "val_size": val_size,
             "minimum_games_train": minimum_games_train,
             "minimum_games_test": minimum_games_test,
-            "conference_filter": conference_filter,
             "min_season": min_season,
             "scaling_method": config.preprocessing.scaling_method,
             "sample_weighting_enabled": weighting_config.enabled,
             "sample_weighting_K": weighting_config.saturation_K,
-            "season_decay_enabled": weighting_config.season_decay_enabled,
-            "season_decay_lambda": weighting_config.season_decay_lambda,
             "feature_selection_enabled": config.feature_selection.enabled,
             "feature_selection_include_tentative": config.feature_selection.include_tentative,
             "feature_engineering_sos_adj_alpha": feat_eng_config.sos_adj_alpha,
@@ -172,7 +224,6 @@ def train_single_model(
             "task": "classification",
             "config_file": config_path.stem if config_path else "default",
             "experiment_type": "training",
-            "conference_filter": conference_filter,
         }
     )
     if config.tags:
@@ -200,50 +251,11 @@ def train_single_model(
         )
 
     # --- Sample weight computation ---
-    train_sample_weight = None
-    if weighting_config.enabled:
-        K = weighting_config.saturation_K
-        train_gp_ht = cast(
-            pd.Series,
-            pd.to_numeric(
-                metadata.loc[X_train.index, "games_played_HT"], errors="coerce"
-            ),
-        )
-        train_gp_vt = cast(
-            pd.Series,
-            pd.to_numeric(
-                metadata.loc[X_train.index, "games_played_VT"], errors="coerce"
-            ),
-        )
-        min_gp_train = np.minimum(
-            train_gp_ht.to_numpy(dtype=np.float64, copy=False),
-            train_gp_vt.to_numpy(dtype=np.float64, copy=False),
-        )
-        train_sample_weight = np.clip(min_gp_train / float(K), 0.0, 1.0)
-        logger.info(
-            f"Within-season weighting (K={K}): "
-            f"min={train_sample_weight.min():.2f}, "
-            f"mean={train_sample_weight.mean():.2f}, "
-            f"pct_full={(train_sample_weight == 1.0).mean() * 100:.1f}%"
-        )
-
-    if weighting_config.season_decay_enabled:
-        lam = weighting_config.season_decay_lambda
-        train_seasons = metadata.loc[X_train.index, "season"]
-        season_order = sorted(train_seasons.unique())
-        season_to_idx = {s: i for i, s in enumerate(season_order)}
-        max_idx = len(season_order) - 1
-        season_indices = train_seasons.map(season_to_idx).to_numpy(dtype=np.float64)
-        cross_season_weight = np.exp(-lam * (max_idx - season_indices))
-        if train_sample_weight is None:
-            train_sample_weight = cross_season_weight
-        else:
-            train_sample_weight = train_sample_weight * cross_season_weight
-        logger.info(
-            f"Cross-season decay (lambda={lam}): "
-            f"min={cross_season_weight.min():.3f}, "
-            f"mean={cross_season_weight.mean():.3f}, "
-            f"oldest={season_order[0]}, newest={season_order[-1]}"
+    # Within-season ramp only; see src/ml/training/weighting.py.
+    train_sample_weight = compute_sample_weights(metadata.loc[X_train.index], weighting_config)
+    if train_sample_weight is not None:
+        tracker.log_metrics(
+            {"train_effective_sample_size": effective_sample_size(train_sample_weight)}
         )
 
     # logger.info(
@@ -278,6 +290,21 @@ def train_single_model(
             }
         )
 
+        # The counts alone do not say *which* features a run chose, and an
+        # MLflow param value would truncate a 16-name list. Without this,
+        # answering "did these two runs select the same features?" meant loading
+        # both model artifacts and reading feature_names_in_.
+        tracker.log_dict(
+            {
+                "include_tentative": config.feature_selection.include_tentative,
+                "selected": list(selected_features),
+                "confirmed": list(boruta_selector.confirmed_features_),
+                "tentative": list(boruta_selector.tentative_features_),
+                "rejected": list(boruta_selector.rejected_features_),
+            },
+            artifact_file="feature_tracking/selected_features.json",
+        )
+
         # Save JSON artifact with full results
         output_dir = Path(paths_config.outputs)
         fs_dir = output_dir / "feature_selection"
@@ -291,7 +318,7 @@ def train_single_model(
             fig_boruta = plot_boruta_shap_results(
                 boruta_selector,
                 top_n=50,
-                title=f"Boruta-SHAP Feature Selection ({conference_filter})",
+                title="Boruta-SHAP Feature Selection",
             )
             fig_boruta.savefig(
                 viz_dir / "boruta_shap_selection.png", dpi=300, bbox_inches="tight"
@@ -309,6 +336,12 @@ def train_single_model(
             "n_val": len(X_val),
             "n_test": len(X_test),
             "n_features": len(X_train.columns),
+            # The splitter that actually ran, plus its season boundaries. Without
+            # these, runs whose train/val/test populations differ completely look
+            # identical in MLflow, and metrics get compared across them.
+            "split_method": splits.split_method,
+            "test_start_season": split_config.test_start_season,
+            "val_seasons": split_config.val_seasons,
         }
     )
     tracker.log_dict(
@@ -375,7 +408,12 @@ def train_single_model(
     #     tracker.log_metrics(baseline_test_metrics)
     #     tracker.set_tags({"model_type": "baseline"})
 
-    model_names = list(models_to_train.keys()) + list(config.model.train_models)
+    # dict.fromkeys dedups while preserving order: a name listed in both the
+    # seeded baselines and config.model.train_models would otherwise be trained
+    # twice, which a multi-family sweep makes easy to do by accident.
+    model_names = list(
+        dict.fromkeys(list(models_to_train.keys()) + list(config.model.train_models))
+    )
     for model_name in model_names:
         if "baseline" in model_name:
             continue
@@ -398,15 +436,22 @@ def train_single_model(
             )
 
             test_metrics = trainer.evaluate(X_test, y_test)
+            # Both branches of train_model_with_config put validation metrics
+            # under "val". They used to be computed and dropped; model choice
+            # and calibration choice are made on them, so they get logged.
+            val_metrics = training_results.get("val", {})
             models_to_train[model_name] = {
                 "pipeline": pipeline,
                 "trainer": trainer,
                 "training_results": training_results,
                 "test_metrics": test_metrics,
+                "val_metrics": val_metrics,
             }
 
             with tracker.child_run(model_name):
                 tracker.log_metrics(test_metrics)
+                if val_metrics:
+                    tracker.log_metrics(val_metrics)
                 tracker.set_tags({"model_type": model_name})
 
                 explicit_model_params = _get_explicit_model_params_for_logging(
@@ -452,7 +497,7 @@ def train_single_model(
 
                 tracker.log_model(
                     pipeline,
-                    artifact_path=f"nba_{model_name}_{conference_filter}",
+                    artifact_path=f"nba_{model_name}",
                     input_example=X_train.head(5),
                 )
 
@@ -469,21 +514,26 @@ def train_single_model(
             model_data["test_metrics"],
             model_name=model_name,
             split="test",
-            conference_filter=conference_filter,
         )
 
     if not models_to_train:
         return {}
 
+    # Chosen on validation, not test. Selecting the family by test accuracy made
+    # every reported test number optimistic by the size of the max over families.
+    # Baselines are a reference line, not candidates: they are fit on the test
+    # split itself and have no validation score to compete with.
+    candidates = [name for name in models_to_train if "baseline" not in name]
+    if not candidates:
+        return {}
     best_model_name = max(
-        models_to_train.keys(),
-        key=lambda name: models_to_train[name]["test_metrics"].get("test_accuracy", 0),
+        candidates,
+        key=lambda name: models_to_train[name]["val_metrics"].get("val_accuracy", 0),
     )
     best_model_data = models_to_train[best_model_name]
 
-    conf_label = get_conference_display_name(conference_filter)
     logger.info(f"\n{'=' * 60}")
-    logger.info(f"Best Model: {get_model_display_name(best_model_name)} ({conf_label})")
+    logger.info(f"Best Model: {get_model_display_name(best_model_name)}")
     logger.info(
         f"  {format_metrics_line(best_model_data['test_metrics'], prefix='test')}"
     )
@@ -491,7 +541,9 @@ def train_single_model(
 
     best_metrics = best_model_data["test_metrics"]
     tracker.set_tags({"best_model": best_model_name})
-    tracker.log_metrics(best_metrics)
+    # The headline test_* metrics are logged after the calibration block below,
+    # against whichever pipeline actually ships. Logging them here reported the
+    # uncalibrated model's numbers even on runs that shipped a calibrated one.
 
     # --- Stratified evaluation by season phase ---
     if (
@@ -555,58 +607,110 @@ def train_single_model(
     best_cal_proba = None
 
     if "baseline" not in best_model_name:
-        y_test_proba_uncal = best_pipeline.predict_proba(X_test)
-        if y_test_proba_uncal.ndim > 1:
-            y_test_proba_uncal = y_test_proba_uncal[:, 1]
+        y_test_proba_uncal = _positive_class_proba(best_pipeline, X_test)
         uncalibrated_proba = y_test_proba_uncal
 
         brier_uncal = compute_brier_score(y_test, y_test_proba_uncal)
-        ece_uncal = compute_ece(y_test, y_test_proba_uncal)
+        ece_uncal = compute_ece_ratio(y_test, y_test_proba_uncal)
         tracker.log_metrics(
             {
                 "test_brier_score_uncalibrated": round(brier_uncal, 4),
-                "test_ece_uncalibrated": round(ece_uncal, 4),
+                "test_ece_uncalibrated": round(ece_uncal["ece"], 4),
+                "test_ece_null_uncalibrated": round(ece_uncal["ece_null"], 4),
+                "test_ece_ratio_uncalibrated": round(ece_uncal["ece_ratio"], 3),
             }
         )
-        logger.info(f"Uncalibrated — Brier: {brier_uncal:.4f}, ECE: {ece_uncal:.4f}")
+        logger.info(
+            f"Uncalibrated — Brier: {brier_uncal:.4f}, "
+            f"ECE: {ece_uncal['ece']:.4f} "
+            f"({ece_uncal['ece_ratio']:.2f}x the perfectly-calibrated null "
+            f"{ece_uncal['ece_null']:.4f})"
+        )
 
+        # Which calibrator to use is *chosen* on validation and only *reported*
+        # on test. Choosing it by test Brier made the shipped model a function
+        # of the test set. The probe runs out-of-fold across all of validation:
+        # a prefit calibrator scored on the rows it was fit to would always
+        # favour isotonic, which can memorise them.
         calibration_results = {}
-        for method in ["sigmoid", "isotonic"]:
-            try:
-                cal_model = CalibratedClassifierCV(
-                    best_pipeline, method=method, cv="prefit"
-                )
-                cal_model.fit(X_val, y_val)
-                y_test_proba_cal = cal_model.predict_proba(X_test)
-                if y_test_proba_cal.ndim > 1:
-                    y_test_proba_cal = y_test_proba_cal[:, 1]
-                brier_cal = compute_brier_score(y_test, y_test_proba_cal)
-                ece_cal = compute_ece(y_test, y_test_proba_cal)
-                calibration_results[method] = {
-                    "model": cal_model,
-                    "brier": brier_cal,
-                    "ece": ece_cal,
-                    "proba": y_test_proba_cal,
-                }
-                tracker.log_metrics(
-                    {
-                        f"test_brier_score_{method}": round(brier_cal, 4),
-                        f"test_ece_{method}": round(ece_cal, 4),
+        brier_uncal_val = None
+        if len(X_val) < MIN_CALIBRATION_PROBE_ROWS:
+            logger.warning(
+                f"Validation split has {len(X_val)} rows; need at least "
+                f"{MIN_CALIBRATION_PROBE_ROWS} to choose a calibrator without "
+                "touching test. Keeping the uncalibrated model."
+            )
+        else:
+            oof_uncal = _oof_calibrated_proba(best_pipeline, X_val, y_val, None)
+            brier_uncal_val = compute_brier_score(y_val, oof_uncal)
+            logger.info(
+                f"Uncalibrated — val Brier (out-of-fold, n={len(X_val)}): "
+                f"{brier_uncal_val:.4f}"
+            )
+
+            for method in ["sigmoid", "isotonic"]:
+                try:
+                    oof_cal = _oof_calibrated_proba(
+                        best_pipeline, X_val, y_val, method
+                    )
+                    brier_val = compute_brier_score(y_val, oof_cal)
+                    val_delta, val_se = _paired_brier_margin(
+                        y_val, oof_cal, oof_uncal
+                    )
+
+                    # The probe only scored the method. The model that ships is
+                    # refit on the whole validation split.
+                    cal_model = CalibratedClassifierCV(
+                        best_pipeline, method=method, cv="prefit"
+                    )
+                    cal_model.fit(X_val, y_val)
+                    y_test_proba_cal = _positive_class_proba(cal_model, X_test)
+                    brier_cal = compute_brier_score(y_test, y_test_proba_cal)
+                    ece_cal = compute_ece_ratio(y_test, y_test_proba_cal)
+                    calibration_results[method] = {
+                        "model": cal_model,
+                        "val_brier": brier_val,
+                        "val_delta": val_delta,
+                        "val_se": val_se,
+                        "brier": brier_cal,
+                        "ece": ece_cal["ece"],
+                        "proba": y_test_proba_cal,
                     }
-                )
-                logger.info(
-                    f"Calibrated [{method}] — Brier: {brier_cal:.4f}, ECE: {ece_cal:.4f}"
-                )
-            except Exception as e:
-                logger.warning(f"Calibration with {method} failed: {e}")
+                    tracker.log_metrics(
+                        {
+                            f"val_brier_score_{method}": round(brier_val, 4),
+                            f"val_brier_delta_{method}": round(val_delta, 5),
+                            f"val_brier_delta_se_{method}": round(val_se, 5),
+                            f"test_brier_score_{method}": round(brier_cal, 4),
+                            f"test_ece_{method}": round(ece_cal["ece"], 4),
+                            f"test_ece_null_{method}": round(ece_cal["ece_null"], 4),
+                            f"test_ece_ratio_{method}": round(ece_cal["ece_ratio"], 3),
+                        }
+                    )
+                    logger.info(
+                        f"Calibrated [{method}] — val Brier: {brier_val:.4f} "
+                        f"({val_delta:+.5f} vs uncalibrated, SE {val_se:.5f}), "
+                        f"test Brier: {brier_cal:.4f}, "
+                        f"test ECE: {ece_cal['ece']:.4f} "
+                        f"({ece_cal['ece_ratio']:.2f}x null)"
+                    )
+                except Exception as e:
+                    logger.warning(f"Calibration with {method} failed: {e}")
 
         if calibration_results:
             best_cal_method = min(
-                calibration_results, key=lambda m: calibration_results[m]["brier"]
+                calibration_results, key=lambda m: calibration_results[m]["val_brier"]
             )
             best_calibration_method = best_cal_method
             best_cal_proba = calibration_results[best_cal_method]["proba"]
-            if calibration_results[best_cal_method]["brier"] < brier_uncal:
+            best_delta = calibration_results[best_cal_method]["val_delta"]
+            best_se = calibration_results[best_cal_method]["val_se"]
+            # Adopting on *any* improvement shipped a calibrator on a 0.0003 Brier
+            # win — noise — and that coin flip pushed test ECE from 0.96x to 1.43x
+            # its perfectly-calibrated null. The uncalibrated model is already well
+            # calibrated, so it keeps the tie: a calibrator has to beat it by more
+            # than one standard error of the paired difference to displace it.
+            if brier_uncal_val is not None and best_delta < -best_se:
                 calibrated_pipeline = calibration_results[best_cal_method]["model"]
                 # Propagate feature_names_in_ for prediction alignment
                 if hasattr(best_pipeline, "feature_names_in_"):
@@ -621,12 +725,39 @@ def train_single_model(
                         "calibration_improved": True,
                     }
                 )
-                logger.info(f"Using calibrated model ({best_calibration_method})")
+                logger.info(
+                    f"Using calibrated model ({best_calibration_method}): "
+                    f"val Brier {best_delta:+.5f} beats uncalibrated by more than "
+                    f"its SE ({best_se:.5f})"
+                )
             else:
                 tracker.set_tags({"calibration_improved": False})
                 logger.info(
-                    "Calibration did not improve Brier score; keeping uncalibrated model."
+                    f"Best calibrator ({best_cal_method}) moved validation Brier by "
+                    f"{best_delta:+.5f} against an SE of {best_se:.5f} — inside the "
+                    "noise. Keeping the uncalibrated model."
                 )
+
+    # Headline test_* metrics, computed against the pipeline that actually ships.
+    # best_model_data["test_metrics"] was measured before calibration, so on a run
+    # that adopted a calibrator it described a model that never left the building.
+    if calibrated_pipeline is not None:
+        y_test_proba_best = _positive_class_proba(best_pipeline, X_test)
+        best_metrics = {
+            f"test_{k}": v
+            for k, v in compute_classification_metrics(
+                y_test, best_pipeline.predict(X_test), y_pred_proba=y_test_proba_best
+            ).items()
+        }
+        ece_best = compute_ece_ratio(y_test, y_test_proba_best)
+        best_metrics["test_ece_null"] = round(ece_best["ece_null"], 4)
+        best_metrics["test_ece_ratio"] = round(ece_best["ece_ratio"], 3)
+    elif uncalibrated_proba is not None:
+        best_metrics = dict(best_metrics)
+        best_metrics["test_ece_null"] = round(ece_uncal["ece_null"], 4)
+        best_metrics["test_ece_ratio"] = round(ece_uncal["ece_ratio"], 3)
+    tracker.log_metrics(best_metrics)
+    logger.info(f"Shipped model — {format_metrics_line(best_metrics, prefix='test')}")
 
     if eval_config.save_visualizations:
         logger.info("Generating visualizations...")
@@ -641,7 +772,7 @@ def train_single_model(
             y_test,
             y_test_pred,
             class_names=class_names,
-            title=f"Test Set Confusion Matrix - {best_model_name} ({conference_filter})",
+            title=f"Test Set Confusion Matrix - {best_model_name}",
         )
         fig_cm.savefig(viz_dir / "confusion_matrix.png", dpi=300, bbox_inches="tight")
         plt.close(fig_cm)
@@ -702,7 +833,7 @@ def train_single_model(
                         trained_model,
                         feature_names,
                         top_n=20,
-                        title=f"Feature Importance - {best_model_name} ({conference_filter})",
+                        title=f"Feature Importance - {best_model_name}",
                     )
                     fig_importance.savefig(
                         viz_dir / "feature_importance.png", dpi=300, bbox_inches="tight"
@@ -722,7 +853,7 @@ def train_single_model(
                     trained_model,
                     X_test_transformed,
                     feature_names,
-                    title=f"SHAP Feature Contribution - {best_model_name} ({conference_filter})",
+                    title=f"SHAP Feature Contribution - {best_model_name}",
                     top_n=20,
                 )
                 fig_shap.savefig(
@@ -739,7 +870,7 @@ def train_single_model(
             fig_roc = plot_roc_curve(
                 y_test,
                 y_test_proba,
-                title=f"ROC Curve - {best_model_name} ({conference_filter})",
+                title=f"ROC Curve - {best_model_name}",
             )
             fig_roc.savefig(viz_dir / "roc_curve.png", dpi=300, bbox_inches="tight")
             plt.close(fig_roc)
@@ -747,7 +878,7 @@ def train_single_model(
             fig_acc_bin = plot_prediction_accuracy_by_bin(
                 y_test,
                 y_test_proba,
-                title=f"Prediction Accuracy by Probability Bin - {best_model_name} ({conference_filter})",
+                title=f"Prediction Accuracy by Probability Bin - {best_model_name}",
             )
             fig_acc_bin.savefig(
                 viz_dir / "prediction_accuracy_by_bin.png", dpi=300, bbox_inches="tight"
@@ -761,7 +892,7 @@ def train_single_model(
                     uncalibrated_proba,
                     best_cal_proba,
                     calibration_method=best_calibration_method,
-                    title=f"Calibration Curve - {best_model_name} ({conference_filter})",
+                    title=f"Calibration Curve - {best_model_name}",
                 )
                 fig_cal.savefig(
                     viz_dir / "calibration_curve.png", dpi=300, bbox_inches="tight"
@@ -785,7 +916,6 @@ def train_single_model(
             y_pred_proba=y_test_proba,
             metadata=metadata_test,
             output_dir=output_dir,
-            conference_filter=conference_filter,
             model_name=best_model_name,
             y_pred_baseline=_y_pred_baseline,
         )
@@ -800,7 +930,7 @@ def train_single_model(
         registry = ModelRegistry(Path(paths_config.model_registry))
         model_path = registry.save(
             model=best_pipeline,
-            model_name=f"nba_classification_{best_model_name}_{conference_filter}",
+            model_name=f"nba_classification_{best_model_name}",
             task_type="classification",
             metrics=best_model_data["test_metrics"],
             feature_names=list(X_train.columns),
@@ -812,7 +942,7 @@ def train_single_model(
     should_register = config.mlflow.register_model
     if should_register:
         registered_model_name = (
-            f"nba_classification_{best_model_name}_{conference_filter}"
+            f"nba_classification_{best_model_name}"
         )
         logger.info(
             f"Registering model '{registered_model_name}' in MLflow Model Registry"
@@ -823,7 +953,7 @@ def train_single_model(
             "Model will be logged but not registered. Use run-based URI for access."
         )
 
-    artifact_path = f"nba_{best_model_name}_{conference_filter}"
+    artifact_path = f"nba_{best_model_name}"
     tracker.log_model(
         best_pipeline,
         artifact_path=artifact_path,
@@ -843,7 +973,6 @@ def train_single_model(
         tracker.set_tags(tags)
 
     return {
-        "conference_filter": conference_filter,
         "best_model_name": best_model_name,
         "best_model_data": best_model_data,
         "models_to_train": models_to_train,

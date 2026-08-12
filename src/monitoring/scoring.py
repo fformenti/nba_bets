@@ -5,12 +5,16 @@ Closes the loop: ``predict-upcoming`` writes predictions, games get played,
 to answer "how is the model actually doing?".
 
 **Outcomes come from the ingested history, not the results JSON directory.**
-Those JSON files are transient — ``append-game-results`` consumes them — whereas
 ``games_updated_history.csv`` is the durable record of every played game and
-already carries ``winner``. Joining against history makes scoring independent of
-pipeline ordering: it can be re-run at any time and always reproduces the same
-numbers. The results directory is only a fallback, for games fetched but not yet
+already carries ``winner``, whereas the results inbox holds only what has been
+fetched and not yet appended. Joining against history makes scoring independent
+of pipeline ordering: it can be re-run at any time and always reproduces the
+same numbers. The inbox is only a fallback, for games fetched but not yet
 appended.
+
+Games that were not played are excluded from both sources. A postponed game
+carries ``winner = 0``, which matches no team id, so scoring it would read as a
+confident away win and quietly mark every home prediction wrong.
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ from src.ml.evaluation.metrics import (
     compute_classification_metrics,
     compute_ece,
 )
+from src.ml.prediction.pipeline import PREDICTION_KEY
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -41,9 +46,11 @@ logger = get_logger(__name__)
 # Rolling window (in games, most recent first) for the trailing-form metric.
 ROLLING_WINDOW = 100
 
-# Identifies one prediction. Older prediction files predate conference_filter,
-# so it is matched only when present.
-PREDICTION_KEY = ["gameId", "conference_filter"]
+# PREDICTION_KEY is imported, not redeclared. The writer's key and the scorer's
+# key have to be the same list: while the writer deduped on gameId and this
+# module still carried ["gameId", "conference_filter"], the warning below could
+# not see the doubled rows the three-model routing had left behind, and the
+# scorecard reported 26 games for a 13-game slate.
 
 # Whichever of these exists is used to order games for the trailing window.
 DATE_COLUMNS = ["gameDate", "gameDateOnlyStr"]
@@ -54,6 +61,17 @@ def _date_column(df: pd.DataFrame) -> Optional[str]:
 
 
 OUTCOME_COLUMNS = ["gameId", "winner", "hometeamId"]
+
+# Read alongside the outcome columns to tell a played game from one that was not.
+POSTPONED_COLUMN = "postponed"
+
+
+def _played_only(games: pd.DataFrame) -> pd.DataFrame:
+    """Rows describing games that actually happened."""
+    if POSTPONED_COLUMN not in games.columns:
+        return games
+    postponed = pd.to_numeric(games[POSTPONED_COLUMN], errors="coerce").fillna(0)
+    return games[postponed != 1]
 
 
 def _to_home_win(outcomes: pd.DataFrame) -> pd.Series:
@@ -78,11 +96,21 @@ def load_outcomes(
     frames = []
 
     if historical_path.exists():
-        history = pd.read_csv(
-            historical_path, usecols=OUTCOME_COLUMNS, low_memory=False
+        # `postponed` is read when the file has it. It is not required, so a
+        # hand-made or older history still scores rather than failing outright.
+        available = pd.read_csv(historical_path, nrows=0).columns
+        columns = list(OUTCOME_COLUMNS)
+        if POSTPONED_COLUMN in available:
+            columns.append(POSTPONED_COLUMN)
+
+        history = pd.read_csv(historical_path, usecols=columns, low_memory=False)
+        played = _played_only(history)
+        skipped = len(history) - len(played)
+        frames.append(played[OUTCOME_COLUMNS])
+        logger.info(
+            f"Loaded {len(played)} outcomes from {historical_path.name}"
+            + (f" (skipped {skipped} not played)" if skipped else "")
         )
-        frames.append(history)
-        logger.info(f"Loaded {len(history)} outcomes from {historical_path.name}")
     else:
         logger.warning(f"No historical games at {historical_path}")
 
@@ -91,6 +119,7 @@ def load_outcomes(
             {column: payload[column] for column in OUTCOME_COLUMNS}
             for payload in (read_json(p) for p in sorted(results_dir.glob("*.json")))
             if all(payload.get(column) is not None for column in OUTCOME_COLUMNS)
+            and not payload.get(POSTPONED_COLUMN)
         ]
         if pending:
             frames.append(pd.DataFrame(pending))
@@ -166,11 +195,9 @@ def _breakdowns(scored: pd.DataFrame) -> list[dict]:
             }
         )
 
-    for column, scope in [("season", "season"), ("conference_filter", "conference")]:
-        if column not in scored.columns:
-            continue
-        for value, group in scored.groupby(column):
-            rows.append({"scope": scope, "group": str(value), **_metrics_for(group)})
+    if "season" in scored.columns:
+        for value, group in scored.groupby("season"):
+            rows.append({"scope": "season", "group": str(value), **_metrics_for(group)})
 
     return rows
 

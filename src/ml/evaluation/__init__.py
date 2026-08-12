@@ -15,7 +15,6 @@ from .metrics import (
     compute_ece,
     compute_regression_metrics,
     format_metrics_line,
-    get_conference_display_name,
     get_model_display_name,
     print_metrics_summary,
 )
@@ -37,7 +36,6 @@ __all__ = [
     "compute_regression_metrics",
     "format_metrics_line",
     "generate_analysis",
-    "get_conference_display_name",
     "get_model_display_name",
     "plot_accuracy_by_season",
     "plot_calibration_curve",

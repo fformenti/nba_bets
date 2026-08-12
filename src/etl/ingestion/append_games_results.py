@@ -1,21 +1,34 @@
-"""Add game results from upcoming games results to historical raw games."""
+"""Fold fetched game results into the history table.
+
+This is a true append: the history table is read, the results inbox is added to
+it, and each consumed file is moved to the archive. It used to rebuild the whole
+table from every JSON ever written, which made the inbox load-bearing — the files
+could never be cleared because they were the only record of everything collected.
+
+Seeding the table from the raw historical archive is `ingest_raw_games`'s job, not
+this module's.
+"""
 
 from __future__ import annotations
+import shutil
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from src.config.paths import (
-    INGESTED_GAMES_PATH,
+    ARCHIVE_RESULTS_DIR,
     INGESTED_GAMES_UPDATED_HISTORY_PATH,
     UPCOMING_GAMES_RESULTS_DIR,
 )
 from src.etl.utils.common import (
     CANONICAL_INGESTED_COLUMNS,
+    assert_unique_game_ids,
+    atomic_write_csv,
     coerce_numeric_columns,
     deduplicate_games,
     enrich_games_locations,
+    game_type_from_id,
     read_json,
 )
 from src.utils.logging_config import get_logger
@@ -51,9 +64,19 @@ def _transform_game_result_to_dataframe_row(
     else:
         game_date = None
 
+    # The gameId is the only reliable source of gameType for a collected game:
+    # results payloads carry no such field, and the league schedule leaves
+    # gameLabel blank for every playoff round. Without this every incrementally
+    # collected game would arrive as an empty string, pass every filter in
+    # filter_regular_season_games, and land in the regular-season table.
+    game_id = game_data.get("gameId")
+    game_type = game_type_from_id(game_id)
+    if game_type is None:
+        logger.warning("Cannot read a game type from gameId %r", game_id)
+
     # Map columns from JSON to historical games schema
     row = {
-        "gameId": game_data.get("gameId"),
+        "gameId": game_id,
         "gameDate": game_date,
         "gameDateOnlyStr": game_date_str,
         "season": game_data.get("season"),
@@ -68,12 +91,14 @@ def _transform_game_result_to_dataframe_row(
         "winner": winner,
         "overtimes": overtimes,
         "postponed": postponed,
-        "gameType": "",  # Empty string as default
+        "gameType": game_type if game_type is not None else "",
         "attendance": game_data.get("attendance"),
-        "arenaId": None,  # Not present in JSON
-        "gameLabel": None,
-        "gameSubLabel": None,
-        "seriesGameNumber": None,
+        "gameLabel": game_data.get("gameLabel"),
+        "gameSubLabel": game_data.get("gameSubLabel"),
+        # arenaId and seriesGameNumber are not present in the JSON — omitted here
+        # (rather than set to None) so they don't become all-NA columns that trip
+        # pandas' concat FutureWarning; the later reindex to
+        # CANONICAL_INGESTED_COLUMNS fills them back in as NaN.
     }
 
     return row
@@ -81,42 +106,52 @@ def _transform_game_result_to_dataframe_row(
 
 def load_upcoming_game_results(
     results_dir: Path,
-) -> tuple[pd.DataFrame, dict[int, Path]]:
+) -> tuple[pd.DataFrame, list[Path]]:
     """
-    Load all JSON files from upcoming games results directory and transform to dataframe.
+    Load every result JSON in the inbox and transform it to the ingested schema.
 
     Args:
         results_dir: Path to directory containing JSON game result files
 
     Returns:
         Tuple of (DataFrame with columns matching historical games schema,
-                 dictionary mapping gameId to JSON file path)
+                 the files that produced it — the ones safe to archive)
     """
     if not results_dir.exists():
         logger.warning(f"Results directory does not exist: {results_dir}")
-        return pd.DataFrame(), {}
+        return pd.DataFrame(), []
 
-    # Get JSON files, excluding those in the archive subdirectory
-    json_files = [f for f in sorted(results_dir.glob("*.json"))]
+    json_files = sorted(results_dir.glob("*.json"))
     if not json_files:
-        logger.warning(f"No JSON files found in {results_dir}")
-        return pd.DataFrame(), {}
+        logger.info(f"No new game results in {results_dir}")
+        return pd.DataFrame(), []
 
     logger.info(f"Found {len(json_files)} JSON files to process")
 
     rows = []
+    consumed: list[Path] = []
     for json_file in json_files:
         try:
             game_data = read_json(json_file)
-            row = _transform_game_result_to_dataframe_row(game_data)
-            rows.append(row)
+            if not _is_played(game_data):
+                # Belt and braces: only played games reach this directory, but a
+                # postponed row here would become a permanent ghost fixture.
+                logger.warning(
+                    "Skipping %s: not a played game (status=%r, postponed=%r)",
+                    json_file.name,
+                    game_data.get("status"),
+                    game_data.get("postponed"),
+                )
+                continue
+            rows.append(_transform_game_result_to_dataframe_row(game_data))
+            consumed.append(json_file)
         except Exception as e:
             logger.error(f"Error processing {json_file}: {e}")
             continue
 
     if not rows:
         logger.warning("No valid game results found")
-        return pd.DataFrame(), {}
+        return pd.DataFrame(), []
 
     df = pd.DataFrame(rows)
 
@@ -130,7 +165,19 @@ def load_upcoming_game_results(
         df["gameDate"] = pd.to_datetime(df["gameDate"], errors="coerce")
 
     logger.info(f"Successfully loaded {len(df)} game results")
-    return df
+    return df, consumed
+
+
+def _is_played(game_data: dict[str, Any]) -> bool:
+    """Whether this payload describes a game that actually happened.
+
+    Trusts an explicit status when present and falls back to the ``postponed``
+    flag for payloads written before statuses existed.
+    """
+    status = game_data.get("status")
+    if status is not None:
+        return str(status).lower() == "final"
+    return not game_data.get("postponed")
 
 
 def load_historical_games(historical_games_path: Path) -> pd.DataFrame:
@@ -155,48 +202,42 @@ def load_historical_games(historical_games_path: Path) -> pd.DataFrame:
 
 def add_game_results_to_historical(
     upcoming_results_dir: Path | None = None,
-    historical_games_path: Path | None = None,
     output_path: Path | None = None,
-    keep_old_ids: bool = True,
+    archive_dir: Path | None = None,
 ) -> pd.DataFrame:
     """
-    Add game results from upcoming games results to historical raw games.
+    Append fetched game results to the history table and archive what was used.
 
     Args:
-        upcoming_results_dir: Path to directory containing upcoming game results JSON files.
-                             Defaults to UPCOMING_GAMES_RESULTS_DIR.
-        historical_games_path: Path to historical games CSV file.
-                               Defaults to RAW_GAMES_PATH.
-        output_path: Path where to save the updated historical games.
-                     Defaults to RAW_GAMES_UPDATED_HISTORY_PATH
+        upcoming_results_dir: Directory holding the result JSON inbox.
+                              Defaults to UPCOMING_GAMES_RESULTS_DIR.
+        output_path: The history table, both read and written.
+                     Defaults to INGESTED_GAMES_UPDATED_HISTORY_PATH.
+        archive_dir: Where consumed result files are moved.
+                     Defaults to ARCHIVE_RESULTS_DIR.
 
     Returns:
-        DataFrame with combined historical and new game results
+        DataFrame with the updated history
     """
     # Set default paths
     if upcoming_results_dir is None:
         upcoming_results_dir = UPCOMING_GAMES_RESULTS_DIR
-    if historical_games_path is None:
-        historical_games_path = INGESTED_GAMES_PATH
     if output_path is None:
         output_path = INGESTED_GAMES_UPDATED_HISTORY_PATH
+    if archive_dir is None:
+        archive_dir = ARCHIVE_RESULTS_DIR
 
-    # Load historical games
-    historical_df = load_historical_games(historical_games_path)
+    historical_df = load_historical_games(output_path)
 
-    # Load upcoming game results and track file mappings
-    upcoming_df = load_upcoming_game_results(upcoming_results_dir)
+    upcoming_df, consumed = load_upcoming_game_results(upcoming_results_dir)
     if upcoming_df.empty:
-        logger.warning("No upcoming game results to add — writing historical data as-is")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        historical_df.to_csv(output_path, index=False)
-        logger.info(f"Saved {len(historical_df)} historical games to {output_path}")
+        logger.info("No new game results to add — history left unchanged")
         return historical_df
 
     # Enrich upcoming results with location columns
     upcoming_df = enrich_games_locations(upcoming_df)
 
-    # Deduplicate using composite key (gameDateOnlyStr, hometeamId, awayteamId)
+    # Drop any rows the new results supersede, matched by gameId
     historical_df = deduplicate_games(historical_df, upcoming_df)
 
     # Combine and align to canonical schema — filter out empty frames to avoid FutureWarning
@@ -208,10 +249,26 @@ def add_game_results_to_historical(
         ["gameDate", "gameId"], na_position="last"
     ).reset_index(drop=True)
 
-    # Save to output path
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    combined_df.to_csv(output_path, index=False)
+    assert_unique_game_ids(combined_df, "append")
+
+    # Atomic: this is the authoritative history table, and nothing downstream can
+    # tell a truncated table from a genuinely short one.
+    atomic_write_csv(combined_df, output_path)
     logger.info(f"Saved {len(combined_df)} games to {output_path}")
-    logger.info(f"Added {len(upcoming_df)} new games to historical data")
+    logger.info(f"Added {len(upcoming_df)} new game(s) to the history table")
+
+    # Only archive once the table is safely on disk: these files are the sole
+    # record of the games until the write above succeeds.
+    _archive_consumed(consumed, archive_dir)
 
     return combined_df
+
+
+def _archive_consumed(consumed: list[Path], archive_dir: Path) -> None:
+    """Move result files that are now recorded in history out of the inbox."""
+    if not consumed:
+        return
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    for path in consumed:
+        shutil.move(str(path), str(archive_dir / path.name))
+    logger.info(f"Archived {len(consumed)} consumed result(s) to {archive_dir}")

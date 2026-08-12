@@ -17,29 +17,48 @@ logger = get_logger(__name__)
 
 GAME_BUDGET = 100
 
+BET_COLUMNS = [
+    "gameId",
+    "gameDateOnlyStr",
+    "hometeamId",
+    "awayteamId",
+    "hometeamName",
+    "awayteamName",
+    "game_slug",
+    "home_win_probability",
+]
+
 
 def load_predictions_for_date(game_date_str: str) -> pd.DataFrame:
     """Predictions for one game date, with a Polymarket slug per game."""
     predictions = pd.read_csv(UPCOMING_GAMES_PREDICTIONS_PATH)
 
-    predictions["game_slug"] = predictions.apply(
+    for_date = predictions[predictions["gameDateOnlyStr"] == game_date_str].copy()
+    if for_date.empty:
+        return pd.DataFrame(columns=BET_COLUMNS)
+
+    # One model predicts every game, so the file is one row per game. The
+    # three-model routing that preceded it (docs/CONFERENCE_SPLIT.md) wrote a
+    # game once per model, and this function sized both — two order plans from
+    # two disagreeing probabilities, each against a full GAME_BUDGET.
+    duplicated = for_date["gameId"].duplicated(keep=False)
+    if duplicated.any():
+        offenders = sorted(for_date.loc[duplicated, "gameId"].unique().tolist())
+        raise ValueError(
+            f"{len(offenders)} game(s) on {game_date_str} have more than one "
+            f"prediction: {offenders}. Sizing them would place a full budget per "
+            "row, from probabilities that disagree."
+        )
+
+    # Slugs are looked up only for the slate being bet, not the whole file.
+    for_date["game_slug"] = for_date.apply(
         lambda row: get_game_slug(
             row["awayteamId"], row["hometeamId"], row["gameDateOnlyStr"], row["season"]
         ),
         axis=1,
     )
 
-    columns = [
-        "gameId",
-        "gameDateOnlyStr",
-        "hometeamId",
-        "awayteamId",
-        "hometeamName",
-        "awayteamName",
-        "game_slug",
-        "home_win_probability",
-    ]
-    return predictions.loc[predictions["gameDateOnlyStr"] == game_date_str, columns]
+    return for_date[BET_COLUMNS]
 
 
 def build_daily_bets(game_date_str: str, budget: float = GAME_BUDGET) -> list[dict]:

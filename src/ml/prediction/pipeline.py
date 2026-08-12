@@ -1,9 +1,14 @@
-"""Predict upcoming games with the trained per-conference classifiers.
+"""Predict upcoming games with the trained classifier.
 
-Each conference matchup type ('same', 'different', 'all') has its own model, so
-a slate is routed three ways and the parts concatenated. The experiment config
-that trained each model is read back from its MLflow run, guaranteeing the
-inference-time feature set matches the training-time one.
+One model scores every game, so a slate produces one row per game. The
+experiment config that trained the model is read back from its MLflow run,
+guaranteeing the inference-time feature set matches the training-time one.
+
+This used to route each game to a same- or cross-conference model *and* score
+the whole slate with an all-games model, writing two rows per game with no rule
+for which to bet. Measured over eight backtested seasons the split was worse —
++0.0047 log loss, 95% CI [+0.0011, +0.0080] — so it is gone. See
+docs/CONFERENCE_SPLIT.md.
 """
 
 from __future__ import annotations
@@ -16,10 +21,12 @@ import numpy as np
 import pandas as pd
 
 from src.config.paths import DEFAULT_PREDICT_CONFIG_PATH, PROJECT_ROOT
+from src.etl.features.last_season_record import prev_season
 from src.ml.config.loader import load_experiment_config, load_prediction_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.prediction.features import (
-    build_features_for_prediction,
+    apply_model_feature_engineering,
+    build_prediction_feature_base,
     fix_upcoming_games_cols,
     prepare_features_for_model,
 )
@@ -36,7 +43,11 @@ logger = get_logger(__name__)
 # Predictions accumulate across runs, so a game must be uniquely identified.
 # Re-predicting the same game replaces the earlier row rather than appending a
 # duplicate — the accuracy scorecard in src/monitoring counts these rows.
-PREDICTION_KEY = ["gameId", "conference_filter"]
+#
+# A game is one row. It used to be one row per model that scored it, which is
+# why re-predicting a slate under the single model also clears the second row
+# the old three-model routing left behind.
+PREDICTION_KEY = ["gameId"]
 
 
 def upsert_predictions(new_predictions: pd.DataFrame, output_path: Path) -> int:
@@ -69,7 +80,14 @@ def upsert_predictions(new_predictions: pd.DataFrame, output_path: Path) -> int:
         (col for col in ("gameDate", "gameDateOnlyStr") if col in combined.columns), None
     )
     if sort_column:
-        combined = combined.sort_values(sort_column)
+        # Sort on the date *and* gameId with a stable kind: on the date alone
+        # every game in a slate ties, and pandas' default quicksort orders ties
+        # arbitrarily, so re-running an unchanged slate rewrote the file with the
+        # rows shuffled.
+        sort_keys = [sort_column]
+        if "gameId" in combined.columns:
+            sort_keys.append("gameId")
+        combined = combined.sort_values(sort_keys, kind="mergesort")
 
     combined.to_csv(output_path, index=False)
     return len(combined)
@@ -141,6 +159,31 @@ def _align_features(
 
     # Reorder columns to match feature_names
     aligned = aligned[feature_names]
+
+    # A feature that is NaN for *every* row of the slate is a different animal
+    # from one that is NaN for some of them. Per-row gaps are ordinary — a team
+    # with no games played yet has no rolling average. A column that is empty
+    # across the board means the feature cannot be computed at inference at all,
+    # which is a train/serve skew: the model was fitted on a real signal and is
+    # being handed an imputed constant. That is silent, permanent, and invisible
+    # in the output, so it is worth failing over.
+    #
+    # This is how the last-season-record skew was found: filtering history to the
+    # slate's own season left every adjusted_last_season_record_* column empty.
+    if len(aligned):
+        empty_columns = [col for col in aligned.columns if aligned[col].isna().all()]
+        if empty_columns:
+            message = (
+                f"{len(empty_columns)} feature(s) the model was trained on are NaN "
+                f"for every game in this slate: {empty_columns}. The model will "
+                f"predict from imputed constants for them. This is a train/serve "
+                f"skew, not a data gap — check that the feature is computable from "
+                f"the history the prediction pipeline keeps in scope."
+            )
+            if allow_missing:
+                logger.warning(message)
+            else:
+                raise ValueError(message)
 
     # Check for missing values and log details
     missing_mask = aligned.isna().any(axis=1)
@@ -223,7 +266,7 @@ def run_prediction_pipeline(
         # Log configuration
         tracker.log_params(
             {
-                "model_uris": str(prediction_config.model_uris),
+                "model_uri": prediction_config.model_uri,
                 "input_dir": prediction_config.paths.input_dir,
                 "output_path": prediction_config.paths.output,
                 "features_path": prediction_config.paths.features,
@@ -263,95 +306,96 @@ def run_prediction_pipeline(
             date_column=date_column,
         )
 
-        # Filter historical features to relevant seasons
+        # Filter historical features to relevant seasons.
+        #
+        # The *previous* season has to come along. Rolling features only need the
+        # current season, but the last-season-record group is by definition a
+        # lookup into the prior one (see _prior_season_lookup in
+        # src/etl/features/last_season_record.py). Filtering to the slate's own
+        # season left every adjusted_last_season_record_* column NaN for every
+        # game — a feature the models had selected during training, silently
+        # imputed away at inference by allow_missing_features.
         upcoming_seasons = upcoming_games["season"].dropna().unique().tolist()
         if upcoming_seasons:
+            required_seasons = set(upcoming_seasons) | {
+                prev_season(season) for season in upcoming_seasons
+            }
             historical_features = historical_features[
-                historical_features["season"].isin(upcoming_seasons)
+                historical_features["season"].isin(required_seasons)
             ].copy()
-            logger.info(f"Filtered historical features to seasons: {upcoming_seasons}")
+            logger.info(
+                f"Filtered historical features to seasons: {sorted(required_seasons)} "
+                f"(slate: {sorted(upcoming_seasons)}, plus the prior season for "
+                f"last-season features)"
+            )
 
-        # Route each game to the appropriate model
-        results_parts = []
-        for conference_filter in ["same", "different", "all"]:
-            if conference_filter not in prediction_config.model_uris:
-                logger.warning(f"No model URI for '{conference_filter}', skipping")
-                continue
+        # Build the feature tables once. They depend on the slate and the
+        # history, not on the model; only the delta and conference engineering
+        # below is config-driven.
+        base_features = build_prediction_feature_base(
+            upcoming_games=upcoming_games,
+            historical_features=historical_features,
+        )
 
-            model_uri = prediction_config.model_uris[conference_filter]
+        model_uri = prediction_config.model_uri
 
-            # Load the experiment config that was used to train this model.
-            # Primary: from the MLflow run artifact (guaranteed to match the model).
-            # Fallback: from a local file via feature_config_path.
-            try:
-                config_dict = load_experiment_config_from_model_uri(
-                    model_uri=model_uri,
-                    tracking_uri=mlflow_config.tracking_uri,
+        # Load the experiment config that was used to train this model.
+        # Primary: from the MLflow run artifact (guaranteed to match the model).
+        # Fallback: from a local file via feature_config_path.
+        try:
+            config_dict = load_experiment_config_from_model_uri(
+                model_uri=model_uri,
+                tracking_uri=mlflow_config.tracking_uri,
+            )
+            model_experiment_config = ExperimentConfig(**config_dict)
+            logger.info("Loaded experiment config from the model's MLflow run")
+        except Exception as e:
+            if prediction_config.feature_config_path:
+                logger.warning(
+                    f"Could not load config from MLflow ({e}); "
+                    f"falling back to {prediction_config.feature_config_path}"
                 )
-                iter_experiment_config = ExperimentConfig(**config_dict)
-                logger.info(f"Loaded experiment config from MLflow run for '{conference_filter}'")
-            except Exception as e:
-                if prediction_config.feature_config_path:
-                    logger.warning(
-                        f"Could not load config from MLflow ({e}); "
-                        f"falling back to {prediction_config.feature_config_path}"
-                    )
-                    fallback_path = PROJECT_ROOT / prediction_config.feature_config_path
-                    base_config = load_experiment_config(fallback_path)
-                    iter_experiment_config = base_config.model_copy(deep=True)
-                    iter_experiment_config.filters.conference_filter = conference_filter
-                else:
-                    raise
+                fallback_path = PROJECT_ROOT / prediction_config.feature_config_path
+                model_experiment_config = load_experiment_config(fallback_path)
+            else:
+                raise
 
-            upcoming_with_features = build_features_for_prediction(
-                upcoming_games=upcoming_games,
-                historical_features=historical_features,
-                experiment_config=iter_experiment_config,
-                conference_filter=conference_filter,
-            )
+        upcoming_with_features = apply_model_feature_engineering(
+            base_features=base_features,
+            experiment_config=model_experiment_config,
+        )
 
-            if upcoming_with_features.empty:
-                logger.warning(f"No {conference_filter}-conference games found, skipping")
-                continue
-
-            data_config = iter_experiment_config.data
-            target_column = data_config.target_column
-            X = prepare_features_for_model(
-                df=upcoming_with_features,
-                experiment_config=iter_experiment_config,
-                target_column=target_column,
-                conference_filter=conference_filter,
-            )
-
-            logger.info(f"Loading model for '{conference_filter}' from MLflow: {model_uri}")
-            model, feature_names = _load_model(model_uri, mlflow_config.tracking_uri)
-
-            X_aligned = _align_features(
-                X,
-                feature_names,
-                allow_missing=prediction_config.allow_missing_features,
-            )
-
-            logger.info(f"Making predictions for '{conference_filter}'-conference games")
-            predictions, probabilities = _predict(model, X_aligned)
-
-            metadata_columns = iter_experiment_config.feature_engineering.metadata_columns
-            part = _collect_metadata(
-                upcoming_games, upcoming_with_features, metadata_columns
-            )
-            part["conference_filter"] = conference_filter
-            part["prediction"] = predictions
-            if probabilities is not None:
-                part["home_win_probability"] = probabilities
-
-            results_parts.append(part)
-
-        if not results_parts:
-            logger.warning("No predictions generated")
+        if upcoming_with_features.empty:
+            logger.warning("No games left after feature engineering; nothing to predict")
             return
 
+        target_column = model_experiment_config.data.target_column
+        X = prepare_features_for_model(
+            df=upcoming_with_features,
+            experiment_config=model_experiment_config,
+            target_column=target_column,
+        )
+
+        logger.info(f"Loading model from MLflow: {model_uri}")
+        model, feature_names = _load_model(model_uri, mlflow_config.tracking_uri)
+
+        X_aligned = _align_features(
+            X,
+            feature_names,
+            allow_missing=prediction_config.allow_missing_features,
+        )
+
+        predictions, probabilities = _predict(model, X_aligned)
+
+        metadata_columns = model_experiment_config.feature_engineering.metadata_columns
+        output = _collect_metadata(
+            upcoming_games, upcoming_with_features, metadata_columns
+        )
+        output["prediction"] = predictions
+        if probabilities is not None:
+            output["home_win_probability"] = probabilities
+
         # Which date column survives depends on the experiment's metadata_columns.
-        output = pd.concat(results_parts)
         sort_column = next(
             (col for col in ("gameDate", "gameDateOnlyStr") if col in output.columns),
             None,

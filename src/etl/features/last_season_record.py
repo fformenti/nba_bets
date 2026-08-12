@@ -18,8 +18,13 @@ from src.etl.features.sos_adjusted_record import _apply_adjustment
 NEW_FRANCHISE_STRENGTH = 0.200
 
 
-def _prev_season(season: str) -> str:
-    """Return the previous season string. "2024/25" -> "2023/24"."""
+def prev_season(season: str) -> str:
+    """Return the previous season string. "2024/25" -> "2023/24".
+
+    Public because the prediction pipeline needs it to decide how much history to
+    keep in the frame: last-season features are a lookup into the prior season,
+    so filtering history to the slate's own season alone makes them all NaN.
+    """
     start_year = int(season.split("/")[0])
     prev_start = start_year - 1
     prev_end = str(prev_start + 1)[-2:]
@@ -98,7 +103,7 @@ def _prior_season_lookup(season_record: pd.DataFrame, out_col: str) -> pd.DataFr
         Columns: teamId, season, {out_col}.
     """
     season_record = season_record.copy()
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
+    season_record["prev_season"] = season_record["season"].map(prev_season)
 
     prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
         columns={"season": "prev_season", "win_pct": out_col}
@@ -138,7 +143,7 @@ def build_prior_season_strength(
         Columns: teamId, season, prior_season_strength.
     """
     season_record = _team_season_win_pct(games)
-    season_record["prev_season"] = season_record["season"].map(_prev_season)
+    season_record["prev_season"] = season_record["season"].map(prev_season)
 
     prev_lookup = season_record[["teamId", "season", "win_pct"]].rename(
         columns={"season": "prev_season", "win_pct": "prior_season_strength"}

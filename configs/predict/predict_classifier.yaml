@@ -8,13 +8,17 @@ data:
   date_column: "gameDate"
   drop_na: true
 
-# MLflow model URIs keyed by conference filter type.
-# Use runs:/ URIs when register_model is false (artifact_path = nba_{model}_{conference}).
-# Use models:/ URIs only when register_model is true in training config.
-model_uris:
-  same: "runs:/1e196258cbcf485ebae1133deb10fa0f/nba_xgboost_same"
-  different: "runs:/93f094fdebfe4363b6ece3a33755cafe/nba_random_forest_different"
-  all: "runs:/06a38946874b45b59578c4f614058e55/nba_xgboost_all"
+# The deployed model, written by `make train PROMOTE=1`.
+# Use runs:/ URIs when register_model is false (artifact_path = nba_{model}).
+# Use models:/ URIs only when register_model is true in the training config.
+#
+# One model predicts every game. Routing games to same-conference and
+# cross-conference models scored worse over eight backtested seasons — see
+# docs/CONFERENCE_SPLIT.md.
+#
+# The `_all` suffix is historical: runs predating that removal logged their
+# artifact as nba_{model}_{conference_filter}. New runs log nba_{model}.
+model_uri: "runs:/bd2afe2b0b3f4ade82ac28d734b08871/nba_xgboost_all"
 
 mlflow:
   experiment_name: "nba_bets_predictions"

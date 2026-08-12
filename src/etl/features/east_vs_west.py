@@ -2,6 +2,19 @@ import pandas as pd
 
 from src.etl.utils.common import get_season_date_range
 
+# Season-to-date conference records over interconference games, one row per
+# (season, date), shifted a day so a game never sees its own result.
+#
+# `location=None` averages the two venues out: east_record_adjusted is the mean
+# of East's win rate hosting and East's win rate visiting. `location="East"` /
+# `"West"` return exactly the venue component that average discards — how well a
+# conference holds its own floor. The two are complements, and both reach the
+# model (src/ml/features/engineering.py::create_conference_features).
+#
+# The games_played_* columns are divisors here and nothing downstream reads
+# them, so they are not returned. `season` is returned because the frame is
+# grouped by (season, date) and the aggregator has to join on both.
+
 
 def make_east_west_record(games, location=None):
     east_west_record = games[games["hometeamConference"] != games["awayteamConference"]]
@@ -11,28 +24,20 @@ def make_east_west_record(games, location=None):
             east_west_record["hometeamConference"] == "East"
         ]
         suffix = "_at_east"
-        return_cols = [
-            "gameDateOnlyStr",
-            f"east_record{suffix}",
-            f"games_played{suffix}",
-        ]
+        return_cols = ["season", "gameDateOnlyStr", f"east_record{suffix}"]
     elif location == "West":
         east_west_record = east_west_record[
             east_west_record["hometeamConference"] == "West"
         ]
         suffix = "_at_west"
-        return_cols = [
-            "gameDateOnlyStr",
-            f"games_played{suffix}",
-            f"west_record{suffix}",
-        ]
+        return_cols = ["season", "gameDateOnlyStr", f"west_record{suffix}"]
     else:
         suffix = ""
         return_cols = [
+            "season",
             "gameDateOnlyStr",
             "east_record_adjusted",
             "west_record_adjusted",
-            "games_played_east_vs_west",
         ]
 
     east_west_record = east_west_record[

@@ -39,7 +39,6 @@ All file paths are in `src/config/paths.py`. Always import paths from there rath
 `src/ml/config/schema.py` defines `ExperimentConfig` and `PredictionConfig` (Pydantic models).
 
 Key `ExperimentConfig` fields:
-- `data.conference_filter` — filters games and adds appropriate features
 - `features.lags`, `features.location_lags`, `features.distances_lags` — temporal lags for features
 - `model.type` — `"random_forest"` or `"gradient_boosting"`
 - `splitting.method` — `"temporal"`

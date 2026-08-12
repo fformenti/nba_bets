@@ -1,15 +1,16 @@
 .PHONY: lint lint-fix format test \
         build-teams-history build-teams-locations build-distances-table \
-        build-polymarket-teams build-holdout-set build-game-slug-lookup \
+        build-polymarket-teams build-game-slug-lookup \
         ingest-raw-games parse-league-schedule process-ingested-games build-features \
-        fetch-upcoming-games fetch-game-results append-game-results \
+        fetch-league-schedule fetch-upcoming-games fetch-game-results append-game-results \
+        reconcile-postponed retry-unresolved migrate-incremental \
         predict-upcoming score-predictions bet-polymarket \
-        train train-all build-llm-dataset train-llm evaluate-llm \
+        train build-llm-dataset train-llm evaluate-llm \
         delete-experiment delete-model plot-home-win-ratio \
         historical-etl full-rebuild predict-upcoming-games \
         process-results-pipeline daily-cycle
 
-TRAIN_CONFIG      ?= train_same
+TRAIN_CONFIG      ?= xgboost
 PREDICTION_CONFIG ?= predict_classifier
 LLM_CONFIG        ?= llama31_8b_qlora
 LLM_RUN           ?=
@@ -33,7 +34,13 @@ format:
 test:
 	uv run pytest
 
-# ─── Reference tables (rebuilt rarely) ──────────────────────────────────────
+# ─── Reference tables ───────────────────────────────────────────────────────
+#
+# build-teams-locations and build-distances-table call paid APIs (OpenAI,
+# Serper) and write *inputs* to data/raw/reference/, not build artifacts. They
+# are deliberately NOT part of full-rebuild: a data rebuild must never depend on
+# a network call that can silently return a worse table than the one it
+# overwrites. Run them by hand, only when a team relocates or a new city appears.
 
 build-teams-history:
 	uv run python -m src.cli.build_teams_history
@@ -42,7 +49,7 @@ build-teams-locations:
 	uv run python -m src.cli.build_teams_locations
 
 build-distances-table:
-	uv run python -m src.cli.build_distances_table
+	uv run python -m src.cli.build_distances_table $(if $(LIMIT),--limit $(LIMIT),)
 
 build-polymarket-teams:
 	uv run python -m src.cli.build_polymarket_teams
@@ -61,12 +68,12 @@ process-ingested-games:
 build-features:
 	uv run python -m src.cli.build_features --config configs/features.yaml
 
-# Freeze the evaluation boundary. Run once: every model, sklearn and LLM alike,
-# is scored against this same set of games.
-build-holdout-set:
-	uv run python -m src.cli.build_holdout_set
-
 # ─── Incremental: upcoming games and their results ──────────────────────────
+
+# Re-pull the schedule. This is what makes makeup dates for postponed games
+# visible; without it the schedule freezes on the day it was downloaded.
+fetch-league-schedule:
+	uv run python -m src.cli.fetch_league_schedule
 
 fetch-upcoming-games:
 	uv run python -m src.cli.fetch_upcoming_games
@@ -76,6 +83,18 @@ fetch-game-results:
 
 append-game-results:
 	uv run python -m src.cli.append_game_results
+
+# Release watched postponed games that now have a new date.
+reconcile-postponed:
+	uv run python -m src.cli.reconcile_postponed
+
+# Put quarantined games back in the queue, once you know why they stalled.
+retry-unresolved:
+	uv run python -m src.cli.retry_unresolved
+
+# One-time move to the staged incremental layout. See the module docstring.
+migrate-incremental:
+	uv run python -m src.cli.migrate_incremental_layout
 
 # ─── Prediction and monitoring ──────────────────────────────────────────────
 
@@ -88,16 +107,20 @@ score-predictions:
 
 # ─── Training ───────────────────────────────────────────────────────────────
 
+# Training does not deploy. Pass PROMOTE=1 to also point predict_classifier.yaml
+# at the run this produces; otherwise the run URI is just logged for you to
+# promote later.
+#
+# Defaults to the single xgboost model. Sweep all four families — same features,
+# same splits, best one registered — with:
+#   make train TRAIN_CONFIG=all_models
 train:
-	uv run python -m src.cli.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml
-
-train-all:
-	uv run python -m src.cli.run_experiments configs/train/train_all.yaml configs/train/train_same.yaml configs/train/train_different.yaml
+	uv run python -m src.cli.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml $(if $(PROMOTE),--promote,)
 
 # Build the LLM dataset from the ML models' splits, so both families are scored
-# on the same games. Add --push to upload to the Hub.
+# on the same games. Pass ARGS=--push to upload to the Hub.
 build-llm-dataset:
-	uv run python -m src.cli.build_llm_dataset --config configs/train_llm/$(LLM_CONFIG).yaml
+	uv run python -m src.cli.build_llm_dataset --config configs/train_llm/$(LLM_CONFIG).yaml $(ARGS)
 
 # LLM fine-tuning (needs `uv sync --extra gpu` on a CUDA box).
 # Pass LLM_RUN=<name> to resume an interrupted run from its Hub checkpoint.
@@ -128,10 +151,11 @@ plot-home-win-ratio:
 
 # ─── Composite pipelines ────────────────────────────────────────────────────
 
+# Rebuilds every derived table from raw inputs. Offline and free by design: the
+# two API-backed reference builders are not called here, they produce inputs
+# (data/raw/reference/) that this target consumes.
 full-rebuild:
 	$(MAKE) build-teams-history
-	$(MAKE) build-teams-locations
-	$(MAKE) build-distances-table
 	$(MAKE) ingest-raw-games
 	$(MAKE) append-game-results
 	$(MAKE) process-ingested-games
@@ -158,6 +182,9 @@ process-results-pipeline:
 # the updated history. Run with SOURCE=placeholder to exercise it without a
 # live results feed.
 daily-cycle:
+	$(MAKE) fetch-league-schedule
+	$(MAKE) parse-league-schedule
+	$(MAKE) reconcile-postponed
 	$(MAKE) fetch-upcoming-games
 	$(MAKE) predict-upcoming
 	$(MAKE) fetch-game-results

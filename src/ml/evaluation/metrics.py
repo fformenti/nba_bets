@@ -76,6 +76,54 @@ def compute_ece(y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10) 
     return float(ece)
 
 
+def compute_ece_null(
+    y_pred_proba: np.ndarray,
+    n_bins: int = 10,
+    n_resamples: int = 500,
+    random_state: int = 0,
+) -> float:
+    """Expected ECE if the model were perfectly calibrated at these predictions.
+
+    compute_ece takes an absolute value per bin, so per-bin sampling noise never
+    cancels: its expected value is strictly positive even for a flawless model,
+    and it grows as the sample shrinks (~0.015 at n=3500, ~0.026 at n=1200).
+    Raw ECE is therefore not comparable between runs whose test set changed size,
+    which is exactly what happened when the season split turned on. Dividing the
+    observed ECE by this null makes it comparable; a ratio near 1.0 means
+    "indistinguishable from perfectly calibrated".
+
+    Estimated by parametric bootstrap: draw y ~ Bernoulli(p_pred) and recompute.
+    """
+    p = np.asarray(y_pred_proba, dtype=float).ravel()
+    rng = np.random.default_rng(random_state)
+    draws = rng.random((n_resamples, p.size)) < p
+    return float(
+        np.mean([compute_ece(row.astype(int), p, n_bins=n_bins) for row in draws])
+    )
+
+
+def compute_ece_ratio(
+    y_true: np.ndarray,
+    y_pred_proba: np.ndarray,
+    n_bins: int = 10,
+    n_resamples: int = 500,
+    random_state: int = 0,
+) -> Dict[str, float]:
+    """ECE alongside its perfectly-calibrated null and their ratio.
+
+    Returns keys ``ece``, ``ece_null`` and ``ece_ratio``, unrounded.
+    """
+    ece = compute_ece(y_true, y_pred_proba, n_bins=n_bins)
+    null = compute_ece_null(
+        y_pred_proba, n_bins=n_bins, n_resamples=n_resamples, random_state=random_state
+    )
+    return {
+        "ece": ece,
+        "ece_null": null,
+        "ece_ratio": ece / null if null > 0 else float("nan"),
+    }
+
+
 def compute_classification_metrics(
     y_true: pd.Series,
     y_pred: np.ndarray,
@@ -129,21 +177,9 @@ MODEL_DISPLAY_NAMES = {
     "point_differential_baseline": "Point Differential Baseline",
 }
 
-CONFERENCE_DISPLAY_NAMES = {
-    "same": "Same Conference",
-    "different": "Different Conferences",
-    "all": "All Games",
-}
-
-
 def get_model_display_name(model_key: str) -> str:
     """Return a human-readable display name for a model key."""
     return MODEL_DISPLAY_NAMES.get(model_key, model_key)
-
-
-def get_conference_display_name(conference_filter: str) -> str:
-    """Return a human-readable display name for a conference filter."""
-    return CONFERENCE_DISPLAY_NAMES.get(conference_filter, conference_filter)
 
 
 def format_metrics_line(metrics: Dict[str, float], prefix: str = "") -> str:
@@ -178,7 +214,6 @@ def print_metrics_summary(
     metrics: Dict[str, float],
     model_name: str = "",
     split: str = "",
-    conference_filter: str = "",
 ) -> None:
     """
     Print a formatted summary of key metrics (accuracy and ROC AUC) as percentages.
@@ -191,14 +226,11 @@ def print_metrics_summary(
         Model key name (e.g. 'random_forest')
     split : str, default=''
         Data split prefix in metric keys (e.g. 'test', 'val', 'train')
-    conference_filter : str, default=''
-        Conference filter key (e.g. 'same', 'different', 'all')
     """
     line = format_metrics_line(metrics, prefix=split)
     if not line:
         return
 
     display_name = get_model_display_name(model_name) if model_name else "Model"
-    conf_label = f" ({get_conference_display_name(conference_filter)})" if conference_filter else ""
     split_label = f" [{split.capitalize()}]" if split else ""
-    print(f"  {display_name}{conf_label}{split_label}: {line}")
+    print(f"  {display_name}{split_label}: {line}")

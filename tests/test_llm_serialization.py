@@ -142,9 +142,13 @@ def test_serialize_row_without_metadata(features):
     assert text.endswith(PROMPT_SUFFIX)
 
 
-def test_unknown_format_rejected(features, meta):
+@pytest.mark.parametrize("fmt", ["yaml", "prose"])
+def test_unknown_format_rejected(features, meta, fmt):
+    """'prose' is listed explicitly: it was a real format until the hand-written
+    template was removed, so a config carrying it must fail loudly rather than
+    silently fall back to the default."""
     with pytest.raises(ValueError, match="Unknown serialization_format"):
-        serialize_row(features, meta, fmt="yaml")
+        serialize_row(features, meta, fmt=fmt)
 
 
 def test_serialize_frame_aligns_metadata_by_index(features, meta):
@@ -160,9 +164,3 @@ def test_serialize_frame_aligns_metadata_by_index(features, meta):
 
     assert "Lakers" in texts[0], "row index 7 should carry index 7's metadata"
     assert "Celtics" in texts[1], "row index 3 should carry index 3's metadata"
-
-
-def test_prose_format_reports_missing_columns_clearly(features, meta):
-    """The prose template is pinned to old columns; the failure must explain itself."""
-    with pytest.raises(KeyError, match="prose"):
-        serialize_row(features, meta, fmt="prose")

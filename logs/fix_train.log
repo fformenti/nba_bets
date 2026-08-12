@@ -1,0 +1,414 @@
+2026-08-12 00:06:16,919 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:06:16,919 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:06:16,919 - __main__ - INFO - 
+############################################################
+2026-08-12 00:06:16,919 - __main__ - INFO - Running experiment: xgb_same
+2026-08-12 00:06:16,920 - __main__ - INFO - ############################################################
+2026-08-12 00:06:16,920 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:06:16,920 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/xgb_same.yaml
+2026-08-12 00:06:16,922 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/train_same.yaml
+2026-08-12 00:06:16,925 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:06:16,933 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/_defaults.yaml
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.schemas
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.tables
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.types
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.constraints
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.defaults
+2026/08/12 00:06:17 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.comments
+2026/08/12 00:06:17 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/08/12 00:06:17 INFO mlflow.store.db.utils: Updating database tables
+2026/08/12 00:06:17 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/12 00:06:17 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026/08/12 00:06:17 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/12 00:06:17 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026-08-12 00:06:17,413 - src.ml.tracking.mlflow_tracker - INFO - Using existing MLflow experiment: nba_bets_same_conference (ID: 3)
+2026-08-12 00:06:17,570 - src.ml.tracking.mlflow_tracker - INFO - Started MLflow run: fc528babec3f4cedba76d016695b220d
+2026-08-12 00:06:17,583 - src.ml.config.loader - INFO - Loaded configuration from configs/train/xgb_same.yaml
+2026-08-12 00:06:17,587 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:06:17,600 - src.ml.config.loader - INFO - Loaded configuration from configs/train/_defaults.yaml
+2026-08-12 00:06:17,615 - src.ml.training.data_prep - INFO - Loading data from data/processed/regular_season/games_features.csv
+2026-08-12 00:06:18,409 - src.ml.datasets.loaders - INFO - Loaded DataFrame from data/processed/regular_season/games_features.csv: 66046 rows, 231 columns
+2026-08-12 00:06:18,447 - src.ml.datasets.splits - INFO - Filtered to 51399 games (min_season: 1980/81)
+2026-08-12 00:06:18,472 - src.ml.datasets.splits - INFO - Filtered to 33904 games (same conference)
+2026-08-12 00:06:18,506 - src.ml.training.data_prep - INFO - Dropped 1727 rows with missing values (5.1%)
+2026-08-12 00:06:18,512 - src.ml.training.data_prep - INFO - Loaded 32177 samples. Target distribution:
+{1: 19520, 0: 12657}
+2026-08-12 00:06:18,516 - src.ml.datasets.splits - INFO - Using fixed holdout: 2312 games (4360 in file, 2312 matched)
+2026-08-12 00:06:18,535 - src.ml.features.engineering - INFO - Dropped 127 columns after delta creation
+2026-08-12 00:06:18,535 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-12 00:06:18,550 - src.ml.features.engineering - INFO - Same conference filter: skipping conference features
+2026-08-12 00:06:18,570 - src.ml.datasets.splitters - INFO - Fixed holdout split: train=23892, val=5973, test=2312
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: Failed to determine whether UCVolumeDatasetSource can resolve source information for 'data/processed/regular_season/games_features.csv'. Exception: 
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: The specified dataset source can be interpreted in multiple ways: LocalArtifactDatasetSource, LocalArtifactDatasetSource. MLflow will assume that this is a LocalArtifactDatasetSource source.
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026-08-12 00:06:20,686 - src.ml.training.experiment - INFO - Within-season weighting (K=30): min=0.20, mean=0.87, pct_full=68.4%
+2026-08-12 00:06:20,688 - src.ml.training.experiment - INFO - Cross-season decay (lambda=0.1): min=0.037, mean=0.302, oldest=1980/81, newest=2013/14
+2026-08-12 00:06:20,688 - src.ml.training.experiment - INFO - Running Boruta-SHAP feature selection on training data...
+2026-08-12 00:06:20,689 - src.ml.features.selection - INFO - Boruta-SHAP iteration 1/20
+2026-08-12 00:06:22,882 - src.ml.features.selection - INFO - Boruta-SHAP iteration 2/20
+2026-08-12 00:06:25,132 - src.ml.features.selection - INFO - Boruta-SHAP iteration 3/20
+2026-08-12 00:06:28,114 - src.ml.features.selection - INFO - Boruta-SHAP iteration 4/20
+2026-08-12 00:06:30,809 - src.ml.features.selection - INFO - Boruta-SHAP iteration 5/20
+2026-08-12 00:06:33,984 - src.ml.features.selection - INFO - Boruta-SHAP iteration 6/20
+2026-08-12 00:06:36,981 - src.ml.features.selection - INFO - Boruta-SHAP iteration 7/20
+2026-08-12 00:06:39,441 - src.ml.features.selection - INFO - Boruta-SHAP iteration 8/20
+2026-08-12 00:06:41,758 - src.ml.features.selection - INFO - Boruta-SHAP iteration 9/20
+2026-08-12 00:06:43,971 - src.ml.features.selection - INFO - Boruta-SHAP iteration 10/20
+2026-08-12 00:06:46,341 - src.ml.features.selection - INFO - Boruta-SHAP iteration 11/20
+2026-08-12 00:06:48,621 - src.ml.features.selection - INFO - Boruta-SHAP iteration 12/20
+2026-08-12 00:06:50,900 - src.ml.features.selection - INFO - Boruta-SHAP iteration 13/20
+2026-08-12 00:06:53,221 - src.ml.features.selection - INFO - Boruta-SHAP iteration 14/20
+2026-08-12 00:06:55,441 - src.ml.features.selection - INFO - Boruta-SHAP iteration 15/20
+2026-08-12 00:06:57,721 - src.ml.features.selection - INFO - Boruta-SHAP iteration 16/20
+2026-08-12 00:06:59,987 - src.ml.features.selection - INFO - Boruta-SHAP iteration 17/20
+2026-08-12 00:07:02,175 - src.ml.features.selection - INFO - Boruta-SHAP iteration 18/20
+2026-08-12 00:07:04,540 - src.ml.features.selection - INFO - Boruta-SHAP iteration 19/20
+2026-08-12 00:07:06,782 - src.ml.features.selection - INFO - Boruta-SHAP iteration 20/20
+2026-08-12 00:07:09,069 - src.ml.features.selection - INFO - Boruta-SHAP complete: 12 confirmed, 9 rejected, 5 tentative
+2026-08-12 00:07:09,070 - src.ml.features.selection - INFO - Selected 17 features: ['norm_pts_diff_avg_L3_delta', 'norm_pts_diff_avg_L8_delta', 'norm_pts_diff_avg_L13_delta', 'norm_pts_diff_avg_L34_delta', 'norm_pts_diff_avg_L55_delta', 'norm_pts_diff_avg_L10_at_location_delta', 'norm_pts_diff_avg_L41_at_location_delta', 'sos_adj_record_L20_at_location_delta', 'sos_adj_record_L41_at_location_delta', 'back_to_back_delta', 'adjusted_last_season_record_delta', 'adjusted_last_season_record_at_location_delta', 'distance_L1_delta', 'distance_L3_delta', 'distance_L14_delta', 'rested_days_delta', 'indifference_flag_delta']
+2026-08-12 00:07:09,629 - src.ml.training.experiment - INFO - Boruta-SHAP visualization saved.
+2026-08-12 00:07:09,630 - src.ml.training.experiment - INFO - Data splits: train=22668, val=5660, test=2178
+2026-08-12 00:07:09,637 - src.ml.training.experiment - INFO - Feature types identified: 17 numerical, 0 categorical, 0 boolean features
+2026-08-12 00:07:09,637 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:07:09,637 - src.ml.training.experiment - INFO - Record Difference Baseline
+2026-08-12 00:07:09,637 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:07:09,643 - src.ml.models.trainer - INFO - Test: Accuracy: 63.64% | ROC AUC: 63.77%
+2026-08-12 00:07:09,675 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:07:09,675 - src.ml.training.experiment - INFO - Training XGBoost
+2026-08-12 00:07:09,675 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:07:09,675 - src.ml.training.model_factory - INFO - Created xgboost model
+2026-08-12 00:07:09,675 - src.ml.training.runners - INFO - Starting hyperparameter tuning for xgboost
+2026-08-12 00:07:09,675 - src.ml.models.trainer - INFO - Starting random search hyperparameter tuning: cv=5 (timeseries), scoring=accuracy, n_iter=20
+2026-08-12 00:07:21,831 - src.ml.training.runners - INFO - Evaluating tuned xgboost (already fit by grid search)...
+2026-08-12 00:07:21,876 - src.ml.models.trainer - INFO - Train: Accuracy: 69.84% | ROC AUC: 74.40%
+2026-08-12 00:07:21,893 - src.ml.models.trainer - INFO - Val: Accuracy: 66.54% | ROC AUC: 71.10%
+2026-08-12 00:07:21,893 - src.ml.training.runners - INFO - HP tuning best CV score (accuracy): 0.6924 
+2026-08-12 00:07:21,902 - src.ml.models.trainer - INFO - Test: Accuracy: 66.62% | ROC AUC: 71.52%
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:07:25 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+2026-08-12 00:07:25,387 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_same
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - Model Comparison - Test Set Results
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - ============================================================
+  record_baseline (Same Conference) [Test]: Accuracy: 63.64% | ROC AUC: 63.77%
+  XGBoost (Same Conference) [Test]: Accuracy: 66.62% | ROC AUC: 71.52%
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - Best Model: XGBoost (Same Conference)
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO -   Accuracy: 66.62% | ROC AUC: 71.52%
+2026-08-12 00:07:25,391 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:07:25,470 - src.ml.training.experiment - INFO - Season phase accuracy (model vs record baseline):
+season_phase   n  accuracy_model  accuracy_baseline     diff
+        0-10 128        0.648438           0.585938 0.062500
+       10-20 378        0.698413           0.634921 0.063492
+       20-30 300        0.666667           0.646667 0.020000
+       30-40 247        0.635628           0.627530 0.008097
+       40-50 227        0.647577           0.599119 0.048458
+       50-60 293        0.672355           0.655290 0.017065
+       60-70 260        0.669231           0.661538 0.007692
+       70-80 280        0.664286           0.646429 0.017857
+       80-82  65        0.661538           0.630769 0.030769
+2026-08-12 00:07:25,484 - src.ml.training.experiment - INFO - Uncalibrated — Brier: 0.2126, ECE: 0.0225
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:07:25,519 - src.ml.training.experiment - INFO - Calibrated [sigmoid] — Brier: 0.2125, ECE: 0.0215
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:07:25,538 - src.ml.training.experiment - INFO - Calibrated [isotonic] — Brier: 0.2131, ECE: 0.0167
+2026-08-12 00:07:25,540 - src.ml.training.experiment - INFO - Using calibrated model (sigmoid)
+2026-08-12 00:07:25,541 - src.ml.training.experiment - INFO - Generating visualizations...
+2026-08-12 00:07:26,237 - src.ml.training.experiment - INFO - SHAP summary plot saved.
+2026-08-12 00:07:27,023 - src.ml.training.experiment - INFO - Calibration curve saved.
+2026-08-12 00:07:27,023 - src.ml.training.experiment - INFO - Visualizations saved to outputs/same/visualizations
+2026-08-12 00:07:27,023 - src.ml.training.experiment - INFO - Generating metadata-based analysis...
+2026-08-12 00:07:28,202 - src.ml.training.experiment - INFO - Analysis saved to outputs/same/analysis and outputs/same/tables
+2026-08-12 00:07:28,226 - src.ml.training.experiment - INFO - Skipping local model save; MLflow handles model logging.
+2026-08-12 00:07:28,226 - src.ml.training.experiment - INFO - Registering model 'nba_classification_xgboost_same' in MLflow Model Registry
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:07:30 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+2026/08/12 00:07:31 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/08/12 00:07:31 INFO mlflow.store.db.utils: Updating database tables
+2026/08/12 00:07:31 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/12 00:07:31 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+Registered model 'nba_classification_xgboost_same' already exists. Creating a new version of this model...
+Created version '55' of model 'nba_classification_xgboost_same'.
+2026-08-12 00:07:31,058 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_same
+2026-08-12 00:07:31,062 - src.ml.training.experiment - INFO - Model logged at run URI: runs:/fc528babec3f4cedba76d016695b220d/nba_xgboost_same
+2026-08-12 00:07:31,070 - src.ml.tracking.mlflow_tracker - INFO - Ended MLflow run: fc528babec3f4cedba76d016695b220d
+2026-08-12 00:07:31,070 - src.ml.training.classifier - INFO - same: xgboost - Accuracy: 0.6662
+2026-08-12 00:07:31,071 - src.ml.training.classifier - INFO - Updated /Users/felipeformenti/dev/fformenti/nba_bets/configs/predict/predict_classifier.yaml with new model URI:
+2026-08-12 00:07:31,071 - src.ml.training.classifier - INFO -   same: runs:/fc528babec3f4cedba76d016695b220d/nba_xgboost_same
+2026-08-12 00:07:31,071 - src.ml.training.classifier - INFO - Training complete!
+2026-08-12 00:07:31,071 - __main__ - INFO - 
+############################################################
+2026-08-12 00:07:31,071 - __main__ - INFO - Running experiment: xgb_different
+2026-08-12 00:07:31,071 - __main__ - INFO - ############################################################
+2026-08-12 00:07:31,072 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:07:31,072 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/xgb_different.yaml
+2026-08-12 00:07:31,074 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/train_different.yaml
+2026-08-12 00:07:31,077 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:07:31,086 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/_defaults.yaml
+2026-08-12 00:07:31,089 - src.ml.tracking.mlflow_tracker - INFO - Using existing MLflow experiment: nba_bets_cross_conference (ID: 4)
+2026-08-12 00:07:31,097 - src.ml.tracking.mlflow_tracker - INFO - Started MLflow run: d77297cfd2f74e26b51c217c690a8182
+2026-08-12 00:07:31,120 - src.ml.config.loader - INFO - Loaded configuration from configs/train/xgb_different.yaml
+2026-08-12 00:07:31,123 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:07:31,136 - src.ml.config.loader - INFO - Loaded configuration from configs/train/_defaults.yaml
+2026-08-12 00:07:31,152 - src.ml.training.data_prep - INFO - Loading data from data/processed/regular_season/games_features.csv
+2026-08-12 00:07:32,193 - src.ml.datasets.loaders - INFO - Loaded DataFrame from data/processed/regular_season/games_features.csv: 66046 rows, 231 columns
+2026-08-12 00:07:32,252 - src.ml.datasets.splits - INFO - Filtered to 51399 games (min_season: 1980/81)
+2026-08-12 00:07:32,275 - src.ml.datasets.splits - INFO - Filtered to 17495 games (different conferences)
+2026-08-12 00:07:32,312 - src.ml.training.data_prep - INFO - Dropped 497 rows with missing values (2.8%)
+2026-08-12 00:07:32,322 - src.ml.training.data_prep - INFO - Loaded 16998 samples. Target distribution:
+{1: 10145, 0: 6853}
+2026-08-12 00:07:32,334 - src.ml.datasets.splits - INFO - Using fixed holdout: 1323 games (4360 in file, 1323 matched)
+2026-08-12 00:07:32,349 - src.ml.features.engineering - INFO - Dropped 127 columns after delta creation
+2026-08-12 00:07:32,349 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-12 00:07:32,360 - src.ml.features.engineering - INFO - Different conference filter: adding conference vs conference record features
+2026-08-12 00:07:32,546 - src.ml.features.engineering - INFO - Created conference features: home_conference_vs_away_conference_record, games_played_at_home_conference
+2026-08-12 00:07:32,558 - src.ml.datasets.splitters - INFO - Fixed holdout split: train=12540, val=3135, test=1323
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: Failed to determine whether UCVolumeDatasetSource can resolve source information for 'data/processed/regular_season/games_features.csv'. Exception: 
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: The specified dataset source can be interpreted in multiple ways: LocalArtifactDatasetSource, LocalArtifactDatasetSource. MLflow will assume that this is a LocalArtifactDatasetSource source.
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026-08-12 00:07:33,962 - src.ml.training.experiment - INFO - Within-season weighting (K=30): min=0.53, mean=0.94, pct_full=75.9%
+2026-08-12 00:07:33,963 - src.ml.training.experiment - INFO - Cross-season decay (lambda=0.1): min=0.033, mean=0.320, oldest=1980/81, newest=2014/15
+2026-08-12 00:07:33,963 - src.ml.training.experiment - INFO - Running Boruta-SHAP feature selection on training data...
+2026-08-12 00:07:33,964 - src.ml.features.selection - INFO - Boruta-SHAP iteration 1/20
+2026-08-12 00:07:35,301 - src.ml.features.selection - INFO - Boruta-SHAP iteration 2/20
+2026-08-12 00:07:36,640 - src.ml.features.selection - INFO - Boruta-SHAP iteration 3/20
+2026-08-12 00:07:37,988 - src.ml.features.selection - INFO - Boruta-SHAP iteration 4/20
+2026-08-12 00:07:39,282 - src.ml.features.selection - INFO - Boruta-SHAP iteration 5/20
+2026-08-12 00:07:41,242 - src.ml.features.selection - INFO - Boruta-SHAP iteration 6/20
+2026-08-12 00:07:42,927 - src.ml.features.selection - INFO - Boruta-SHAP iteration 7/20
+2026-08-12 00:07:44,769 - src.ml.features.selection - INFO - Boruta-SHAP iteration 8/20
+2026-08-12 00:07:46,651 - src.ml.features.selection - INFO - Boruta-SHAP iteration 9/20
+2026-08-12 00:07:48,708 - src.ml.features.selection - INFO - Boruta-SHAP iteration 10/20
+2026-08-12 00:07:50,248 - src.ml.features.selection - INFO - Boruta-SHAP iteration 11/20
+2026-08-12 00:07:52,177 - src.ml.features.selection - INFO - Boruta-SHAP iteration 12/20
+2026-08-12 00:07:53,650 - src.ml.features.selection - INFO - Boruta-SHAP iteration 13/20
+2026-08-12 00:07:55,530 - src.ml.features.selection - INFO - Boruta-SHAP iteration 14/20
+2026-08-12 00:07:57,346 - src.ml.features.selection - INFO - Boruta-SHAP iteration 15/20
+2026-08-12 00:07:58,915 - src.ml.features.selection - INFO - Boruta-SHAP iteration 16/20
+2026-08-12 00:08:00,257 - src.ml.features.selection - INFO - Boruta-SHAP iteration 17/20
+2026-08-12 00:08:01,533 - src.ml.features.selection - INFO - Boruta-SHAP iteration 18/20
+2026-08-12 00:08:02,861 - src.ml.features.selection - INFO - Boruta-SHAP iteration 19/20
+2026-08-12 00:08:04,201 - src.ml.features.selection - INFO - Boruta-SHAP iteration 20/20
+2026-08-12 00:08:05,605 - src.ml.features.selection - INFO - Boruta-SHAP complete: 8 confirmed, 20 rejected, 0 tentative
+2026-08-12 00:08:05,606 - src.ml.features.selection - INFO - Selected 8 features: ['norm_pts_diff_avg_L3_delta', 'norm_pts_diff_avg_L13_delta', 'norm_pts_diff_avg_L34_delta', 'norm_pts_diff_avg_L55_delta', 'norm_pts_diff_avg_L20_at_location_delta', 'back_to_back_delta', 'adjusted_last_season_record_delta', 'adjusted_last_season_record_at_location_delta']
+2026-08-12 00:08:05,883 - src.ml.training.experiment - INFO - Boruta-SHAP visualization saved.
+2026-08-12 00:08:05,883 - src.ml.training.experiment - INFO - Data splits: train=10072, val=2589, test=1284
+2026-08-12 00:08:05,889 - src.ml.training.experiment - INFO - Feature types identified: 8 numerical, 0 categorical, 0 boolean features
+2026-08-12 00:08:05,890 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:08:05,890 - src.ml.training.experiment - INFO - Record Difference Baseline
+2026-08-12 00:08:05,890 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:08:05,896 - src.ml.models.trainer - INFO - Test: Accuracy: 61.84% | ROC AUC: 61.90%
+2026-08-12 00:08:05,921 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:08:05,921 - src.ml.training.experiment - INFO - Training XGBoost
+2026-08-12 00:08:05,921 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:08:05,921 - src.ml.training.model_factory - INFO - Created xgboost model
+2026-08-12 00:08:05,921 - src.ml.training.runners - INFO - Starting hyperparameter tuning for xgboost
+2026-08-12 00:08:05,921 - src.ml.models.trainer - INFO - Starting random search hyperparameter tuning: cv=5 (timeseries), scoring=accuracy, n_iter=20
+2026-08-12 00:08:09,034 - src.ml.training.runners - INFO - Evaluating tuned xgboost (already fit by grid search)...
+2026-08-12 00:08:09,050 - src.ml.models.trainer - INFO - Train: Accuracy: 69.94% | ROC AUC: 75.21%
+2026-08-12 00:08:09,056 - src.ml.models.trainer - INFO - Val: Accuracy: 64.97% | ROC AUC: 69.99%
+2026-08-12 00:08:09,056 - src.ml.training.runners - INFO - HP tuning best CV score (accuracy): 0.6850 
+2026-08-12 00:08:09,062 - src.ml.models.trainer - INFO - Test: Accuracy: 62.23% | ROC AUC: 68.48%
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:08:11 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+2026-08-12 00:08:11,093 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_different
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - Model Comparison - Test Set Results
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - ============================================================
+  record_baseline (Different Conferences) [Test]: Accuracy: 61.84% | ROC AUC: 61.90%
+  XGBoost (Different Conferences) [Test]: Accuracy: 62.23% | ROC AUC: 68.48%
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - Best Model: XGBoost (Different Conferences)
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO -   Accuracy: 62.23% | ROC AUC: 68.48%
+2026-08-12 00:08:11,095 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:08:11,153 - src.ml.training.experiment - INFO - Season phase accuracy (model vs record baseline):
+season_phase   n  accuracy_model  accuracy_baseline      diff
+        0-10  70        0.600000           0.614286 -0.014286
+       10-20 121        0.553719           0.512397  0.041322
+       20-30 154        0.629870           0.636364 -0.006494
+       30-40 209        0.698565           0.636364  0.062201
+       40-50 221        0.592760           0.565611  0.027149
+       50-60 155        0.619355           0.645161 -0.025806
+       60-70 185        0.589189           0.637838 -0.048649
+       70-80 158        0.670886           0.696203 -0.025316
+       80-82  11        0.454545           0.454545  0.000000
+2026-08-12 00:08:11,161 - src.ml.training.experiment - INFO - Uncalibrated — Brier: 0.2224, ECE: 0.0368
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:08:11,172 - src.ml.training.experiment - INFO - Calibrated [sigmoid] — Brier: 0.2222, ECE: 0.0385
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:08:11,181 - src.ml.training.experiment - INFO - Calibrated [isotonic] — Brier: 0.2227, ECE: 0.0444
+2026-08-12 00:08:11,184 - src.ml.training.experiment - INFO - Using calibrated model (sigmoid)
+2026-08-12 00:08:11,184 - src.ml.training.experiment - INFO - Generating visualizations...
+2026-08-12 00:08:11,707 - src.ml.training.experiment - INFO - SHAP summary plot saved.
+2026-08-12 00:08:12,222 - src.ml.training.experiment - INFO - Calibration curve saved.
+2026-08-12 00:08:12,222 - src.ml.training.experiment - INFO - Visualizations saved to outputs/different/visualizations
+2026-08-12 00:08:12,222 - src.ml.training.experiment - INFO - Generating metadata-based analysis...
+2026-08-12 00:08:13,230 - src.ml.training.experiment - INFO - Analysis saved to outputs/different/analysis and outputs/different/tables
+2026-08-12 00:08:13,266 - src.ml.training.experiment - INFO - Skipping local model save; MLflow handles model logging.
+2026-08-12 00:08:13,266 - src.ml.training.experiment - INFO - Registering model 'nba_classification_xgboost_different' in MLflow Model Registry
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:08:14 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+Registered model 'nba_classification_xgboost_different' already exists. Creating a new version of this model...
+Created version '9' of model 'nba_classification_xgboost_different'.
+2026-08-12 00:08:14,638 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_different
+2026-08-12 00:08:14,640 - src.ml.training.experiment - INFO - Model logged at run URI: runs:/d77297cfd2f74e26b51c217c690a8182/nba_xgboost_different
+2026-08-12 00:08:14,650 - src.ml.tracking.mlflow_tracker - INFO - Ended MLflow run: d77297cfd2f74e26b51c217c690a8182
+2026-08-12 00:08:14,650 - src.ml.training.classifier - INFO - different: xgboost - Accuracy: 0.6223
+2026-08-12 00:08:14,651 - src.ml.training.classifier - INFO - Updated /Users/felipeformenti/dev/fformenti/nba_bets/configs/predict/predict_classifier.yaml with new model URI:
+2026-08-12 00:08:14,651 - src.ml.training.classifier - INFO -   different: runs:/d77297cfd2f74e26b51c217c690a8182/nba_xgboost_different
+2026-08-12 00:08:14,651 - src.ml.training.classifier - INFO - Training complete!
+2026-08-12 00:08:14,651 - __main__ - INFO - 
+############################################################
+2026-08-12 00:08:14,651 - __main__ - INFO - Running experiment: xgb_all
+2026-08-12 00:08:14,651 - __main__ - INFO - ############################################################
+2026-08-12 00:08:14,652 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:08:14,652 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/xgb_all.yaml
+2026-08-12 00:08:14,655 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/train_all.yaml
+2026-08-12 00:08:14,657 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:08:14,777 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/train/_defaults.yaml
+2026-08-12 00:08:14,780 - src.ml.tracking.mlflow_tracker - INFO - Using existing MLflow experiment: nba_bets_all_games (ID: 5)
+2026-08-12 00:08:14,786 - src.ml.tracking.mlflow_tracker - INFO - Started MLflow run: 33bb34cd42544a6b88cdbea96cf9db7e
+2026-08-12 00:08:14,798 - src.ml.config.loader - INFO - Loaded configuration from configs/train/xgb_all.yaml
+2026-08-12 00:08:14,801 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-12 00:08:14,812 - src.ml.config.loader - INFO - Loaded configuration from configs/train/_defaults.yaml
+2026-08-12 00:08:14,827 - src.ml.training.data_prep - INFO - Loading data from data/processed/regular_season/games_features.csv
+2026-08-12 00:08:15,643 - src.ml.datasets.loaders - INFO - Loaded DataFrame from data/processed/regular_season/games_features.csv: 66046 rows, 231 columns
+2026-08-12 00:08:15,689 - src.ml.datasets.splits - INFO - Filtered to 51399 games (min_season: 1980/81)
+2026-08-12 00:08:15,689 - src.ml.datasets.splits - INFO - Using all 51399 games (no conference filter)
+2026-08-12 00:08:15,740 - src.ml.training.data_prep - INFO - Dropped 2224 rows with missing values (4.3%)
+2026-08-12 00:08:15,748 - src.ml.training.data_prep - INFO - Loaded 49175 samples. Target distribution:
+{1: 29665, 0: 19510}
+2026-08-12 00:08:15,752 - src.ml.datasets.splits - INFO - Using fixed holdout: 3635 games (4360 in file, 3635 matched)
+2026-08-12 00:08:15,778 - src.ml.features.engineering - INFO - Dropped 127 columns after delta creation
+2026-08-12 00:08:15,778 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-12 00:08:15,800 - src.ml.features.engineering - INFO - All teams filter: adding conference delta feature
+2026-08-12 00:08:15,820 - src.ml.features.engineering - INFO - Created conference_diff_home_advantage_pct feature (0.0 for same conference teams)
+2026-08-12 00:08:15,843 - src.ml.datasets.splitters - INFO - Fixed holdout split: train=36432, val=9108, test=3635
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: Failed to determine whether UCVolumeDatasetSource can resolve source information for 'data/processed/regular_season/games_features.csv'. Exception: 
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/data/dataset_source_registry.py:148: UserWarning: The specified dataset source can be interpreted in multiple ways: LocalArtifactDatasetSource, LocalArtifactDatasetSource. MLflow will assume that this is a LocalArtifactDatasetSource source.
+  return _dataset_source_registry.resolve(
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026-08-12 00:08:19,124 - src.ml.training.experiment - INFO - Within-season weighting (K=30): min=0.53, mean=0.94, pct_full=77.9%
+2026-08-12 00:08:19,126 - src.ml.training.experiment - INFO - Cross-season decay (lambda=0.1): min=0.037, mean=0.316, oldest=1980/81, newest=2013/14
+2026-08-12 00:08:19,126 - src.ml.training.experiment - INFO - Running Boruta-SHAP feature selection on training data...
+2026-08-12 00:08:19,127 - src.ml.features.selection - INFO - Boruta-SHAP iteration 1/20
+2026-08-12 00:08:21,922 - src.ml.features.selection - INFO - Boruta-SHAP iteration 2/20
+2026-08-12 00:08:25,123 - src.ml.features.selection - INFO - Boruta-SHAP iteration 3/20
+2026-08-12 00:08:29,031 - src.ml.features.selection - INFO - Boruta-SHAP iteration 4/20
+2026-08-12 00:08:32,374 - src.ml.features.selection - INFO - Boruta-SHAP iteration 5/20
+2026-08-12 00:08:35,991 - src.ml.features.selection - INFO - Boruta-SHAP iteration 6/20
+2026-08-12 00:08:39,196 - src.ml.features.selection - INFO - Boruta-SHAP iteration 7/20
+2026-08-12 00:08:42,101 - src.ml.features.selection - INFO - Boruta-SHAP iteration 8/20
+2026-08-12 00:08:45,151 - src.ml.features.selection - INFO - Boruta-SHAP iteration 9/20
+2026-08-12 00:08:48,038 - src.ml.features.selection - INFO - Boruta-SHAP iteration 10/20
+2026-08-12 00:08:51,025 - src.ml.features.selection - INFO - Boruta-SHAP iteration 11/20
+2026-08-12 00:08:53,922 - src.ml.features.selection - INFO - Boruta-SHAP iteration 12/20
+2026-08-12 00:08:56,885 - src.ml.features.selection - INFO - Boruta-SHAP iteration 13/20
+2026-08-12 00:08:59,847 - src.ml.features.selection - INFO - Boruta-SHAP iteration 14/20
+2026-08-12 00:09:02,759 - src.ml.features.selection - INFO - Boruta-SHAP iteration 15/20
+2026-08-12 00:09:05,659 - src.ml.features.selection - INFO - Boruta-SHAP iteration 16/20
+2026-08-12 00:09:08,534 - src.ml.features.selection - INFO - Boruta-SHAP iteration 17/20
+2026-08-12 00:09:11,451 - src.ml.features.selection - INFO - Boruta-SHAP iteration 18/20
+2026-08-12 00:09:14,482 - src.ml.features.selection - INFO - Boruta-SHAP iteration 19/20
+2026-08-12 00:09:17,326 - src.ml.features.selection - INFO - Boruta-SHAP iteration 20/20
+2026-08-12 00:09:20,294 - src.ml.features.selection - INFO - Boruta-SHAP complete: 11 confirmed, 13 rejected, 3 tentative
+2026-08-12 00:09:20,299 - src.ml.features.selection - INFO - Selected 14 features: ['norm_pts_diff_avg_L8_delta', 'norm_pts_diff_avg_L13_delta', 'norm_pts_diff_avg_L21_delta', 'norm_pts_diff_avg_L34_delta', 'norm_pts_diff_avg_L55_delta', 'norm_pts_diff_avg_L41_at_location_delta', 'sos_adj_record_L20_at_location_delta', 'sos_adj_record_L41_at_location_delta', 'back_to_back_delta', 'adjusted_last_season_record_delta', 'adjusted_last_season_record_at_location_delta', 'distance_L14_delta', 'indifference_flag_delta', 'days_at_home_delta']
+2026-08-12 00:09:20,554 - src.ml.training.experiment - INFO - Boruta-SHAP visualization saved.
+2026-08-12 00:09:20,554 - src.ml.training.experiment - INFO - Data splits: train=29762, val=7552, test=3462
+2026-08-12 00:09:20,563 - src.ml.training.experiment - INFO - Feature types identified: 14 numerical, 0 categorical, 0 boolean features
+2026-08-12 00:09:20,564 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:09:20,564 - src.ml.training.experiment - INFO - Record Difference Baseline
+2026-08-12 00:09:20,564 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:09:20,566 - src.ml.models.trainer - INFO - Test: Accuracy: 62.97% | ROC AUC: 63.07%
+2026-08-12 00:09:20,589 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:09:20,589 - src.ml.training.experiment - INFO - Training XGBoost
+2026-08-12 00:09:20,589 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:09:20,589 - src.ml.training.model_factory - INFO - Created xgboost model
+2026-08-12 00:09:20,589 - src.ml.training.runners - INFO - Starting hyperparameter tuning for xgboost
+2026-08-12 00:09:20,589 - src.ml.models.trainer - INFO - Starting random search hyperparameter tuning: cv=5 (timeseries), scoring=accuracy, n_iter=20
+2026-08-12 00:09:27,970 - src.ml.training.runners - INFO - Evaluating tuned xgboost (already fit by grid search)...
+2026-08-12 00:09:28,007 - src.ml.models.trainer - INFO - Train: Accuracy: 69.84% | ROC AUC: 74.59%
+2026-08-12 00:09:28,020 - src.ml.models.trainer - INFO - Val: Accuracy: 65.89% | ROC AUC: 71.00%
+2026-08-12 00:09:28,020 - src.ml.training.runners - INFO - HP tuning best CV score (accuracy): 0.6931 
+2026-08-12 00:09:28,028 - src.ml.models.trainer - INFO - Test: Accuracy: 65.19% | ROC AUC: 70.61%
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:09:30 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+2026-08-12 00:09:30,349 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_all
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - Model Comparison - Test Set Results
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - ============================================================
+  record_baseline (All Games) [Test]: Accuracy: 62.97% | ROC AUC: 63.07%
+  XGBoost (All Games) [Test]: Accuracy: 65.19% | ROC AUC: 70.61%
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - 
+============================================================
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - Best Model: XGBoost (All Games)
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO -   Accuracy: 65.19% | ROC AUC: 70.61%
+2026-08-12 00:09:30,352 - src.ml.training.experiment - INFO - ============================================================
+2026-08-12 00:09:30,417 - src.ml.training.experiment - INFO - Season phase accuracy (model vs record baseline):
+season_phase   n  accuracy_model  accuracy_baseline     diff
+        0-10 198        0.631313           0.595960 0.035354
+       10-20 499        0.647295           0.605210 0.042084
+       20-30 454        0.647577           0.643172 0.004405
+       30-40 456        0.677632           0.631579 0.046053
+       40-50 448        0.616071           0.582589 0.033482
+       50-60 448        0.665179           0.651786 0.013393
+       60-70 445        0.653933           0.651685 0.002247
+       70-80 438        0.666667           0.664384 0.002283
+       80-82  76        0.644737           0.605263 0.039474
+2026-08-12 00:09:30,433 - src.ml.training.experiment - INFO - Uncalibrated — Brier: 0.2156, ECE: 0.0290
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:09:30,459 - src.ml.training.experiment - INFO - Calibrated [sigmoid] — Brier: 0.2154, ECE: 0.0185
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+2026-08-12 00:09:30,475 - src.ml.training.experiment - INFO - Calibrated [isotonic] — Brier: 0.2149, ECE: 0.0165
+2026-08-12 00:09:30,482 - src.ml.training.experiment - INFO - Using calibrated model (isotonic)
+2026-08-12 00:09:30,482 - src.ml.training.experiment - INFO - Generating visualizations...
+2026-08-12 00:09:31,105 - src.ml.training.experiment - INFO - SHAP summary plot saved.
+2026-08-12 00:09:31,706 - src.ml.training.experiment - INFO - Calibration curve saved.
+2026-08-12 00:09:31,706 - src.ml.training.experiment - INFO - Visualizations saved to outputs/all/visualizations
+2026-08-12 00:09:31,706 - src.ml.training.experiment - INFO - Generating metadata-based analysis...
+2026-08-12 00:09:32,843 - src.ml.training.experiment - INFO - Analysis saved to outputs/all/analysis and outputs/all/tables
+2026-08-12 00:09:32,867 - src.ml.training.experiment - INFO - Skipping local model save; MLflow handles model logging.
+2026-08-12 00:09:32,867 - src.ml.training.experiment - INFO - Registering model 'nba_classification_xgboost_all' in MLflow Model Registry
+/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/mlflow/types/utils.py:452: UserWarning: Hint: Inferred schema contains integer column(s). Integer columns in Python cannot represent missing values. If your input data contains missing values at inference time, it will be encoded as floats and will cause a schema enforcement error. The best way to avoid this problem is to infer the model schema based on a realistic data sample (training dataset) that includes missing values. Alternatively, you can declare integer columns as doubles (float64) whenever these columns may have missing values. See `Handling Integers With Missing Values <https://www.mlflow.org/docs/latest/models.html#handling-integers-with-missing-values>`_ for more details.
+  warnings.warn(
+2026/08/12 00:09:34 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+Registered model 'nba_classification_xgboost_all' already exists. Creating a new version of this model...
+Created version '15' of model 'nba_classification_xgboost_all'.
+2026-08-12 00:09:34,605 - src.ml.tracking.mlflow_tracker - INFO - Logged model to MLflow at nba_xgboost_all
+2026-08-12 00:09:34,608 - src.ml.training.experiment - INFO - Model logged at run URI: runs:/33bb34cd42544a6b88cdbea96cf9db7e/nba_xgboost_all
+2026-08-12 00:09:34,633 - src.ml.tracking.mlflow_tracker - INFO - Ended MLflow run: 33bb34cd42544a6b88cdbea96cf9db7e
+2026-08-12 00:09:34,633 - src.ml.training.classifier - INFO - all: xgboost - Accuracy: 0.6519
+2026-08-12 00:09:34,637 - src.ml.training.classifier - INFO - Updated /Users/felipeformenti/dev/fformenti/nba_bets/configs/predict/predict_classifier.yaml with new model URI:
+2026-08-12 00:09:34,637 - src.ml.training.classifier - INFO -   all: runs:/33bb34cd42544a6b88cdbea96cf9db7e/nba_xgboost_all
+2026-08-12 00:09:34,637 - src.ml.training.classifier - INFO - Training complete!
+2026-08-12 00:09:34,637 - __main__ - INFO - All experiments completed successfully.

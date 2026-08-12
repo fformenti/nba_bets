@@ -1,0 +1,32 @@
+# The model sweep: same games, same features, same splits as xgboost.yaml —
+# only the set of model families differs. train_experiment() trains each in turn,
+# scores them all on the same test set and registers the best.
+#
+# Use this to answer "is xgboost still the right family?"; use xgboost.yaml for
+# routine runs and anything you intend to promote. Per-family hyperparameters and
+# their search grids live in _defaults.yaml.
+#
+# lgbm is deliberately absent. It is installed and model_factory supports it, but
+# it has never been part of the sweep; add it here and to _defaults.yaml's
+# train_models together if you want it back.
+
+_include:
+  - "../features.yaml"
+  - "_defaults.yaml"
+
+description: "All games, all model families: random forest, gradient boosting, xgboost, neural network"
+tags:
+  variation: "all_models"
+
+model:
+  train_models:
+    - random_forest
+    - gradient_boosting
+    - xgboost
+    - neural_network
+
+paths:
+  outputs: "outputs/all_models"
+
+mlflow:
+  experiment_name: "nba_bets_all_models"

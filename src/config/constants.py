@@ -5,6 +5,52 @@ Project-wide constants for reusable defaults.
 # League schedule file
 LEAGUE_SCHEDULE_FILE = "LeagueSchedule25_26.csv"
 
+# Current season start year (e.g., 2025 for 2025/26 season).
+CURRENT_SEASON_START_YEAR = 2025
+
+# Earliest season kept in processed data. Seasons before this are dropped:
+# the teams history lookup (src/etl/reference/teams_history.py) has sparse
+# conference coverage before 1950/51, which would otherwise leave games with
+# NaN conference features.
+MIN_SEASON = "1950/51"
+
+# ===== Incremental collection =====
+# How many times a pending game may come back without a terminal status *after
+# its scheduled tip-off* before it is quarantined. Without this the daily cycle
+# deadlocks: the selector keeps emitting the same unanswerable game and the
+# history frontier never advances.
+MAX_FETCH_ATTEMPTS = 5
+
+# The clock the league schedule's tip-off times are expressed in. The raw
+# gameDateTimeEst column stamps a "Z" on values that are really Eastern wall
+# time, and the collectors carry them naive rather than re-labelling them, so
+# anything comparing a payload's gameDate against "now" must use this zone.
+SCHEDULE_TIMEZONE = "America/New_York"
+
+# Bookkeeping the results collector owns, carried on a pending payload so a game
+# remembers how many times it has been asked about across runs. It lives here
+# because the selector has to preserve it when refreshing a payload.
+FETCH_ATTEMPTS_KEY = "_fetchAttempts"
+
+# A scheduled game this many days behind the history frontier is quarantined
+# even if it was never fetched. Second line of defence, for games that fall out
+# of the pending directory entirely.
+UNRESOLVED_GRACE_DAYS = 3
+
+# The third digit of a zero-padded NBA gameId encodes what kind of game it is.
+# This is the only reliable discriminator for incrementally collected games: the
+# league schedule's gameLabel does not mark playoff rounds, and results payloads
+# carry no gameType at all.
+GAME_ID_TYPE_PREFIX = {
+    "1": "Preseason",
+    "2": "Regular Season",
+    "3": "All-Star",
+    "4": "Playoffs",
+    "5": "Play-in Tournament",
+}
+
+# Only these game types belong in the regular-season table.
+REGULAR_SEASON_GAME_TYPE = "Regular Season"
 
 ENRICHED_COLUMNS = [
     "win_bool",
@@ -62,8 +108,7 @@ DEFAULT_METADATA_COLUMNS = [
     "is_neutral_court_game",
 ]
 
-# Current season start year (e.g., 2025 for 2025/26 season).
-CURRENT_SEASON_START_YEAR = 2025
+
 
 # Precision for floats written to feature CSVs.  Feature math runs at full
 # double precision; rounding happens only here, at the persistence boundary,

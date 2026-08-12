@@ -1,7 +1,7 @@
 # Training the LLM on a RunPod GPU box
 
 Step-by-step runbook for QLoRA fine-tuning `meta-llama/Meta-Llama-3.1-8B` on the
-`fformenti/nba-bets` dataset using `src/ml/scripts/train_llm.py`.
+`fformenti/nba-bets` dataset via `make train-llm` (`src/cli/train_llm.py`).
 
 This can't run on the laptop: `bitsandbytes` has no macOS wheel, which is why the fine-tuning stack
 lives in the `gpu` extra of `pyproject.toml` rather than the core dependencies.
@@ -29,11 +29,16 @@ Do all of this from your laptop. Every minute spent fixing credentials on a runn
    / `test` splits. It's built and uploaded by:
 
    ```bash
-   make build-llm-dataset
+   make build-llm-dataset ARGS=--push
    ```
 
-   Run this from the laptop if the features have changed. Don't do it on the pod — the pod has no
-   `data/processed/` files.
+   Run this from the laptop — the pod has no `data/processed/` files. Without `--push` the dataset is
+   only built and summarised locally, and the pod keeps loading whatever is already on the Hub.
+
+   The Hub repo still holds the **pre-refactor** dataset until you push once. That version predates
+   the current serializer and uses the old `text` schema, so training against it fails as described
+   in the troubleshooting table below. Push before the first pod run, and again whenever the features
+   or the serialization format change.
 
    The schema is load-bearing: each split must have exactly `game_id`, `prompt` and `completion`, and
    **no `text` column**. trl picks its collator by inspecting column names, so a stray `text` column

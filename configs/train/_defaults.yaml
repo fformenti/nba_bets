@@ -1,5 +1,17 @@
-# Shared training defaults.
-# Experiment configs include this via _include and override what differs.
+# Shared training defaults, plus the canonical ML feature set.
+#
+# Not runnable on its own: it does not _include features.yaml and declares no
+# mlflow.experiment_name. Leaf configs in this directory include it and override
+# only what differs — today that is `model.train_models` and nothing else for the
+# sklearn path. Read directly by src/betting/game_slugs.py (for
+# splitting.test_start_season) and by src/ml/training/experiment.py.
+#
+# Division of labour with ../features.yaml, which is included first:
+#   features.yaml   lags / location_lags — which feature tables ETL builds
+#   this file       delta / enabled — what a model consumes, plus ML-only lag
+#                   overrides where the model wants fewer lags than ETL builds
+# A lag list repeated here with the same value as features.yaml is noise; only
+# genuine overrides belong below.
 
 data:
   path: "data/processed/regular_season/games_features.csv"
@@ -13,13 +25,46 @@ filters:
   minimum_games_test: 5
 
 weighting:
+  # Within-season ramp only. There is deliberately no cross-season decay knob:
+  # `make tune-decay` backtested eight seasons (2014/15–2021/22), one model per
+  # fold, everything but lambda held fixed, and log loss rose monotonically with
+  # it — the old 0.1 cost +0.0031 to +0.0055 against no decay, 2.4–3.1 standard
+  # errors out, because halving the effective sample (44.7k rows → 22.7k) bought
+  # less than the recency it paid for. [0, 0.05] was within noise, 0.2 and above
+  # clearly worse. The knob, the sweep and its harness were removed once the
+  # answer stopped changing.
+  #
+  # Note that the decay anchor was never the issue people took it for: it sat on
+  # the newest *training* season, but exp(-l*(A-i)) = exp(-l*(M-i)) * exp(-l*(A-M)),
+  # so moving it forward only rescales every weight by a constant. Relative
+  # weighting across seasons is anchor-invariant. Staleness is a training-window
+  # problem, handled under `splitting:` below.
   enabled: true
   saturation_K: 30
-  season_decay_enabled: true
-  season_decay_lambda: 0.1
 
 splitting:
   method: "temporal"
+  # Split on season boundaries, not row proportions. A fraction of the rows
+  # covers far more calendar time at the old end of the history than the recent
+  # end, so test_size/val_size of 0.2 left the last training game in 2014 —
+  # eleven years of the most relevant basketball never reached the model.
+  # These two win over test_size/val_size; those remain only as the fallback.
+  #
+  # Keep this window rolling forward. The boundary is terminal, so every season
+  # spent on validation or test is a season the deployed model never trains on —
+  # at "2022/23"/2 the train ceiling was 2019/20 while prediction served 2025/26,
+  # six seasons of basketball absent from training rather than down-weighted.
+  # Roll both forward as seasons complete.
+  #
+  # val_seasons was 1 on the theory that ~1,230 games is enough. After the
+  # minimum_games_train mask that is 982 rows, and every validation-based
+  # decision is made on them. Measured head to head, 1 vs 2 seasons: no
+  # meaningful difference in test Brier (0.2098 vs 0.2094) or accuracy (66.11%
+  # vs 66.44%), both inside the noise of a 1,201-row test set. But the
+  # calibration choice flipped between them on a ±0.0003 Brier margin. Two
+  # seasons (1,965 rows) buys a steadier decision for 2.6% of the training rows.
+  test_start_season: "2024/25"
+  val_seasons: 2
   test_size: 0.2
   val_size: 0.2
   random_state: 42
@@ -54,40 +99,35 @@ feature_engineering:
     - "games_played_HT"
     - "games_played_VT"
 
+  # Delta for every group lives here — including the disabled ones — so
+  # create_delta_features and resolve_feature_columns stay consistent the moment
+  # an experiment flips `enabled`.
   features:
     record:
-      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: false
     point_differential:
-      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: false
     norm_point_differential:
-      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [5, 10, 20, 41]
+      # ETL builds L82 (see features.yaml); the model stops at L55. One genuine
+      # override, not a copy of the ETL list.
+      lags: [1, 3, 5, 8, 13, 21, 34, 55]
       delta: true
       enabled: true
 
-    # Delta for every group lives here so create_delta_features and
-    # resolve_feature_columns stay consistent when experiments enable a group.
     sos:
       delta: false
       enabled: false
     sos_adj_record:
-      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [5, 10, 20, 41]
+      # location_lags only — the plain rolling variants lost to the at-location
+      # ones. Declare `lags:` in a leaf config to bring them back.
       delta: true
-      enabled: true # opt-in per experiment; declare lags explicitly when enabling
+      enabled: true
     gds:
-      lags: [3, 5, 8, 13, 21, 34, 55, 82]
-      location_lags: [5, 10, 20, 41]
       delta: true
       enabled: false
     distance:
-      lags: [1, 3, 7, 14]
       delta: true
       enabled: true
     rested_days:
@@ -104,11 +144,15 @@ feature_engineering:
       delta: true
       enabled: false
     adjusted_last_season_record:
-      location_lags: [] # no lags, but has HT_at_home/VT_on_road variants
       delta: true
       enabled: true
     home_and_road:
-      delta: false
+      # delta here is a SUM, not a difference (engineering.py) — and a sum is the
+      # right operation: days_at_home helps the home team, and days_on_road for
+      # the visitor helps the home team too, so both push the same direction.
+      # This collapses two columns into one to cut dimensionality. Which wins,
+      # collapsed or raw, is still unmeasured — llm_features.yaml keeps them raw.
+      delta: true
       enabled: true
     indifference_flag:
       delta: true

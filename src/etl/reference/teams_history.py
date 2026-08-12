@@ -6,15 +6,16 @@ where each row represents a team in a specific season, expanding the seasonFound
 to seasonActiveTill range into individual season rows.
 """
 
-import pandas as pd
 from pathlib import Path
 
+import pandas as pd
+
+from src.config.constants import CURRENT_SEASON_START_YEAR
 from src.config.paths import (
-    TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     PROCESSED_DIR,
+    TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH,
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
 )
-from src.config.constants import CURRENT_SEASON_START_YEAR
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -35,8 +36,8 @@ def format_season(year: int) -> str:
 
 
 def create_teams_history_table(
-    input_file: str,
-    output_file: str = None,
+    input_file: Path | str,
+    output_file: Path | str | None = None,
     current_season_start_year: int = CURRENT_SEASON_START_YEAR,
 ) -> pd.DataFrame:
     """
@@ -109,7 +110,7 @@ def create_teams_history_table(
 
 
 def load_teams_history_table(
-    processed_file: str = None,
+    processed_file: Path | str | None = None,
 ) -> pd.DataFrame:
     """
     Load the precomputed teams history table from disk.

@@ -1,13 +1,59 @@
 """Common utility functions for data processing."""
 
 import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from src.config.constants import CSV_FLOAT_FORMAT, NEUTRAL_COURT_GAME_LABELS
-from src.config.paths import TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH
+from src.config.constants import (
+    CSV_FLOAT_FORMAT,
+    GAME_ID_TYPE_PREFIX,
+    NEUTRAL_COURT_GAME_LABELS,
+)
+from src.config.paths import TEAMS_LOCATIONS_REFERENCE_PATH
+
+
+def require_reference_file(path: Path, make_target: str) -> None:
+    """Fail early, and legibly, when a reference input is missing.
+
+    These files are generated once by an external service and cannot be rebuilt
+    from anything in this repo (see ``RAW_REFERENCE_DIR``). Without this check a
+    missing one surfaces as a bare ``FileNotFoundError`` from inside pandas,
+    several frames below the step the user actually ran.
+    """
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"Reference input not found: {path}\n"
+            f"It is an input, not a build artifact — nothing in the pipeline can "
+            f"regenerate it offline. Restore it from a backup, or rebuild it with "
+            f"`make {make_target}` (needs API credentials; see docs/PIPELINE_AUDIT.md)."
+        )
+
+
+def game_type_from_id(game_id: Any) -> str | None:
+    """The kind of game a gameId encodes, or ``None`` if it cannot be read.
+
+    The third digit of a zero-padded NBA gameId is the game type: ``0022500798``
+    is a regular-season game, ``0042500101`` a playoff game. Incrementally
+    collected games have no other source of truth for this — results payloads
+    carry no ``gameType``, and the league schedule's ``gameLabel`` is blank for
+    every playoff round — so a game fetched in April would otherwise be filed as
+    regular season.
+
+    Returns ``None`` rather than guessing, so callers can decide whether an
+    unreadable id is fatal.
+    """
+    if game_id is None or (isinstance(game_id, float) and pd.isna(game_id)):
+        return None
+    try:
+        padded = f"{int(game_id):010d}"
+    except (TypeError, ValueError):
+        return None
+    if len(padded) != 10:
+        return None
+    return GAME_ID_TYPE_PREFIX.get(padded[2])
 
 
 def read_json(file_path: Path) -> dict[str, Any]:
@@ -17,6 +63,33 @@ def read_json(file_path: Path) -> dict[str, Any]:
     """
     with Path(file_path).open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def atomic_write_csv(df: pd.DataFrame, output_path: Path) -> None:
+    """Write via a temp file in the same directory, then rename over the target.
+
+    Use this for any file the rest of the pipeline reads back as authoritative.
+    A plain ``to_csv`` that is interrupted — Ctrl-C, a full disk — leaves a
+    truncated file behind, and nothing downstream can tell a truncated table
+    from a genuinely short one.
+
+    The temp file goes in the target's own directory so the final ``replace`` is
+    a same-filesystem rename, which is atomic.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", dir=output_path.parent, suffix=".tmp", delete=False, encoding="utf-8"
+        ) as handle:
+            temp_path = Path(handle.name)
+            df.to_csv(handle, index=False)
+        temp_path.replace(output_path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def save_feature_table(df: pd.DataFrame, path, **kwargs) -> None:
@@ -60,7 +133,8 @@ CANONICAL_INGESTED_COLUMNS = [
 
 def get_teams_locations(df: pd.DataFrame) -> pd.DataFrame:
     """Enrich a games DataFrame with home/away/game location columns via teams history lookup."""
-    teams_cities_states = pd.read_csv(TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH)
+    require_reference_file(TEAMS_LOCATIONS_REFERENCE_PATH, "build-teams-locations")
+    teams_cities_states = pd.read_csv(TEAMS_LOCATIONS_REFERENCE_PATH)
     # Home team location
     df = df.merge(
         teams_cities_states[["teamId", "season", "city", "state"]],
@@ -109,34 +183,96 @@ def enrich_games_locations(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def has_result(games: pd.DataFrame) -> pd.Series:
+    """Which rows are games that have actually been played.
+
+    ``winner`` holds the winning teamId, so a played game's winner is one of its
+    two teams. The prediction pipeline concatenates the upcoming slate onto
+    history and builds the feature tables from the combined frame — those slate
+    rows are placeholders from ``fix_upcoming_games_cols`` with ``winner = 0``
+    and ``0-0`` scores.
+
+    A placeholder must still *receive* features (that is the point of predicting
+    it), but it must never *contribute* to anything cumulative: read as a game
+    outcome, ``winner = 0`` is a loss for both sides, which quietly depressed
+    every opponent win percentage the strength-of-schedule lookup served to the
+    rest of the slate. Builders that aggregate across games filter on this.
+    """
+    winner = pd.to_numeric(games["winner"], errors="coerce")
+    home = pd.to_numeric(games["hometeamId"], errors="coerce")
+    away = pd.to_numeric(games["awayteamId"], errors="coerce")
+    return (winner == home) | (winner == away)
+
+
+def assert_unique_game_ids(df: pd.DataFrame, context: str) -> None:
+    """Raise if the frame holds the same gameId twice.
+
+    The history table is the one place a duplicate fixture is unrecoverable —
+    every feature table downstream counts games — so both writers check before
+    the write rather than after.
+    """
+    duplicated = pd.to_numeric(df["gameId"], errors="coerce").dropna().duplicated()
+    if duplicated.any():
+        raise ValueError(
+            f"Refusing to write: {duplicated.sum()} duplicate gameId(s) after {context}."
+        )
+
+
 def deduplicate_games(
     existing_df: pd.DataFrame, new_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """Remove rows from existing_df that match any row in new_df on composite key.
+    """Remove rows from existing_df that new_df supersedes.
 
-    Note: the key collapses same-day repeat pairings, so a same-day home-and-home
-    between two teams would be de-duplicated down to a single game.
+    Matching is by ``gameId``, which is stable when a game is rescheduled. The
+    old composite key ``(gameDateOnlyStr, hometeamId, awayteamId)`` could not do
+    this: a postponed game replayed on another date changed its date component,
+    so the original fixture survived alongside the replay and the same gameId
+    appeared twice.
+
+    Rows missing a gameId fall back to the composite key, which is how the
+    oldest historical rows are matched. That fallback still collapses a same-day
+    home-and-home between two teams down to a single game.
     """
-    key_cols = ["gameDateOnlyStr", "hometeamId", "awayteamId"]
+    composite_cols = ["gameDateOnlyStr", "hometeamId", "awayteamId"]
 
-    def _keys(df):
+    # A first run has no history table at all, so existing_df arrives with no
+    # columns and the composite-key lookup below would raise on all three.
+    if existing_df.empty:
+        return existing_df
+
+    def _ids(df: pd.DataFrame) -> pd.Series:
+        if "gameId" not in df.columns:
+            return pd.Series(pd.NA, index=df.index, dtype="Float64")
+        return pd.to_numeric(df["gameId"], errors="coerce")
+
+    def _composite_keys(df: pd.DataFrame) -> pd.DataFrame:
         # Normalize dtypes before comparing: an id read as float64 or Int64 would
         # never match the same id as int64 in a set lookup, silently skipping
         # the dedupe and duplicating games.
-        normalized = df[key_cols].copy()
+        normalized = df[composite_cols].copy()
         for col in ["hometeamId", "awayteamId"]:
             normalized[col] = pd.to_numeric(normalized[col], errors="coerce")
         normalized["gameDateOnlyStr"] = normalized["gameDateOnlyStr"].astype("string")
         return normalized
 
-    new_keys = set(_keys(new_df).dropna().itertuples(index=False, name=None))
+    new_ids = set(_ids(new_df).dropna().astype("int64"))
+    new_composite = set(
+        _composite_keys(new_df).dropna().itertuples(index=False, name=None)
+    )
+
+    existing_ids = _ids(existing_df)
+    existing_composite = _composite_keys(existing_df)
 
     # Build the mask over the FULL frame, not a dropna'd copy: a shorter mask
     # raises "Boolean index has wrong length" against existing_df.
-    mask = [
-        row not in new_keys
-        for row in _keys(existing_df).itertuples(index=False, name=None)
-    ]
+    mask = []
+    for game_id, composite in zip(
+        existing_ids, existing_composite.itertuples(index=False, name=None)
+    ):
+        if pd.notna(game_id):
+            mask.append(int(game_id) not in new_ids)
+        else:
+            mask.append(composite not in new_composite)
     return existing_df.loc[mask].copy()
 
 

@@ -15,7 +15,7 @@ description: >
 
 - **Python runner**: Always use `uv run python -m ...` (never `python` or `pip`)
 - **Config-driven**: All experiments use Pydantic-validated YAML configs (`ExperimentConfig`, `PredictionConfig`)
-- **Dual-model pattern**: Training always produces two models — one for same-conference games, one for different-conference games
+- **One model, every game**: training produces a single model. The same/cross-conference split it replaced measured worse (+0.0047 log loss) — see docs/CONFERENCE_SPLIT.md. The conference *signal* is kept as two features, both 0.0 for same-conference games.
 - **Temporal split**: Default and preferred split. Test set must always be chronologically after training data
 - **MLflow**: All experiments tracked via `MLflowTracker` context manager → see mlflow skill for details
 
@@ -51,9 +51,9 @@ Scikit-learn API required: `fit()`, `predict()`, `predict_proba()`, `score()`.
 
 ## Training flow summary
 
-`train_classifier.py` iterates `["same", "different"]` conference filters. For each:
-1. `load_and_validate_data()` → filter by conference + minimum games → `prepare_data()`
-2. `create_delta_features()` + `apply_conference_features()`
+`train_classifier.py` trains one model:
+1. `load_and_validate_data()` → filter by `min_season` + minimum games → `prepare_data()`
+2. `create_delta_features()` + `create_conference_features()`
 3. Temporal/stratified/random split → preprocessor fit on train only
 4. Train `RecordDifferenceBaseline`, `PointDifferentialBaseline`, `random_forest`, `gradient_boosting`
 5. Best model selected by `test_accuracy` from `test_metrics`
@@ -62,13 +62,13 @@ Scikit-learn API required: `fit()`, `predict()`, `predict_proba()`, `score()`.
 
 ## Prediction flow summary
 
-`predict_classifier.py` routes games by conference. For each conference filter:
+`predict_classifier.py` scores the whole slate with the one deployed model:
 1. `load_upcoming_games()` from `data/raw/incremental/upcoming_games/`
 2. `fix_upcoming_games_cols()` — adds placeholder post-game columns (scores=0, winner=0)
 3. `build_features_for_prediction()` — concatenates historical + upcoming, recomputes feature tables via `create_features_tables()`, then calls `merge_features()` for upcoming rows only
 4. `prepare_features_for_model()` — drops metadata, enriched, and excluded columns
 5. `_align_features()` — reorders/fills missing columns to match training feature set
-6. Output: predictions **appended** to CSV (not overwritten); columns include `conference_filter`, `prediction`, `home_win_probability`
+6. Output: `upsert_predictions()` writes **one row per game**, keyed on `PREDICTION_KEY = ["gameId"]` — re-predicting a slate replaces rows rather than appending. Columns include `prediction`, `home_win_probability`
 
 ## Organizing ML code
 
@@ -87,18 +87,18 @@ Follow this module boundary contract:
 2. [ ] Features built with `make make-features`
 3. [ ] Temporal split confirmed (no future data in train)
 4. [ ] Preprocessor fit on train split only
-5. [ ] Both conference models trained and logged (→ mlflow skill for tracking details)
+5. [ ] Model trained and logged (→ mlflow skill for tracking details)
 6. [ ] Baseline comparison included
-7. [ ] `register_model: true` and model registered with conference suffix
-8. [ ] Prediction config updated with new model URIs
+7. [ ] `register_model: true` and model registered
+8. [ ] Prediction config updated with the new `model_uri` (`make train PROMOTE=1`)
 9. [ ] Prediction script tested end-to-end with `make predict-upcoming`
 
 ## Common pitfalls in this codebase
 
 - **Feature alignment**: `predict_classifier.py` aligns prediction features to training feature set via `_align_features()`; new features must appear consistently in both `games_features.csv` and the upcoming game feature construction
-- **Conference filter isolation**: The dual-model pattern means features must be correct for the specific conference split; don't mix same/different conference features
+- **Off-population features**: a feature whose estimand is only defined on a sub-population (the two conference features) must be imputed at its neutral value elsewhere — 0 for a signed difference, 0.5 for a raw rate — never NaN (`drop_na: true` would delete those rows) and never the population mean.
 - **Config schema silent failures**: `ExperimentConfig` uses `extra="ignore"` — typos in YAML keys are silently ignored; double-check key names against `schema.py`
-- **Prediction output appends**: `predict_classifier.py` appends to the CSV if it exists — clear the file before a fresh prediction run to avoid duplicate rows
+- **Prediction output upserts**: re-predicting a slate replaces its rows. `src/betting/bets.py` raises on a duplicate gameId rather than sizing a full budget against each of two disagreeing probabilities.
 - **`originally_enriched_columns` vs `exclude_columns`**: The former are raw source columns used to compute lag features — they must be excluded from the feature matrix. The latter are any ad-hoc extra columns to drop.
 
 ## Reference documentation

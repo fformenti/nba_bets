@@ -1,0 +1,15 @@
+uv run python -m src.cli.fetch_game_results --source nba_api
+2026-08-12 00:12:52,529 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:12:52,530 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500644 via 'nba_api'
+2026-08-12 00:12:53,237 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500644.json
+2026-08-12 00:12:57,249 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500650 via 'nba_api'
+2026-08-12 00:12:57,544 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500650.json
+2026-08-12 00:13:01,552 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500653 via 'nba_api'
+2026-08-12 00:13:01,800 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500653.json
+2026-08-12 00:13:05,810 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500654 via 'nba_api'
+2026-08-12 00:13:06,041 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500654.json
+2026-08-12 00:13:10,044 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500655 via 'nba_api'
+2026-08-12 00:13:10,328 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500655.json
+2026-08-12 00:13:14,337 - src.etl.collectors.upcoming_games_results - INFO - Fetching final score for game 0022500656 via 'nba_api'
+2026-08-12 00:13:14,577 - src.etl.collectors.upcoming_games_results - INFO - Saved enriched game to data/raw/incremental/upcoming_games_results/22500656.json
+2026-08-12 00:13:14,578 - src.etl.collectors.upcoming_games_results - INFO - Resolved 6 pending game(s) using 'nba_api': 6 final, 0 postponed, 0 still pending, 0 quarantined

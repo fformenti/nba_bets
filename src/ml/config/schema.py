@@ -35,15 +35,6 @@ class WeightingConfig(BaseModel):
         description="Games-played saturation point for sample weights. "
         "Observations where min(games_played_HT, games_played_VT) >= K get weight 1.0.",
     )
-    season_decay_enabled: bool = Field(
-        default=False,
-        description="Enable exponential decay weighting by season to downweight older seasons.",
-    )
-    season_decay_lambda: float = Field(
-        default=0.1,
-        description="Decay rate for cross-season weighting. Higher = faster decay. "
-        "Weight = exp(-lambda * seasons_ago).",
-    )
 
 
 class FiltersConfig(BaseModel):
@@ -52,10 +43,6 @@ class FiltersConfig(BaseModel):
     min_season: str | None = None
     minimum_games_train: int = 15
     minimum_games_test: int = 15
-    conference_filter: str = Field(
-        default="same",
-        description="Conference filter type: 'same', 'different', or 'all'.",
-    )
 
 
 class SplittingConfig(BaseModel):
@@ -65,6 +52,25 @@ class SplittingConfig(BaseModel):
     test_size: float = 0.2
     val_size: float = 0.2
     random_state: int = 42
+
+    # Prefer these two over test_size/val_size. A *fraction* of the rows is a
+    # much longer span at the old end of a 46-season history than at the recent
+    # end, because games-per-season roughly quintupled since 1950 — which is how
+    # a 20% validation slice silently pushed the last training game back to 2014.
+    test_start_season: Optional[str] = Field(
+        default=None,
+        description=(
+            "First season of the test set, e.g. '2022/23'. Every game from this "
+            "season on is test and never trains. Takes precedence over test_size."
+        ),
+    )
+    val_seasons: Optional[int] = Field(
+        default=None,
+        description=(
+            "Validation = the N seasons immediately before test_start_season. "
+            "Takes precedence over val_size."
+        ),
+    )
 
 
 class MomentumPairConfig(BaseModel):
@@ -349,10 +355,11 @@ class PredictionConfig(BaseModel):
     paths: PredictionPathsConfig = PredictionPathsConfig()
     feature_config_path: Optional[str] = None
 
-    model_uris: dict[str, str] = Field(
+    model_uri: str = Field(
         ...,
-        description="MLflow model URIs keyed by conference filter type, e.g. "
-        "{'same': 'models:/...', 'different': 'models:/...'}",
+        description="MLflow URI of the deployed model, e.g. "
+        "'runs:/<run_id>/nba_xgboost_all'. One model predicts every game — the "
+        "per-conference split it replaced scored worse; see docs/CONFERENCE_SPLIT.md.",
     )
 
     mlflow: MLflowConfig = MLflowConfig(experiment_name="nba_bets_predictions")
@@ -397,20 +404,20 @@ class LLMDataConfig(BaseModel):
         default=None, description="Cap training rows; useful for smoke tests."
     )
     source_experiment_config: str = Field(
-        default="configs/train/train_all.yaml",
+        default="configs/train/xgboost.yaml",
         description="Experiment config whose train/val/test splits the LLM "
         "dataset mirrors. Using the same config as the sklearn models is what "
         "makes the two families comparable — same gameIds, same features, only "
         "the encoding differs.",
     )
-    serialization_format: Literal["labeled", "json", "markdown", "prose"] = Field(
+    serialization_format: Literal["labeled", "json", "markdown"] = Field(
         default="labeled",
-        description="How a feature row becomes prompt text. 'labeled' (default) "
-        "renders human-readable feature names in grouped sections, which suits a "
-        "base model with no instruction tuning. 'json' and 'markdown' are also "
-        "schema-driven off the actual feature columns; 'prose' is the original "
-        "hand-written Game prompt. The latter three are kept unchanged so runs "
-        "already on the Hub stay reproducible.",
+        description="How a feature row becomes prompt text. All three formats "
+        "are schema-driven off the actual feature columns, so a feature added "
+        "in configs/features.yaml reaches the prompt with no code change. "
+        "'labeled' (default) additionally renders human-readable feature names "
+        "in grouped sections, which suits a base model with no instruction "
+        "tuning.",
     )
 
 

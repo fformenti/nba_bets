@@ -15,7 +15,7 @@ from typing import Any
 import requests
 from nba_api.stats.endpoints import boxscoresummaryv2, boxscoresummaryv3
 
-from src.etl.collectors.results.base import GameResult
+from src.etl.collectors.results.base import GameResult, GameStatus
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +23,16 @@ logger = get_logger(__name__)
 NBA_API_TIMEOUT = 60
 NBA_API_DELAY_SECONDS = 4
 NBA_API_MAX_RETRIES = 2
+
+# stats.nba.com's numeric status: 1 scheduled, 2 in progress, 3 final.
+_STATUS_ID_TO_STATUS = {
+    1: GameStatus.SCHEDULED,
+    2: GameStatus.IN_PROGRESS,
+    3: GameStatus.FINAL,
+}
+
+# A postponed game keeps status id 1 or 3 and announces itself in the text only.
+_NOT_PLAYED_PATTERN = re.compile(r"\b(PPD|Postponed|Cancell?ed|Suspended)\b", re.IGNORECASE)
 
 
 def _result_sets_by_name(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -40,6 +50,36 @@ def _dataset_to_dicts(dataset: dict[str, Any]) -> list[dict[str, Any]]:
     headers = dataset.get("headers", [])
     rows = dataset.get("data", [])
     return [dict(zip(headers, row)) for row in rows]
+
+
+def _parse_game_status(
+    status_id: Any, status_text: str | None, home_score: int, away_score: int
+) -> GameStatus:
+    """Read the game's status from the provider, conservatively.
+
+    The text is checked first because a postponed game is not distinguishable by
+    its status id — stats.nba.com leaves it at "scheduled" or "final" and says
+    "PPD" only in the text.
+
+    A "final" with no points on the board is reported as ``UNKNOWN``, not final
+    and not postponed: it is the shape stats.nba.com returns for a game whose
+    box score has not been published, and treating it as either would write
+    something untrue into history.
+    """
+    if status_text and _NOT_PLAYED_PATTERN.search(status_text):
+        return GameStatus.POSTPONED
+
+    status = _STATUS_ID_TO_STATUS.get(_coerce_int(status_id), GameStatus.UNKNOWN)
+
+    if status is GameStatus.FINAL and not (home_score > 0 and away_score > 0):
+        logger.warning(
+            "Status says final but the score is %s-%s; treating as unknown",
+            home_score,
+            away_score,
+        )
+        return GameStatus.UNKNOWN
+
+    return status
 
 
 def _parse_game_status_overtimes(status_text: str | None) -> int:
@@ -122,21 +162,26 @@ def _fetch_game_result_legacy(game_id: str) -> dict[str, Any]:
         elif team_id == away_team_id:
             away_line = line
 
-    home_score = int(home_line) if home_line.get("PTS") is not None else 0
-    away_score = int(away_line) if away_line.get("PTS") is not None else 0
+    home_score = _coerce_int(home_line.get("PTS")) or 0 if home_line else 0
+    away_score = _coerce_int(away_line.get("PTS")) or 0 if away_line else 0
+
+    status = _parse_game_status(
+        summary.get("GAME_STATUS_ID"),
+        summary.get("GAME_STATUS_TEXT"),
+        home_score,
+        away_score,
+    )
 
     winner = 0
     overtime = 0
-    postponed = 1
     inactive_players = []
     attendance = None
-    if home_score > 0 and away_score > 0:
+    if status is GameStatus.FINAL:
         winner = home_team_id if home_score > away_score else away_team_id
-        postponed = 0
 
         overtime = _parse_game_status_overtimes(summary.get("GAME_STATUS_TEXT"))
-        if overtime is None and home_line:
-            overtime = _count_overtimes_from_line_score(home_line)
+        if not overtime and home_line:
+            overtime = _count_overtimes_from_line_score(home_line) or 0
 
         game_info_rows = result_sets.get("GameInfo", [])
         game_info = game_info_rows[0] if game_info_rows else {}
@@ -161,9 +206,10 @@ def _fetch_game_result_legacy(game_id: str) -> dict[str, Any]:
             away_score=away_score,
             overtimes=overtime,
             winner=winner,
-            postponed=postponed,
+            postponed=1 if status is GameStatus.POSTPONED else 0,
             attendance=attendance,
             inactive_players=inactive_players,
+            status=status,
         ),
         "status": "success",
         "status_code": 200,
@@ -194,29 +240,26 @@ def _fetch_game_result_v3(game_id: str) -> dict[str, Any]:
         elif team_id == away_team_id:
             away_line = line
 
-    home_score = (
-        int(home_line.get("score")) if home_line.get("score") is not None else 0
-    )
-    away_score = (
-        int(away_line.get("score")) if away_line.get("score") is not None else 0
+    home_score = _coerce_int(home_line.get("score")) or 0 if home_line else 0
+    away_score = _coerce_int(away_line.get("score")) or 0 if away_line else 0
+
+    status = _parse_game_status(
+        summary.get("gameStatus"),
+        summary.get("gameStatusText"),
+        home_score,
+        away_score,
     )
 
     winner = 0
     inactive_players = []
     attendance = None
     overtime = 0
-    postponed = 1
-    if home_score > 0 and away_score > 0:
-        postponed = 0
+    if status is GameStatus.FINAL:
         winner = home_team_id if home_score > away_score else away_team_id
         overtime = _parse_game_status_overtimes(summary.get("gameStatusText"))
         if overtime > 0:
-            period = summary.get("period")
-            try:
-                period_value = int(period) if period is not None else None
-            except (TypeError, ValueError):
-                period_value = None
-            if period_value > 4:
+            period_value = _coerce_int(summary.get("period"))
+            if period_value is not None and period_value > 4:
                 overtime = period_value - 4
 
         game_info_rows = _dataset_to_dicts(response.game_info.get_dict())
@@ -240,9 +283,10 @@ def _fetch_game_result_v3(game_id: str) -> dict[str, Any]:
             away_score=away_score,
             overtimes=overtime,
             winner=winner,
-            postponed=postponed,
+            postponed=1 if status is GameStatus.POSTPONED else 0,
             attendance=attendance,
             inactive_players=inactive_players,
+            status=status,
         ),
         "status": "success",
         "status_code": 200,
@@ -284,7 +328,7 @@ class NBAApiResultsSource:
     def fetch(self, game_id: str) -> GameResult | None:
         result = _fetch_game_result(game_id)
         if result["status"] == "timeout":
-            logger.warning(f"Timed out fetching {game_id}; treating as not yet available")
+            logger.warning(f"Timed out fetching {game_id}; the source is unreachable")
             return None
         return result["GameResult"]
 

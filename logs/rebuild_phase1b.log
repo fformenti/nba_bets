@@ -1,0 +1,4 @@
+uv run python -m src.cli.process_ingested_games
+2026-08-11 22:46:02,883 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:46:02,883 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:46:03,419 - src.etl.process_ingested_games - INFO - Saved 66033 regular season games to /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games.csv

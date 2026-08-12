@@ -1,5 +1,6 @@
 """Rest days between games feature calculations."""
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from numpy import nan
@@ -157,8 +158,18 @@ def make_rested_days_table_season(
     )["rest"].transform("cumsum")
 
     # At Home Count
-    rested_days["at_home_indicator"] = rested_days.apply(
-        lambda x: is_home(x["home_game"], x["away_game"]), axis=1
+    #
+    # Vectorised: this frame is every team × every calendar day of every season,
+    # so a row-wise apply here crossed into Python about a million times and
+    # dominated the whole feature build. np.select reproduces is_home() exactly,
+    # including the NaN for a day with no game (which the ffill below fills).
+    home_game = rested_days["home_game"]
+    away_game = rested_days["away_game"]
+    played_home = home_game == 1
+    played_away = away_game == 1
+
+    rested_days["at_home_indicator"] = np.select(
+        [played_home, played_away], [1.0, 0.0], default=nan
     )
     rested_days["at_home_indicator"] = (
         rested_days.groupby("teamId")["at_home_indicator"].ffill().fillna(1).astype(int)
@@ -167,9 +178,9 @@ def make_rested_days_table_season(
         ["teamId", (rested_days["at_home_indicator"] == 0).cumsum()]
     )["at_home_indicator"].transform("cumsum")
 
-    # On the Road Count
-    rested_days["at_road_indicator"] = rested_days.apply(
-        lambda x: is_away(x["home_game"], x["away_game"]), axis=1
+    # On the Road Count (same vectorisation as above)
+    rested_days["at_road_indicator"] = np.select(
+        [played_home, played_away], [0.0, 1.0], default=nan
     )
     rested_days["at_road_indicator"] = (
         rested_days.groupby("teamId")["at_road_indicator"].ffill().fillna(0).astype(int)

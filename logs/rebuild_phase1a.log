@@ -1,0 +1,67 @@
+uv run python -m src.cli.build_teams_history
+2026-08-11 22:45:22,621 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+Output saved to /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/TeamsHistoriesConferenceNBALookUpTable.csv
+2026-08-11 22:45:22,643 - src.etl.reference.teams_history - INFO - Processed 1675 rows
+2026-08-11 22:45:22,645 - src.etl.reference.teams_history - INFO - First few rows:
+       teamId    teamCity    teamName teamAbbrev   season Conference
+0  1610612737  Tri-Cities  Blackhawks        TRI  1949/50       West
+1  1610612737  Tri-Cities  Blackhawks        TRI  1950/51       West
+2  1610612737   Milwaukee       Hawks        MLH  1951/52       West
+3  1610612737   Milwaukee       Hawks        MLH  1952/53       West
+4  1610612737   Milwaukee       Hawks        MLH  1953/54       West
+5  1610612737   Milwaukee       Hawks        MLH  1954/55       West
+6  1610612737   St. Louis       Hawks        STL  1955/56       West
+7  1610612737   St. Louis       Hawks        STL  1956/57       West
+8  1610612737   St. Louis       Hawks        STL  1957/58       West
+9  1610612737   St. Louis       Hawks        STL  1958/59       West
+2026-08-11 22:45:22,647 - src.etl.reference.teams_history - INFO - Last few rows:
+          teamId   teamCity teamName teamAbbrev   season Conference
+1665  1610612766  Charlotte  Hornets        CHA  2016/17       East
+1666  1610612766  Charlotte  Hornets        CHA  2017/18       East
+1667  1610612766  Charlotte  Hornets        CHA  2018/19       East
+1668  1610612766  Charlotte  Hornets        CHA  2019/20       East
+1669  1610612766  Charlotte  Hornets        CHA  2020/21       East
+1670  1610612766  Charlotte  Hornets        CHA  2021/22       East
+1671  1610612766  Charlotte  Hornets        CHA  2022/23       East
+1672  1610612766  Charlotte  Hornets        CHA  2023/24       East
+1673  1610612766  Charlotte  Hornets        CHA  2024/25       East
+1674  1610612766  Charlotte  Hornets        CHA  2025/26       East
+uv run python -m src.cli.parse_league_schedule
+2026-08-11 22:45:22,914 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:45:22,914 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:45:22,929 - src.etl.ingestion.parse_league_schedule - INFO - Saved 1321 parsed games to /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/league_schedule.csv
+uv run python -m src.cli.ingest_raw_games
+2026-08-11 22:45:23,183 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:45:23,183 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:45:23,442 - src.etl.ingestion.raw_games - INFO - Parsed 72628 games from /Users/felipeformenti/dev/fformenti/nba_bets/data/raw/historical/games/Games.csv
+2026-08-11 22:45:23,442 - src.etl.ingestion.raw_games - INFO - No history table at /Users/felipeformenti/dev/fformenti/nba_bets/data/ingested/games_updated_history.csv yet; creating it
+2026-08-11 22:45:23,792 - src.etl.ingestion.raw_games - INFO - Saved 72628 games to /Users/felipeformenti/dev/fformenti/nba_bets/data/ingested/games_updated_history.csv
+uv run python -m src.cli.process_ingested_games
+2026-08-11 22:45:24,060 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:45:24,060 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/src/cli/process_ingested_games.py", line 13, in <module>
+    main()
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/src/cli/process_ingested_games.py", line 9, in main
+    process_ingested_games()
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/src/etl/process_ingested_games.py", line 103, in process_ingested_games
+    regular_season_games.to_csv(REGULAR_SEASON_GAMES_PATH, index=False)
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/util/_decorators.py", line 333, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/core/generic.py", line 3986, in to_csv
+    return DataFrameRenderer(formatter).to_csv(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/io/formats/format.py", line 1014, in to_csv
+    csv_formatter.save()
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/io/formats/csvs.py", line 251, in save
+    with get_handle(
+         ^^^^^^^^^^^
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/io/common.py", line 749, in get_handle
+    check_parent_directory(str(handle))
+  File "/Users/felipeformenti/dev/fformenti/nba_bets/.venv/lib/python3.11/site-packages/pandas/io/common.py", line 616, in check_parent_directory
+    raise OSError(rf"Cannot save file into a non-existent directory: '{parent}'")
+OSError: Cannot save file into a non-existent directory: '/Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season'
+make: *** [process-ingested-games] Error 1

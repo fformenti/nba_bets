@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from src.config.paths import (
     TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH,
-    TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH,
+    TEAMS_LOCATIONS_REFERENCE_PATH,
 )
 
 from src.config.constants import list_of_nba_cities, list_of_nba_states
@@ -72,6 +72,5 @@ def build_teams_locations() -> None:
         teams_names_locations_df, on=["teamId", "teamFullName"], how="left"
     )
 
-    teams_cities_locations_history.to_csv(
-        TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH, index=False
-    )
+    TEAMS_LOCATIONS_REFERENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    teams_cities_locations_history.to_csv(TEAMS_LOCATIONS_REFERENCE_PATH, index=False)

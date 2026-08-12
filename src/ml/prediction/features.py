@@ -9,20 +9,19 @@ to the games that came before.
 
 from __future__ import annotations
 
-from typing import Optional
 
 import pandas as pd
 
-from src.config.paths import DEFAULT_FEATURES_CONFIG_PATH
+from src.config.paths import DEFAULT_FEATURES_CONFIG_PATH, PREDICTION_FEATURES_DIR
 from src.etl.features.aggregator import (
     create_features_tables_from_config,
     merge_features,
 )
-from src.etl.utils.common import get_nba_season
+from src.etl.utils.common import enrich_games_locations, get_nba_season
 from src.ml.config.loader import load_features_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.features.engineering import (
-    apply_conference_features,
+    create_conference_features,
     create_delta_features,
     resolve_feature_columns,
 )
@@ -61,7 +60,11 @@ def fix_upcoming_games_cols(
     columns_to_drop = ["arenaCity", "arenaName"]
     df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
-    # Set placeholder values for upcoming games
+    # Set placeholder values for upcoming games.
+    #
+    # `winner = 0` marks the row as not yet played — see
+    # src.etl.utils.common.has_result, which is how the builders that accumulate
+    # across games know to leave these rows out of everyone else's totals.
     df["postponed"] = 0
     df["overtimes"] = None
     df["winner"] = 0
@@ -71,60 +74,52 @@ def fix_upcoming_games_cols(
     df["attendance"] = None
     df["gameType"] = "Regular Season"
 
+    # `win_bool` and `pts_diff` exist on the ETL's historical frame, and
+    # join_games_and_teams_feature only suffixes columns the games frame does not
+    # already have. Without them here the prediction path grew a set of
+    # win_bool_HT / pts_diff_VT / ... columns the training path never had — the
+    # same silent divergence between the two feature paths that let the distance
+    # bug below go unnoticed.
+    df["win_bool"] = 0
+    df["pts_diff"] = 0
+
+    # Likewise `neutral_court`, which the ETL adds in make_features. Deriving it
+    # here rather than calling add_neutral_court keeps the prediction path free
+    # of a dependency on teams_arena.csv and gives the identical answer: that
+    # function falls back to the label flag whenever arenaId is null, and an
+    # upcoming game has no arenaId.
+    if "is_neutral_court_game" in df.columns:
+        df["neutral_court"] = df["is_neutral_court_game"].fillna(False).astype(int)
+    else:
+        df["neutral_court"] = 0
+
+    # Travel distance is computed from where each team last played, so the slate
+    # needs its locations like any other game. Only the ETL's ingestion path
+    # enriched them, which left every upcoming game with NaN locations and, via
+    # the unknown-location branch of the distance builder, a travel distance of
+    # zero for the away team of every game ever predicted. In training that same
+    # feature carries the real mileage.
+    df = enrich_games_locations(df)
+
     return df
 
 
-def filter_by_conference(
-    df: pd.DataFrame,
-    conference_filter: str,
-) -> pd.DataFrame:
-    """
-    Filter games by conference matchup type.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame with conference columns
-    conference_filter : str
-        Filter type: 'different', 'same', or 'all'
-
-    Returns
-    -------
-    pd.DataFrame
-        Filtered DataFrame
-    """
-    if conference_filter == "different":
-        filtered = df[df["hometeamConference"] != df["awayteamConference"]].copy()
-        logger.info(f"Filtered to {len(filtered)} games (different conferences)")
-    elif conference_filter == "same":
-        filtered = df[df["hometeamConference"] == df["awayteamConference"]].copy()
-        logger.info(f"Filtered to {len(filtered)} games (same conference)")
-    else:
-        filtered = df.copy()
-        logger.info(f"No conference filter applied ({len(filtered)} games)")
-
-    return filtered
-
-
-def build_features_for_prediction(
+def build_prediction_feature_base(
     upcoming_games: pd.DataFrame,
     historical_features: pd.DataFrame,
-    experiment_config: ExperimentConfig,
-    conference_filter: str,
     features_config=None,
 ) -> pd.DataFrame:
     """
-    Build features for upcoming games prediction.
+    Build the ETL half of the prediction features: one slate, one set of tables.
 
-    Two configs, two jobs. The **ETL** features config decides which feature
-    *tables* get built — it must match the one that produced the historical
-    rows. The **experiment** config then decides which of those columns the
-    model consumes (delta features, conference features, selection).
+    This is the run-level work — it depends only on the slate and the history,
+    never on which model the rows are headed for. Call it once per run and hand
+    the result to ``apply_model_feature_engineering`` for each model.
 
-    Conflating them was a bug: an experiment may set ``record.lags: []`` while
-    leaving a derived group like ``sos_adj_record`` enabled, which is coherent
-    for feature selection but incoherent as an ETL instruction, and blew up as
-    ``KeyError: 'record_L5'`` inside the SOS-adjusted record builder.
+    The tables are written to ``PREDICTION_FEATURES_DIR``, not to the ETL's
+    ``REGULAR_SEASON_FEATURES_DIR``: the frame here is a single season plus the
+    slate, and writing that under the ETL's filenames left `make build-features`
+    output truncated after every prediction run.
 
     Parameters
     ----------
@@ -132,14 +127,6 @@ def build_features_for_prediction(
         Prepared upcoming games DataFrame
     historical_features : pd.DataFrame
         Historical features DataFrame
-    experiment_config : ExperimentConfig
-        Experiment configuration, for the model-side feature engineering
-    conference_filter : str
-        Conference filter type ('same', 'different', or 'all').
-        Determines which conference features to create:
-        - 'same': No conference features
-        - 'different': Conference vs conference record features
-        - 'all': Conference delta feature (0.0 for same conference)
     features_config : optional
         ETL features config. Defaults to ``configs/features.yaml`` — the same
         file `make build-features` uses.
@@ -147,7 +134,8 @@ def build_features_for_prediction(
     Returns
     -------
     pd.DataFrame
-        DataFrame with features ready for prediction
+        Upcoming games with every merged feature column, before any
+        model-specific engineering.
     """
     logger.info("Building features for prediction")
 
@@ -156,15 +144,37 @@ def build_features_for_prediction(
 
     # Rolling features are defined relative to prior games, so upcoming rows
     # have to sit on top of history to be computable at all.
+    #
+    # A game in the upcoming slate may already have been played and ingested
+    # into history: the daily loop writes the slate before tip-off and does not
+    # clear it afterwards, so `fetch-upcoming-games` and `append-game-results`
+    # overlap by design. History wins — it carries the real score, whereas the
+    # upcoming row is a 0-0 placeholder from `fix_upcoming_games_cols`.
+    #
+    # Keeping both is not merely inaccurate, it is fatal: the duplicate gameId
+    # propagates into every feature table, and `merge_features` joins on
+    # (gameId, season, teamId) roughly two dozen times, doubling the frame at
+    # each join. A 10-game slate with 7 already-played games reached 7.3M rows
+    # by the 20th join and the process was OOM-killed.
     historical_combined = pd.concat([historical_features, upcoming_games])
-
-    feat_eng_config = experiment_config.feature_engineering
+    already_played = historical_combined["gameId"].duplicated()
+    if already_played.any():
+        logger.info(
+            f"{int(already_played.sum())} upcoming game(s) already present in history; "
+            "keeping the historical row: "
+            f"{sorted(historical_combined.loc[already_played, 'gameId'].tolist())}"
+        )
+        historical_combined = historical_combined[~already_played]
 
     logger.info("Creating feature tables")
-    create_features_tables_from_config(historical_combined, features_config)
+    create_features_tables_from_config(
+        historical_combined, features_config, output_dir=PREDICTION_FEATURES_DIR
+    )
 
     # Merge features for upcoming games
-    upcoming_with_features = merge_features(upcoming_games)
+    upcoming_with_features = merge_features(
+        upcoming_games, features_dir=PREDICTION_FEATURES_DIR
+    )
 
     # Drop columns that are not needed for feature engineering
     # These columns are added for merge_features but shouldn't be in final features
@@ -175,28 +185,79 @@ def build_features_for_prediction(
         ]
     )
 
-    # Apply conference filter
-    upcoming_with_features = filter_by_conference(upcoming_with_features, conference_filter)
+    return upcoming_with_features
 
-    # Create delta features
+
+def apply_model_feature_engineering(
+    base_features: pd.DataFrame,
+    experiment_config: ExperimentConfig,
+) -> pd.DataFrame:
+    """
+    Build the model half of the prediction features, for one model.
+
+    Two configs, two jobs. The **ETL** features config decided which feature
+    *tables* got built, back in ``build_prediction_feature_base``. The
+    **experiment** config here decides which of those columns this model
+    consumes (delta features, conference features, selection).
+
+    Conflating them was a bug: an experiment may set ``record.lags: []`` while
+    leaving a derived group like ``sos_adj_record`` enabled, which is coherent
+    for feature selection but incoherent as an ETL instruction, and blew up as
+    ``KeyError: 'record_L5'`` inside the SOS-adjusted record builder.
+
+    Parameters
+    ----------
+    base_features : pd.DataFrame
+        Output of ``build_prediction_feature_base``. Not mutated — each model
+        adds its own columns, so they must not see each other's.
+    experiment_config : ExperimentConfig
+        Experiment configuration for the model these rows are headed for
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with features ready for prediction
+    """
+    feat_eng_config = experiment_config.feature_engineering
+
+    # Same two steps as the training path, in the same order — see
+    # src/ml/datasets/splits.py::build_splits.
     logger.info("Creating delta features")
     upcoming_with_features = create_delta_features(
-        upcoming_with_features,
+        base_features.copy(),
         feat_eng_config.features,
     )
-
-    # Apply conference-specific features based on filter type
-    # This matches the training logic exactly - conference_filter determines features
-    upcoming_with_features = apply_conference_features(upcoming_with_features, conference_filter)
+    upcoming_with_features = create_conference_features(upcoming_with_features)
 
     return upcoming_with_features
+
+
+def build_features_for_prediction(
+    upcoming_games: pd.DataFrame,
+    historical_features: pd.DataFrame,
+    experiment_config: ExperimentConfig,
+    features_config=None,
+) -> pd.DataFrame:
+    """Build prediction features end to end, for a single model.
+
+    Both halves in one call. The pipeline calls them separately so the ETL
+    tables are built once per slate rather than once per caller.
+    """
+    base_features = build_prediction_feature_base(
+        upcoming_games=upcoming_games,
+        historical_features=historical_features,
+        features_config=features_config,
+    )
+    return apply_model_feature_engineering(
+        base_features=base_features,
+        experiment_config=experiment_config,
+    )
 
 
 def prepare_features_for_model(
     df: pd.DataFrame,
     experiment_config: ExperimentConfig,
     target_column: str,
-    conference_filter: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Prepare features DataFrame for model prediction.
@@ -212,9 +273,6 @@ def prepare_features_for_model(
         Experiment configuration
     target_column : str
         Target column name
-    conference_filter : str, optional
-        Conference filter used to resolve conference feature columns. Falls back
-        to experiment_config.filters.conference_filter when not provided.
 
     Returns
     -------
@@ -224,8 +282,7 @@ def prepare_features_for_model(
     feat_eng_config = experiment_config.feature_engineering
 
     if feat_eng_config.selection_mode == "inclusion":
-        cf = conference_filter or experiment_config.filters.conference_filter
-        feature_columns = resolve_feature_columns(feat_eng_config.features, cf)
+        feature_columns = resolve_feature_columns(feat_eng_config.features)
         available = [c for c in feature_columns if c in df.columns]
         missing_features = [c for c in feature_columns if c not in df.columns]
         if missing_features:

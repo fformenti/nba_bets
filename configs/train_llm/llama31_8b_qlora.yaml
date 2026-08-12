@@ -21,23 +21,25 @@ data:
   # LLMDataConfig.prompt_field and build_sft_config().
   prompt_field: "prompt"
   max_sequence_length: 1024
-  max_train_samples: 100 # null
+  # null = train on the full split. The train split is date-sorted and the cap
+  # takes the first N rows, so a small value here means the oldest N games, not
+  # a sample. Use --max-train-samples for smoke tests instead.
+  max_train_samples: null
 
   # The LLM trains on exactly the games the sklearn models train on. Splits are
   # produced by src/ml/datasets/splits.py from the config below, then serialized
   # to text — same gameIds, same feature columns, only the encoding differs.
   # Point this at the same config you compare against.
   # LLM-specific feature set: same pipeline as the sklearn configs, but with
-  # win percentage and streak enabled. Swap back to configs/train/train_all.yaml
+  # win percentage and streak enabled. Swap back to configs/train/xgboost.yaml
   # for a strict like-for-like comparison against the sklearn models.
-  source_experiment_config: "configs/train/train_llm_features.yaml"
+  source_experiment_config: "configs/train/llm_features.yaml"
 
-  # labeled | json | markdown | prose.
-  # labeled/json/markdown follow whatever feature columns the config produces,
-  # so new features reach the prompt automatically. labeled additionally renders
+  # labeled | json | markdown.
+  # All three follow whatever feature columns the config produces, so new
+  # features reach the prompt automatically. labeled additionally renders
   # human-readable names, which a base (non-instruct) model has more to work
-  # with. prose is the original hand-written template, pinned to a fixed column
-  # list — use it, or markdown, only to reproduce older runs.
+  # with.
   serialization_format: "labeled"
 
 quantization:

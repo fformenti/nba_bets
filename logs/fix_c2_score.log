@@ -1,0 +1,32 @@
+uv run python -m src.cli.score_predictions
+2026-08-12 00:16:32,487 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:32,488 - src.monitoring.scoring - INFO - Loaded 26 prediction(s) from upcoming_games_predictions.csv
+2026-08-12 00:16:32,558 - src.monitoring.scoring - INFO - Loaded 72631 outcomes from games_updated_history.csv (skipped 3 not played)
+2026-08-12 00:16:32,560 - src.monitoring.scoring - INFO - Loaded 7 outcomes not yet appended to history
+2026-08-12 00:16:32,571 - src.monitoring.scoring - INFO - Wrote 26 scored game(s) to /Users/felipeformenti/dev/fformenti/nba_bets/data/predictions/prediction_scored_games.csv
+2026-08-12 00:16:32,571 - src.monitoring.scoring - INFO - Wrote scorecard to /Users/felipeformenti/dev/fformenti/nba_bets/data/predictions/prediction_scorecard.csv
+2026-08-12 00:16:32,572 - src.monitoring.scoring - INFO - Live accuracy: 61.5% over 26 played game(s)
+2026-08-12 00:16:32,573 - __main__ - INFO - 
+     scope     group  n_games  accuracy  brier_score      ece
+   overall       all       26    0.6154     0.247227 0.100999
+  last_100       all       26    0.6154     0.247227 0.100999
+    season   2025/26       26    0.6154     0.247227 0.100999
+conference       all       13    0.6154     0.251837 0.122126
+conference different        6    0.5000     0.241933 0.257893
+conference      same        7    0.7143     0.243202 0.337733
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.schemas
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.tables
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.types
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.constraints
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.defaults
+2026/08/12 00:16:33 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.comments
+2026/08/12 00:16:33 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/08/12 00:16:33 INFO mlflow.store.db.utils: Updating database tables
+2026/08/12 00:16:33 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/12 00:16:33 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026/08/12 00:16:33 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/12 00:16:33 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026-08-12 00:16:33,530 - src.ml.tracking.mlflow_tracker - INFO - Using existing MLflow experiment: nba_bets_monitoring (ID: 7)
+2026-08-12 00:16:33,609 - src.ml.tracking.mlflow_tracker - INFO - Started MLflow run: 55f4a4a998824392b565e9f573e8a8b5
+2026-08-12 00:16:33,643 - src.ml.tracking.mlflow_tracker - INFO - Ended MLflow run: 55f4a4a998824392b565e9f573e8a8b5
+2026-08-12 00:16:33,644 - src.monitoring.scoring - INFO - Logged scorecard to MLflow experiment 'nba_bets_monitoring'

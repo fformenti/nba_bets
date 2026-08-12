@@ -1,0 +1,75 @@
+uv run python -m src.cli.predict_upcoming --config configs/predict/predict_classifier.yaml
+2026-08-11 22:59:06,968 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:59:06,968 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-11 22:59:06,969 - src.ml.prediction.pipeline - INFO - Loaded prediction configuration from configs/predict/predict_classifier.yaml
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.schemas
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.tables
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.types
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.constraints
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.defaults
+2026/08/11 22:59:07 INFO alembic.runtime.plugins: setup plugin alembic.autogenerate.comments
+2026/08/11 22:59:07 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/08/11 22:59:07 INFO mlflow.store.db.utils: Updating database tables
+2026/08/11 22:59:07 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/11 22:59:07 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026/08/11 22:59:07 INFO alembic.runtime.migration: Context impl SQLiteImpl.
+2026/08/11 22:59:07 INFO alembic.runtime.migration: Will assume non-transactional DDL.
+2026-08-11 22:59:07,418 - src.ml.tracking.mlflow_tracker - INFO - Using existing MLflow experiment: nba_bets_predictions (ID: 2)
+2026-08-11 22:59:07,747 - src.ml.tracking.mlflow_tracker - INFO - Started MLflow run: 71ca44f5f9544dd1989c5eb9df6bbab3
+2026-08-11 22:59:07,756 - src.ml.prediction.pipeline - INFO - Loading upcoming games from /Users/felipeformenti/dev/fformenti/nba_bets/data/raw/incremental/upcoming_games
+2026-08-11 22:59:07,760 - src.ml.prediction.pipeline - INFO - Loaded 7 upcoming games
+2026-08-11 22:59:07,760 - src.ml.prediction.features - INFO - Preparing 7 upcoming games
+2026-08-11 22:59:07,760 - src.ml.prediction.pipeline - INFO - Loading historical features from /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games_features.csv
+2026-08-11 22:59:07,760 - src.ml.training.data_prep - INFO - Loading data from /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games_features.csv
+2026-08-11 22:59:08,623 - src.ml.datasets.loaders - INFO - Loaded DataFrame from /Users/felipeformenti/dev/fformenti/nba_bets/data/processed/regular_season/games_features.csv: 66039 rows, 231 columns
+2026-08-11 22:59:08,628 - src.ml.prediction.pipeline - INFO - Filtered historical features to seasons: ['2024/25', '2025/26'] (slate: ['2025/26'], plus the prior season for last-season features)
+2026-08-11 22:59:08,629 - src.ml.prediction.features - INFO - Building features for prediction
+2026-08-11 22:59:08,632 - src.ml.config.loader - INFO - Loaded configuration from /Users/felipeformenti/dev/fformenti/nba_bets/configs/features.yaml
+2026-08-11 22:59:08,635 - src.ml.prediction.features - INFO - Creating feature tables
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 4500.33it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 2716.52it/s]
+2026-08-11 22:59:13,262 - src.ml.prediction.pipeline - INFO - Loaded experiment config from MLflow run for 'same'
+2026-08-11 22:59:13,263 - src.ml.prediction.features - INFO - Filtered to 5 games (same conference)
+2026-08-11 22:59:13,263 - src.ml.prediction.features - INFO - Creating delta features
+2026-08-11 22:59:13,268 - src.ml.features.engineering - INFO - Dropped 126 columns after delta creation
+2026-08-11 22:59:13,268 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-11 22:59:13,268 - src.ml.features.engineering - INFO - Same conference filter: skipping conference features
+2026-08-11 22:59:13,268 - src.ml.prediction.features - INFO - Prepared 26 features for model prediction
+2026-08-11 22:59:13,268 - src.ml.prediction.pipeline - INFO - Loading model for 'same' from MLflow: runs:/154ea6bc7ca642a0b40b9c5044148f17/nba_xgboost_same
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]
+Downloading artifacts:   0%|          | 0/7 [00:00<?, ?it/s]Downloading artifacts:  14%|█▍        | 1/7 [00:00<00:00, 2637.93it/s]Downloading artifacts:  29%|██▊       | 2/7 [00:00<00:00, 4114.08it/s]Downloading artifacts:  43%|████▎     | 3/7 [00:00<00:00, 2310.91it/s]Downloading artifacts:  57%|█████▋    | 4/7 [00:00<00:00, 2787.38it/s]Downloading artifacts:  71%|███████▏  | 5/7 [00:00<00:00, 3191.04it/s]Downloading artifacts:  86%|████████▌ | 6/7 [00:00<00:00, 3759.46it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 4211.75it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 4078.93it/s]
+2026-08-11 22:59:13,546 - src.ml.prediction.pipeline - INFO - No missing values found in aligned features
+2026-08-11 22:59:13,546 - src.ml.prediction.pipeline - INFO - Making predictions for 'same'-conference games
+2026-08-11 22:59:13,556 - src.ml.prediction.pipeline - INFO - Metadata columns unavailable for upcoming games: ['hometeamLocation', 'awayteamLocation', 'gameLocation']
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1671.70it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1538.07it/s]
+2026-08-11 22:59:13,573 - src.ml.prediction.pipeline - INFO - Loaded experiment config from MLflow run for 'different'
+2026-08-11 22:59:13,574 - src.ml.prediction.features - INFO - Filtered to 2 games (different conferences)
+2026-08-11 22:59:13,574 - src.ml.prediction.features - INFO - Creating delta features
+2026-08-11 22:59:13,579 - src.ml.features.engineering - INFO - Dropped 126 columns after delta creation
+2026-08-11 22:59:13,579 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-11 22:59:13,579 - src.ml.features.engineering - INFO - Different conference filter: adding conference vs conference record features
+2026-08-11 22:59:13,580 - src.ml.features.engineering - INFO - Created conference features: home_conference_vs_away_conference_record, games_played_at_home_conference
+2026-08-11 22:59:13,580 - src.ml.prediction.features - INFO - Prepared 28 features for model prediction
+2026-08-11 22:59:13,580 - src.ml.prediction.pipeline - INFO - Loading model for 'different' from MLflow: runs:/873cf184a6804ab4bebb9b7dabd5fe4d/nba_xgboost_different
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]
+Downloading artifacts:   0%|          | 0/7 [00:00<?, ?it/s]Downloading artifacts:  14%|█▍        | 1/7 [00:00<00:00, 2462.89it/s]Downloading artifacts:  29%|██▊       | 2/7 [00:00<00:00, 3586.41it/s]Downloading artifacts:  43%|████▎     | 3/7 [00:00<00:00, 2057.71it/s]Downloading artifacts:  57%|█████▋    | 4/7 [00:00<00:00, 2649.17it/s]Downloading artifacts:  71%|███████▏  | 5/7 [00:00<00:00, 3244.86it/s]Downloading artifacts:  86%|████████▌ | 6/7 [00:00<00:00, 3722.76it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 3329.19it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 3271.32it/s]
+2026-08-11 22:59:13,615 - src.ml.prediction.pipeline - INFO - No missing values found in aligned features
+2026-08-11 22:59:13,615 - src.ml.prediction.pipeline - INFO - Making predictions for 'different'-conference games
+2026-08-11 22:59:13,620 - src.ml.prediction.pipeline - INFO - Metadata columns unavailable for upcoming games: ['hometeamLocation', 'awayteamLocation', 'gameLocation']
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1827.58it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 1694.67it/s]
+2026-08-11 22:59:13,637 - src.ml.prediction.pipeline - INFO - Loaded experiment config from MLflow run for 'all'
+2026-08-11 22:59:13,637 - src.ml.prediction.features - INFO - No conference filter applied (7 games)
+2026-08-11 22:59:13,637 - src.ml.prediction.features - INFO - Creating delta features
+2026-08-11 22:59:13,642 - src.ml.features.engineering - INFO - Dropped 126 columns after delta creation
+2026-08-11 22:59:13,642 - src.ml.features.engineering - INFO - Created 26 delta features
+2026-08-11 22:59:13,642 - src.ml.features.engineering - INFO - All teams filter: adding conference delta feature
+2026-08-11 22:59:13,643 - src.ml.features.engineering - INFO - Created conference_diff_home_advantage_pct feature (0.0 for same conference teams)
+2026-08-11 22:59:13,644 - src.ml.prediction.features - INFO - Prepared 27 features for model prediction
+2026-08-11 22:59:13,644 - src.ml.prediction.pipeline - INFO - Loading model for 'all' from MLflow: runs:/0d169ce4a2034b90b54f108849f73a9c/nba_xgboost_all
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]
+Downloading artifacts:   0%|          | 0/7 [00:00<?, ?it/s]Downloading artifacts:  14%|█▍        | 1/7 [00:00<00:00, 1528.54it/s]Downloading artifacts:  29%|██▊       | 2/7 [00:00<00:00, 2828.26it/s]Downloading artifacts:  43%|████▎     | 3/7 [00:00<00:00, 1974.72it/s]Downloading artifacts:  57%|█████▋    | 4/7 [00:00<00:00, 2545.86it/s]Downloading artifacts:  71%|███████▏  | 5/7 [00:00<00:00, 3118.91it/s]Downloading artifacts:  86%|████████▌ | 6/7 [00:00<00:00, 3689.46it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 3932.51it/s]Downloading artifacts: 100%|██████████| 7/7 [00:00<00:00, 3856.58it/s]
+2026-08-11 22:59:13,678 - src.ml.prediction.pipeline - INFO - No missing values found in aligned features
+2026-08-11 22:59:13,678 - src.ml.prediction.pipeline - INFO - Making predictions for 'all'-conference games
+2026-08-11 22:59:13,684 - src.ml.prediction.pipeline - INFO - Metadata columns unavailable for upcoming games: ['hometeamLocation', 'awayteamLocation', 'gameLocation']
+2026-08-11 22:59:13,689 - src.ml.prediction.pipeline - INFO - Predicted 14 games; 26 rows now in /Users/felipeformenti/dev/fformenti/nba_bets/data/predictions/upcoming_games_predictions.csv
+2026-08-11 22:59:13,695 - src.ml.prediction.pipeline - INFO - Prediction complete!
+2026-08-11 22:59:13,698 - src.ml.tracking.mlflow_tracker - INFO - Ended MLflow run: 71ca44f5f9544dd1989c5eb9df6bbab3

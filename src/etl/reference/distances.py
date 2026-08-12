@@ -11,9 +11,10 @@ from tqdm import tqdm
 
 
 from src.config.paths import (
-    TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH,
+    TEAMS_LOCATIONS_REFERENCE_PATH,
     LOCATIONS_DISTANCES_PATH,
 )
+from src.etl.utils.common import require_reference_file
 from src.config.constants import SERPER_ENDPOINT
 from src.config.secrets import OPENAI_ENV_VAR, SERPER_ENV_VAR, require_env
 
@@ -89,15 +90,34 @@ def get_distances_ai(google_query, google_results_txt):
     return distance_dict
 
 
-def build_distances_table() -> None:
-    """Build the city-to-city distance table used by travel features."""
-    teams_locations = pd.read_csv(TEAMS_CITIES_LOCATIONS_HISTORY_PROCESSED_PATH)
+def build_distances_table(limit: int | None = None) -> None:
+    """Build the city-to-city distance table used by travel features.
+
+    Parameters
+    ----------
+    limit : int, optional
+        Stop after this many city pairs. For smoke-testing the API wiring only —
+        a partial table is worse than no table, because every unmatched pair
+        silently reads as a trip the team did not take. This used to be a
+        hardcoded ``[0:5]`` slice, which meant the documented way to rebuild the
+        table in fact destroyed it.
+    """
+    require_reference_file(TEAMS_LOCATIONS_REFERENCE_PATH, "build-teams-locations")
+    teams_locations = pd.read_csv(TEAMS_LOCATIONS_REFERENCE_PATH)
     teams_locations["city_state"] = teams_locations["city"] + ", " + teams_locations["state"]
 
     unique_locations = list(set(teams_locations["city_state"]))
     locations_distances = []
     all_combinations = list(itertools.combinations(unique_locations, 2))
-    for pair in tqdm(all_combinations[0:5]):
+    if limit is not None:
+        logger.warning(
+            "Building a PARTIAL distance table: %d of %d pairs. Do not use the "
+            "result for a real feature build.",
+            limit,
+            len(all_combinations),
+        )
+        all_combinations = all_combinations[:limit]
+    for pair in tqdm(all_combinations):
         logger.info(f"Processing pair: {pair[0]} to {pair[1]}")
         cities_dict = {"from": pair[0], "to": pair[1]}
 
@@ -109,4 +129,8 @@ def build_distances_table() -> None:
         locations_distances.append({**cities_dict, **distance_dict})
 
     locations_distances_df = pd.DataFrame(locations_distances)
+    LOCATIONS_DISTANCES_PATH.parent.mkdir(parents=True, exist_ok=True)
     locations_distances_df.to_csv(LOCATIONS_DISTANCES_PATH, index=False)
+    logger.info(
+        f"Saved {len(locations_distances_df)} city pairs to {LOCATIONS_DISTANCES_PATH}"
+    )

@@ -3,6 +3,7 @@
 import logging
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
 
 from src.ml.config.schema import FeaturesMapConfig, MomentumPairConfig
@@ -181,199 +182,95 @@ def create_momentum_features(
     return df
 
 
-def create_conference_delta(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Create conference-based feature: difference between binary conference values * east_wins_pct.
+CONFERENCE_FEATURES = [
+    "conference_diff_home_advantage_pct",
+    "conference_home_court_advantage_pct",
+]
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame with conference columns
-    home_conf_col : str, default='hometeamConference'
-        Home team conference column name
-    away_conf_col : str, default='awayteamConference'
-        Away team conference column name
-    east_wins_pct_col : str, default='east_wins_pct_L1'
-        East wins percentage column name
+# Columns create_conference_features reads and then removes from the frame.
+# Nothing downstream may consume them: they are conference-season-level, so on a
+# same-conference game they describe a contest that isn't happening.
+_CONFERENCE_INTERMEDIATES = [
+    "hometeamConference",
+    "awayteamConference",
+    "east_record_adjusted",
+    "west_record_adjusted",
+    "east_record_at_east",
+    "west_record_at_west",
+]
 
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with conference_diff_east_pct feature added
+
+def create_conference_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Both conference features, defined for every game.
+
+    Each measures a conference-vs-conference advantage — a quantity that exists
+    only for interconference games. On a same-conference game both teams are
+    drawn from the same pool, so the effect doesn't cancel *approximately*, it
+    cancels **exactly**; the neutral value is a known truth rather than an
+    imputation guess. Both features are therefore 0.0 there:
+
+    ``conference_diff_home_advantage_pct``
+        The venue-balanced East/West gap, signed by who is hosting.
+        ``east_record_adjusted`` averages East's win rate hosting and visiting,
+        so venue is deliberately averaged out. ``conference_diff`` is +1 when
+        the East hosts, -1 when the West hosts, and 0 within a conference —
+        which is what zeroes the product.
+
+    ``conference_home_court_advantage_pct``
+        Exactly the venue component the average above discards: how well the
+        home team's conference holds its own floor against the other one,
+        centered so that parity is 0.0. Positive means the home team belongs to
+        the conference that defends home court better in interconference play.
+
+    Centering matters because the neutral value has to be expressible. A signed
+    difference is neutral at 0 and a raw win rate at 0.5; subtracting 0.5 makes
+    "no effect" and "no data" the same number, so the linear and neural paths
+    don't have to learn where neutral sits, and the LLM prompt renders 0.0
+    rather than a spurious .500.
+
+    Leaving the second feature ungated would be a confound, not noise: its
+    ingredients are defined on every date, so the raw lookup happily reports
+    "the East holds home court at .550" on an all-East game, handing every East
+    home team one value and every West home team another.
+
+    Note the intermediates are dropped on the way out — see
+    ``_CONFERENCE_INTERMEDIATES``.
     """
     df = df.copy()
 
-    # Encode conferences as binary: East=1, West=0
-    home_conf_col: str = "hometeamConference"
-    away_conf_col: str = "awayteamConference"
-    df["hometeamConference_binary"] = df[home_conf_col].map({"East": 1, "West": 0})
-    df["awayteamConference_binary"] = df[away_conf_col].map({"East": 1, "West": 0})
+    is_cross_conference = df["hometeamConference"] != df["awayteamConference"]
 
-    df["east_record_adjusted_advantage"] = (
+    # East=1, West=0 → +1 East hosts West, -1 West hosts East, 0 same conference.
+    conference_diff = df["hometeamConference"].map({"East": 1, "West": 0}) - df[
+        "awayteamConference"
+    ].map({"East": 1, "West": 0})
+
+    df["conference_diff_home_advantage_pct"] = conference_diff * (
         df["east_record_adjusted"] - df["west_record_adjusted"]
     )
 
-    # East vs West = 1, West vs East = -1
-    df["conference_diff"] = (
-        df["hometeamConference_binary"] - df["awayteamConference_binary"]
+    home_conference_home_record = np.where(
+        df["hometeamConference"] == "East",
+        df["east_record_at_east"],
+        df["west_record_at_west"],
     )
-
-    # Positive values means the home team has advantage over the away team, negative means the away team has advantage over the home team.
-    df["conference_diff_home_advantage_pct"] = (
-        df["conference_diff"] * df["east_record_adjusted_advantage"]
-    )
-
-    # Drop intermediate columns
-    df = df.drop(
-        columns=[
-            "hometeamConference",
-            "awayteamConference",
-            "east_record_adjusted",
-            "west_record_adjusted",
-            "hometeamConference_binary",
-            "awayteamConference_binary",
-            "east_record_adjusted_advantage",
-            "conference_diff",
-        ]
-    )
-
-    logger.info(
-        "Created conference_diff_home_advantage_pct feature (0.0 for same conference teams)"
-    )
-    return df
-
-
-def get_home_conference_vs_away_conference_record(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Create conference-specific features for different conference matchups.
-
-    Creates:
-    - home_conference_vs_away_conference_record: Record of home team's conference
-      when playing at home conference
-    - games_played_at_home_conference: Games played by home team at their conference
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame with conference columns and east/west record features
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with conference features added and intermediate columns dropped
-    """
-    df = df.copy()
-
-    df["home_conference_vs_away_conference_record"] = df.apply(
-        lambda x: x["east_record_at_east"]
-        if x["hometeamConference"] == "East"
-        else x["west_record_at_west"],
-        axis=1,
-    )
-
-    df["games_played_at_home_conference"] = df.apply(
-        lambda x: x["games_played_at_east"]
-        if x["hometeamConference"] == "East"
-        else x["games_played_at_west"],
-        axis=1,
+    df["conference_home_court_advantage_pct"] = np.where(
+        is_cross_conference, home_conference_home_record - 0.5, 0.0
     )
 
     df = df.drop(
-        columns=[
-            "east_record_adjusted",
-            "west_record_adjusted",
-            "east_record_at_east",
-            "west_record_at_west",
-            "games_played_at_east",
-            "games_played_at_west",
-            "games_played_east_vs_west",
-        ]
+        columns=[col for col in _CONFERENCE_INTERMEDIATES if col in df.columns]
     )
 
     logger.info(
-        "Created conference features: home_conference_vs_away_conference_record, "
-        "games_played_at_home_conference"
+        f"Created {', '.join(CONFERENCE_FEATURES)} "
+        f"({(~is_cross_conference).sum()} same-conference game(s) set to 0.0)"
     )
-    return df
-
-
-def apply_conference_features(
-    df: pd.DataFrame,
-    conference_filter: str,
-) -> pd.DataFrame:
-    """
-    Apply appropriate conference features based on conference filter type.
-
-    This function ensures consistent feature engineering across training and prediction:
-    - 'same': No conference features (teams from same conference)
-    - 'different': Conference vs conference record features (teams from different conferences)
-    - 'all': Conference delta feature (works for both same and different conferences,
-             equals 0.0 for same conference matchups)
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame with delta features already created
-    conference_filter : str
-        Conference filter type: 'same', 'different', or 'all'
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with appropriate conference features added
-
-    Raises
-    ------
-    ValueError
-        If conference_filter is not one of the valid options
-    """
-    if conference_filter not in ["same", "different", "all"]:
-        raise ValueError(
-            f"conference_filter must be 'same', 'different', or 'all', got '{conference_filter}'"
-        )
-
-    df = df.copy()
-
-    if conference_filter == "same":
-        # Same conference teams: no conference features needed
-        logger.info("Same conference filter: skipping conference features")
-        # Drop any conference-related columns that might exist
-        conference_cols_to_drop = [
-            "east_record_adjusted",
-            "west_record_adjusted",
-            "east_record_at_east",
-            "west_record_at_west",
-            "games_played_at_east",
-            "games_played_at_west",
-            "games_played_east_vs_west",
-            "home_conference_vs_away_conference_record",
-            "games_played_at_home_conference",
-            "conference_diff_home_advantage_pct",
-        ]
-        df = df.drop(
-            columns=[col for col in conference_cols_to_drop if col in df.columns]
-        )
-
-    elif conference_filter == "different":
-        # Different conference teams: use conference vs conference record features
-        logger.info(
-            "Different conference filter: adding conference vs conference record features"
-        )
-        df = get_home_conference_vs_away_conference_record(df)
-
-    elif conference_filter == "all":
-        # All teams: use conference delta feature (0.0 for same conference)
-        logger.info("All teams filter: adding conference delta feature")
-        df = create_conference_delta(df)
-
     return df
 
 
 def resolve_feature_columns(
     features_config: FeaturesMapConfig,
-    conference_filter: str,
     momentum_pairs: Optional[List[MomentumPairConfig]] = None,
 ) -> list[str]:
     """
@@ -388,8 +285,6 @@ def resolve_feature_columns(
     ----------
     features_config : FeaturesMapConfig
         Feature group configuration.
-    conference_filter : str
-        Conference filter type: 'same', 'different', or 'all'.
     momentum_pairs : list of MomentumPairConfig, optional
         Momentum pairs that replace two delta columns with one momentum column.
 
@@ -440,16 +335,8 @@ def resolve_feature_columns(
     if features_config.neutral_court.enabled:
         columns.append("neutral_court")
 
-    # Conference features (created dynamically by apply_conference_features)
-    if conference_filter == "different":
-        columns.extend(
-            [
-                "home_conference_vs_away_conference_record",
-                "games_played_at_home_conference",
-            ]
-        )
-    elif conference_filter == "all":
-        columns.append("conference_diff_home_advantage_pct")
+    # Conference features (created dynamically by create_conference_features)
+    columns.extend(CONFERENCE_FEATURES)
 
     # Momentum pairs: replace two source deltas with one momentum column
     if momentum_pairs:

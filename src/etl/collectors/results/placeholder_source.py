@@ -17,6 +17,14 @@ live feed. It reads outcomes that you drop by hand into
 return ``None``, which the collector treats as "not played yet" — exactly how a
 real source behaves mid-slate.
 
+To exercise the other outcomes, set ``"status"`` explicitly to any
+:class:`~src.etl.collectors.results.base.GameStatus` value:
+
+.. code-block:: json
+
+    {"status": "postponed"}
+    {"status": "in_progress", "homeTeamFinalScore": 54, "awayTeamFinalScore": 61}
+
 **Replacing this:** implement :class:`~src.etl.collectors.results.base.ResultsSource`
 in a new module here and register it in ``__init__.py``. No caller changes —
 ``src/cli/fetch_game_results.py`` picks the source by name.
@@ -28,7 +36,7 @@ import json
 from pathlib import Path
 
 from src.config.paths import MANUAL_RESULTS_DIR
-from src.etl.collectors.results.base import GameResult
+from src.etl.collectors.results.base import GameResult, GameStatus
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -55,9 +63,14 @@ class PlaceholderResultsSource:
             return None
 
         payload = json.loads(path.read_text(encoding="utf-8"))
+        status = self._read_status(path, payload)
 
-        if payload.get("postponed"):
-            return GameResult(postponed=1)
+        if status is not GameStatus.FINAL:
+            logger.info(f"Manual result for {game_id}: {status.value}")
+            return GameResult(
+                postponed=1 if status is GameStatus.POSTPONED else 0,
+                status=status,
+            )
 
         try:
             home_score = int(payload["homeTeamFinalScore"])
@@ -80,7 +93,28 @@ class PlaceholderResultsSource:
             postponed=0,
             attendance=payload.get("attendance"),
             inactive_players=payload.get("inactivePlayers", []),
+            status=GameStatus.FINAL,
         )
+
+    @staticmethod
+    def _read_status(path: Path, payload: dict) -> GameStatus:
+        """An explicit status wins; otherwise a dropped file means a final score.
+
+        ``postponed: true`` is still honoured so files written before statuses
+        existed keep working.
+        """
+        raw_status = payload.get("status")
+        if raw_status is not None:
+            try:
+                return GameStatus(str(raw_status).lower())
+            except ValueError as exc:
+                raise ValueError(
+                    f"{path} has unknown status {raw_status!r}. Expected one of: "
+                    f"{', '.join(s.value for s in GameStatus)}"
+                ) from exc
+        if payload.get("postponed"):
+            return GameStatus.POSTPONED
+        return GameStatus.FINAL
 
     def available(self) -> bool:
         if not self.results_dir.exists():

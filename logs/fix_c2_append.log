@@ -1,0 +1,9 @@
+uv run python -m src.cli.append_game_results
+2026-08-12 00:16:34,222 - src.utils.logging_config - INFO - Logging configured: level=INFO, log_file=None
+2026-08-12 00:16:34,222 - src.etl.ingestion.append_games_results - INFO - Loading historical games from /Users/felipeformenti/dev/fformenti/nba_bets/data/ingested/games_updated_history.csv
+2026-08-12 00:16:34,343 - src.etl.ingestion.append_games_results - INFO - Loaded 72634 historical games
+2026-08-12 00:16:34,344 - src.etl.ingestion.append_games_results - INFO - Found 7 JSON files to process
+2026-08-12 00:16:34,346 - src.etl.ingestion.append_games_results - INFO - Successfully loaded 7 game results
+2026-08-12 00:16:34,796 - src.etl.ingestion.append_games_results - INFO - Saved 72641 games to /Users/felipeformenti/dev/fformenti/nba_bets/data/ingested/games_updated_history.csv
+2026-08-12 00:16:34,796 - src.etl.ingestion.append_games_results - INFO - Added 7 new game(s) to the history table
+2026-08-12 00:16:34,797 - src.etl.ingestion.append_games_results - INFO - Archived 7 consumed result(s) to /Users/felipeformenti/dev/fformenti/nba_bets/data/raw/incremental/archive/results

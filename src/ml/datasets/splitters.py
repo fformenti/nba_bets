@@ -169,71 +169,94 @@ def temporal_split(
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def fixed_holdout_split(
+def season_split(
     X: pd.DataFrame,
     y: pd.Series,
-    holdout_indices: "pd.Index",
-    date_column: str,
-    val_size: float = 0.2,
+    seasons: pd.Series,
+    test_start_season: str,
+    val_seasons: int,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """
-    Split data using a pre-defined holdout set frozen on disk.
+    Split data on season boundaries rather than row proportions.
 
-    Rows whose pandas index appears in holdout_indices become the test set.
-    The remaining rows are split into train/val via temporal_split.
+    Test is every game from ``test_start_season`` on. Of what remains, the last
+    ``val_seasons`` seasons are validation and everything older is train.
+
+    Prefer this over :func:`temporal_split` for this dataset. A proportional
+    split spans far more calendar time at the old end than the recent end —
+    games per season roughly quintupled between 1950 and today — so a 20%
+    validation slice consumes whole decades and the model ends up never
+    training on recent basketball.
+
+    Because the boundary is a season rather than a row count, the split is
+    reproducible from config alone and stable as new games are appended: a game
+    played today falls on the test side and can never leak into training.
 
     Parameters
     ----------
     X : pd.DataFrame
-        Features DataFrame (must include date_column). Index must align with y.
+        Features DataFrame. Index must align with ``y`` and ``seasons``.
     y : pd.Series
         Target Series
-    holdout_indices : pd.Index
-        Pandas index values of rows that form the fixed test set.
-        Computed by the caller from the metadata DataFrame.
-    date_column : str
-        Name of the date column, used for train/val temporal ordering.
-    val_size : float, default=0.2
-        Proportion of non-holdout data to use for validation.
+    seasons : pd.Series
+        Season label per row (e.g. ``"2021/22"``), index-aligned with ``X``.
+        Compared lexicographically, which orders ``"YYYY/YY"`` correctly.
+    test_start_season : str
+        First season of the test set.
+    val_seasons : int
+        Number of seasons immediately before ``test_start_season`` to use for
+        validation.
 
     Returns
     -------
     tuple
         (X_train, X_val, X_test, y_train, y_val, y_test)
+
+    Raises
+    ------
+    ValueError
+        If no rows fall on or after ``test_start_season``, or if the remaining
+        seasons cannot supply both a validation window and a non-empty train set.
     """
-    if date_column not in X.columns:
-        raise ValueError(f"Date column '{date_column}' not found in DataFrame")
+    if val_seasons < 1:
+        raise ValueError(f"val_seasons must be at least 1, got {val_seasons}")
 
-    holdout_mask = X.index.isin(holdout_indices)
-    X_test = X.loc[holdout_mask].copy()
-    y_test = y.loc[holdout_mask].copy()
-    X_remaining = X.loc[~holdout_mask].copy()
-    y_remaining = y.loc[~holdout_mask].copy()
+    seasons = seasons.reindex(X.index)
+    if seasons.isna().any():
+        raise ValueError("seasons must cover every row of X")
 
-    if len(X_test) == 0:
+    test_mask = seasons >= test_start_season
+    if not test_mask.any():
         raise ValueError(
-            "No holdout games found in the dataset. "
-            "Ensure the holdout file was generated from the same games_features.csv."
+            f"No games on or after season '{test_start_season}'. The latest season "
+            f"in the data is '{seasons.max()}' — check splitting.test_start_season."
         )
 
-    # Split remaining data into train/val only (no test portion)
-    n_total = len(X_remaining)
-    dates = pd.to_datetime(X_remaining[date_column])
-    sorted_indices = dates.sort_values().index
-    X_sorted = X_remaining.loc[sorted_indices]
-    y_sorted = y_remaining.loc[sorted_indices]
+    remaining_seasons = sorted(seasons[~test_mask].unique())
+    if len(remaining_seasons) < val_seasons + 1:
+        raise ValueError(
+            f"Need at least {val_seasons + 1} seasons before '{test_start_season}' "
+            f"to build a {val_seasons}-season validation set and a non-empty train "
+            f"set, but only {len(remaining_seasons)} are present."
+        )
 
-    n_val = int(n_total * val_size)
-    n_train = n_total - n_val
-    X_train = X_sorted.iloc[:n_train].copy()
-    X_val = X_sorted.iloc[n_train:].copy()
-    y_train = y_sorted.iloc[:n_train].copy()
-    y_val = y_sorted.iloc[n_train:].copy()
+    val_labels = set(remaining_seasons[-val_seasons:])
+    val_mask = ~test_mask & seasons.isin(val_labels)
+    train_mask = ~test_mask & ~val_mask
 
-    logger.info(
-        f"Fixed holdout split: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}"
+    splits = {}
+    for name, mask in (("train", train_mask), ("val", val_mask), ("test", test_mask)):
+        splits[name] = (X.loc[mask].copy(), y.loc[mask].copy())
+        span = seasons[mask]
+        logger.info(f"Season split {name}: {mask.sum()} rows ({span.min()} to {span.max()})")
+
+    return (
+        splits["train"][0],
+        splits["val"][0],
+        splits["test"][0],
+        splits["train"][1],
+        splits["val"][1],
+        splits["test"][1],
     )
-
-    return X_train, X_val, X_test, y_train, y_val, y_test
 
 

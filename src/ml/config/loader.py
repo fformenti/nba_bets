@@ -93,11 +93,17 @@ def load_yaml_config(config_path: Path | str) -> Dict[str, Any]:
     return config
 
 
-def load_prediction_config(config_path: Path) -> PredictionConfig:
-    """Load prediction config from YAML."""
-    with open(config_path, "r", encoding="utf-8") as handle:
-        raw_config = yaml.safe_load(handle) or {}
-    return PredictionConfig(**raw_config)
+def load_prediction_config(config_path: Path | str) -> PredictionConfig:
+    """Load prediction config from YAML, resolving ``_include`` directives.
+
+    This used to bypass ``_resolve_includes``, which made it the one loader where
+    an ``_include`` did nothing: the key fell through to ``extra="ignore"`` and
+    was dropped without a word.
+    """
+    config_path = Path(config_path).resolve()
+    raw_config = load_yaml_config(config_path)
+    raw_config = _resolve_includes(raw_config, config_path.parent)
+    return PredictionConfig.model_validate(raw_config)
 
 
 def load_experiment_config(config_path: Path | str) -> ExperimentConfig:

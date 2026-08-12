@@ -5,7 +5,12 @@ import pandas as pd
 from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     LOCATIONS_DISTANCES_PATH,
+    TEAMS_LOCATIONS_REFERENCE_PATH,
 )
+from src.etl.utils.common import require_reference_file
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def make_teams_games_dates(games: Optional[pd.DataFrame] = None) -> pd.DataFrame:
@@ -90,6 +95,7 @@ def make_teams_distances_table_season(
         prediction), distances are computed for all games including
         upcoming ones. When None, uses REGULAR_SEASON_GAMES_PATH.
     """
+    require_reference_file(LOCATIONS_DISTANCES_PATH, "build-distances-table")
     distances = pd.read_csv(LOCATIONS_DISTANCES_PATH)
     aux_distances = distances.rename(columns={"from": "to", "to": "from"})
     distances = pd.concat([distances, aux_distances]).reset_index(drop=True)
@@ -135,17 +141,18 @@ def make_teams_distances_table_season(
             ["teamId", "gameDateOnlyStr"]
         ).reset_index(drop=True)
 
-        full_calendar_teams["teamLocation"] = full_calendar_teams[
-            "teamLocation"
-        ].ffill().infer_objects(copy=False)
-        full_calendar_teams["current_location"] = full_calendar_teams["gameLocation"]
-        full_calendar_teams["next_gameLocation"] = full_calendar_teams.groupby(
-            ["teamId"]
-        )["gameLocation"].shift(-1)
+        with pd.option_context("future.no_silent_downcasting", True):
+            full_calendar_teams["teamLocation"] = full_calendar_teams[
+                "teamLocation"
+            ].ffill().infer_objects(copy=False)
+            full_calendar_teams["current_location"] = full_calendar_teams["gameLocation"]
+            full_calendar_teams["next_gameLocation"] = full_calendar_teams.groupby(
+                ["teamId"]
+            )["gameLocation"].shift(-1)
 
-        _next_filled = full_calendar_teams.groupby("teamId")["next_gameLocation"].transform(
-            lambda x: x.bfill().infer_objects(copy=False)
-        )
+            _next_filled = full_calendar_teams.groupby("teamId")["next_gameLocation"].transform(
+                lambda x: x.bfill().infer_objects(copy=False)
+            )
         full_calendar_teams["current_location"] = full_calendar_teams["current_location"].mask(
             full_calendar_teams["current_location"].isna()
             & (_next_filled == full_calendar_teams["teamLocation"]),
@@ -189,6 +196,47 @@ def make_teams_distances_table_season(
             how="left",
         ).drop(columns=["from", "to"])
 
+        # An unmatched pair means one of two very different things. The distance
+        # table holds *distinct* city pairs only (itertools.combinations), so a
+        # team that stayed put has no row by construction and genuinely travelled
+        # zero. A pair of different cities with no row is a gap in the reference
+        # table, and filling it with 0 would read as "no travel" — the same value
+        # as a rest day at home. Only the first case is filled silently.
+        # A null location is a third case again — a team-season the locations
+        # lookup does not cover — and cannot be judged either way, so it is
+        # counted and left at zero rather than failing the build.
+        known = (
+            full_calendar_teams["current_location"].notna()
+            & full_calendar_teams["previous_location"].notna()
+        )
+        unknown_location = full_calendar_teams["driving_distance"].isna() & ~known
+        if unknown_location.any():
+            logger.warning(
+                "Season %s: %d team-day(s) have no known location; distance recorded "
+                "as 0. Check the team-season coverage of %s.",
+                season,
+                int(unknown_location.sum()),
+                TEAMS_LOCATIONS_REFERENCE_PATH.name,
+            )
+
+        same_city = (
+            full_calendar_teams["current_location"]
+            == full_calendar_teams["previous_location"]
+        )
+        unmatched = full_calendar_teams["driving_distance"].isna() & ~same_city & known
+        if unmatched.any():
+            missing_pairs = (
+                full_calendar_teams.loc[unmatched, ["previous_location", "current_location"]]
+                .drop_duplicates()
+                .itertuples(index=False, name=None)
+            )
+            raise ValueError(
+                f"{int(unmatched.sum())} team-day(s) in season {season} travelled "
+                f"between cities missing from {LOCATIONS_DISTANCES_PATH.name}: "
+                f"{sorted(missing_pairs)}. Add them rather than letting the trip "
+                f"read as zero miles."
+            )
+
         full_calendar_teams["driving_distance"] = (
             full_calendar_teams["driving_distance"].fillna(0).astype(int)
         )
@@ -199,6 +247,12 @@ def make_teams_distances_table_season(
         # ---------------------
 
         # ---- Calculate distances lags L1 represents the current game distance
+        #
+        # Deliberately *not* shifted, unlike every other rolling feature in the
+        # ETL. Travel into a game is fixed by the schedule and fully known before
+        # tip-off, so including the current row is information the model would
+        # genuinely have at prediction time — not lookahead. This is the one
+        # exception to the shift(1) rule; keep it documented as such.
         distances_lags_cols = []
         for lag in lags:
             full_calendar_teams[f"distance_L{lag}"] = (

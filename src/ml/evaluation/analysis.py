@@ -454,7 +454,6 @@ def generate_analysis(
     y_pred_proba: Optional[np.ndarray],
     metadata: pd.DataFrame,
     output_dir: Path,
-    conference_filter: str = "all",
     model_name: str = "",
     y_pred_baseline: Optional[np.ndarray] = None,
 ) -> None:
@@ -467,7 +466,7 @@ def generate_analysis(
     analysis_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
 
-    suffix = f" - {model_name} ({conference_filter})" if model_name else ""
+    suffix = f" - {model_name}" if model_name else ""
 
     # 1. Error by team
     fig, table = plot_error_by_team(

@@ -1,0 +1,33 @@
+# The deployed model: every game, one model, xgboost.
+#
+# There used to be three of these — same-conference, cross-conference, and this
+# one — with the first two routed per game at prediction time. Backtested over
+# eight seasons the split lost: +0.0047 log loss and -0.64pp accuracy against
+# this config, on the identical 8,762 games. The cross-conference model, trained
+# on a third of the rows, carried the loss. See docs/CONFERENCE_SPLIT.md.
+#
+# The conference *signal* stayed. Two features carry it, both 0.0 when the two
+# teams share a conference, which is why one model needs no routing.
+#
+# Features, splits and hyperparameters all come from _defaults.yaml. The only
+# thing this file decides is which model family to train — everything it used to
+# restate was already the default. Run the full sweep instead with
+# `make train TRAIN_CONFIG=all_models`.
+
+_include:
+  - "../features.yaml"
+  - "_defaults.yaml"
+
+description: "All games, xgboost: sos-adjusted record, all lags, 1980/81 season"
+tags:
+  variation: "xgboost"
+
+model:
+  train_models:
+    - xgboost
+
+paths:
+  outputs: "outputs/xgboost"
+
+mlflow:
+  experiment_name: "nba_bets_xgboost"
