@@ -9,16 +9,13 @@ data:
   drop_na: true
 
 # The deployed model, written by `make train PROMOTE=1`.
-# Use runs:/ URIs when register_model is false (artifact_path = nba_{model}).
-# Use models:/ URIs only when register_model is true in the training config.
+# Always a runs:/ URI (artifact_path = nba_{model}). Training does not register
+# models — the MLflow Model Registry is unused, so models:/ URIs never resolve.
 #
 # One model predicts every game. Routing games to same-conference and
 # cross-conference models scored worse over eight backtested seasons — see
 # docs/CONFERENCE_SPLIT.md.
-#
-# The `_all` suffix is historical: runs predating that removal logged their
-# artifact as nba_{model}_{conference_filter}. New runs log nba_{model}.
-model_uri: "runs:/bd2afe2b0b3f4ade82ac28d734b08871/nba_xgboost_all"
+model_uri: "runs:/ee34b43e038245b8a3879a86a4bf69b0/nba_xgboost"
 
 mlflow:
   experiment_name: "nba_bets_predictions"

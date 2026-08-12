@@ -307,9 +307,10 @@ class MLflowConfig(BaseModel):
     experiment_name: str = "nba_bets_classification"
     tracking_uri: str = "sqlite:///mlflow.db"
     register_model: bool = Field(
-        default=True,
+        default=False,
         description="Whether to register the model in MLflow Model Registry. "
-        "Set to False for experimental runs (use run-based URIs instead).",
+        "Off by default: promotion and prediction both use run-based URIs, "
+        "so a registry version would never be read.",
     )
 
 
