@@ -2,13 +2,26 @@
 # Used by: ETL (make_features), incremental ingestion, ML training (lags/alpha merge).
 # Training configs include this file via _include, then configs/train/_defaults.yaml.
 #
-# Delta (home − away) and drop_after_delta are ML-only; define them in
-# configs/train/_defaults.yaml under feature_engineering.features.
+# This file answers exactly one question: which rolling windows does the ETL
+# compute? Nothing here decides what a model consumes.
 #
-# Each feature group controls:
-#   lags:             which rolling windows to compute (ETL + ML)
-#   location_lags:    which lags also get home/road variants (ETL + ML)
-#   enabled:          whether to keep this feature group for training (ML only; ETL always computes all)
+#   lags:          rolling windows to compute (ETL + ML)
+#   location_lags: which lags also get home/road variants (ETL + ML)
+#
+# `enabled` and `delta` are ML-only and live in configs/train/_defaults.yaml.
+# There used to be an `enabled` key on every group here, documented as "ML
+# only; ETL always computes all". It was read by nothing: the ETL never looks
+# at it (aggregator.py only unpacks .lags/.location_lags/.sos_adj_alpha/
+# .gds_beta), and _defaults.yaml is merged afterwards and re-declares `enabled`
+# for every group, so its value always won. Five of the thirteen keys asserted
+# the opposite of what actually reached a model — this file said
+# `record: enabled: true` while no sklearn model had seen record in months.
+#
+# Groups with no lags at all (rested_days, back_to_back, streak, home_and_road,
+# indifference_flag, neutral_court, games_behind_leader, games_behind_above,
+# games_ahead_of_below, clinched_playoff_berth, eliminated_from_playoffs,
+# clinched_final_seed) have nothing to say to the ETL and are declared only in
+# _defaults.yaml.
 
 feature_engineering:
   sos_adj_alpha: 1.0
@@ -18,55 +31,30 @@ feature_engineering:
     record:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
-      enabled: true
 
     point_differential:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
-      enabled: false
 
     norm_point_differential:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
-      enabled: true
 
     sos:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
-      enabled: true
 
     sos_adj_record:
       location_lags: [5, 10, 20, 41]
-      enabled: true
 
     gds:
       lags: [3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
-      enabled: true
 
     distance:
       lags: [1, 3, 7, 14]
-      enabled: true
-
-    rested_days:
-      enabled: true
-
-    back_to_back:
-      # Consecutive games on consecutive days: 0 = rested yesterday,
-      # 1 = back-to-back, 2 = three games in three days, etc.
-      enabled: true
-
-    streak:
-      enabled: true
 
     last_season_record:
       location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
-      enabled: true
 
     adjusted_last_season_record:
       location_lags: []         # no lags, but has HT_at_home/VT_on_road variants
-      enabled: true
-
-    home_and_road:
-      # Special: days_at_home (home team) and days_on_road (away team)
-      # These are raw per-team columns, NOT HT/VT suffixed
-      enabled: true

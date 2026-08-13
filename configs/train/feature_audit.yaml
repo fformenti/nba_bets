@@ -1,0 +1,110 @@
+# Diagnostic config: every feature group the ETL builds, turned on at once.
+#
+# ⚠ THIS CONFIG DELIBERATELY VIOLATES THE REDUNDANCY RULE IN _defaults.yaml.
+#
+# It answers exactly one question: HAS BORUTA-SHAP EVER SEEN THIS FEATURE, and
+# does it beat a shadow? It cannot answer "should both members of this pair be
+# enabled?" — and reading it that way on 2026-08-12 is what put
+# point_differential beside norm_point_differential (r = 0.998) and gds beside
+# its own parent sos_adj_record (r = 0.946) in the shipping config, at a cost of
+# 0.66pp test accuracy. Two features at r ≈ 1 split the SHAP credit and both
+# clear significance; that is an artifact of the method, not a finding.
+#
+# The coupled pairs live inside this pool, all of them co-enabled here on
+# purpose:
+#   point_differential  ↔ norm_point_differential   r = 0.998
+#   last_season_record  ↔ adjusted_last_season_record r = 0.9985
+#   record, sos         → sos_adj_record            r = 0.95
+#   sos_adj_record      → gds                       r = 0.946
+# A confirmation for any of these says nothing about which member to ship. Take
+# that decision from the redundancy map in the feature catalog, or from a
+# head-to-head on held-out Brier — never from this artifact.
+#
+# What it IS good for: a group with no confirmed member anywhere in this pool
+# has no case for being enabled. That is how record, sos, streak,
+# last_season_record and neutral_court were retired with evidence, and how
+# playoff_standings — uncoupled, and confirmed — earned its place.
+#
+# Not a candidate for promotion. Read the artifact at
+# outputs/feature_audit/feature_selection/, not the test metrics: this trains
+# one untuned xgboost on ~90 partly-collinear features and is expected to score
+# worse than xgboost.yaml.
+#
+# Delta settings are inherited, deliberately. The question is what happens when
+# you flip `enabled` on the config as it actually stands — so `sos` is measured
+# as the raw HT/VT pair its `delta: false` produces, not as a delta it does not.
+
+_include:
+  - "../features.yaml"
+  - "_defaults.yaml"
+
+description: "Diagnostic: every feature group enabled, for Boruta-SHAP coverage"
+tags:
+  variation: "feature_audit"
+
+feature_engineering:
+  features:
+    record:
+      enabled: true
+    point_differential:
+      # Lag lists must match norm_point_differential's, or the comparison is
+      # rigged: the first audit pass gave raw an L82 window that normalized did
+      # not have, and raw L82 duly came out the strongest feature in the pool.
+      # Matching them showed the two were tied — because they are the same
+      # column in different units. _defaults.yaml now carries the full list on
+      # norm_point_differential, so this inherits it and needs no override.
+      enabled: true
+    sos:
+      enabled: true
+    gds:
+      # Windows from the disabled block in _defaults.yaml. Restated here because
+      # that block is now commented out rather than live.
+      lags: [55, 82]
+      location_lags: []
+      enabled: true
+    streak:
+      enabled: true
+    last_season_record:
+      enabled: true
+    neutral_court:
+      enabled: true
+    # eliminated_from_playoffs and clinched_final_seed have never been through
+    # Boruta before: they existed in games_features.csv but no group named them
+    # until the playoff_standings split, so inclusion mode dropped them every
+    # run. This is their first pass.
+    games_behind_leader:
+      delta: false
+      enabled: false
+    games_behind_above:
+      delta: false
+      enabled: false
+    games_ahead_of_below:
+      delta: false
+      enabled: false
+    clinched_playoff_berth:
+      delta: false
+      enabled: true
+    eliminated_from_playoffs:
+      delta: false
+      enabled: true
+    clinched_final_seed:
+      delta: false
+      enabled: true
+
+model:
+  train_models:
+    - random_forest
+    - gradient_boosting
+    - xgboost
+    - neural_network
+  xgboost:
+    hyperparameter_tuning:
+      # The selection artifact is the deliverable; a 20x5 search on a feature
+      # set this run exists to discard is time spent on nothing.
+      enabled: true
+
+paths:
+  outputs: "outputs/feature_audit"
+
+mlflow:
+  experiment_name: "nba_bets_feature_audit"

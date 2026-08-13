@@ -102,35 +102,140 @@ feature_engineering:
   # Delta for every group lives here — including the disabled ones — so
   # create_delta_features and resolve_feature_columns stay consistent the moment
   # an experiment flips `enabled`.
+  #
+  # ── The redundancy rule ────────────────────────────────────────────────────
+  # Several groups here are computed from each other: sos_adj_record from
+  # `record` and `sos`, gds from sos_adj_record, adjusted_last_season_record
+  # from last_season_record and `sos`, and the two point-differential families
+  # from one shared pts_diff column. Where one group is derived from another,
+  # OR the two measure r > 0.95 on the training rows, exactly one of them is
+  # enabled and the comment at the disabled one names the winner and why.
+  #
+  # Do not resolve such a pair with Boruta-SHAP. Two features at r ≈ 1 split the
+  # SHAP credit between them and each still beats its shadow, so *both* get
+  # confirmed — which reads as "two independent signals" and is nothing of the
+  # kind. That misreading enabled point_differential beside
+  # norm_point_differential (r = 0.998) and gds beside its own parent
+  # sos_adj_record on 2026-08-12, and cost 0.66pp of test accuracy. Boruta
+  # confirms a feature beats noise; only mechanism and held-out metrics can say
+  # whether it beats its own correlate.
+  #
+  # The full graph, the measured correlations, and the designated member of each
+  # cluster are in the redundancy map:
+  # .claude/skills/data-analyst/references/feature-catalog.md
+  # tests/test_config_loading.py::test_no_coupled_pairs_co_enabled enforces it.
   features:
     record:
+      # COUPLED — superseded by sos_adj_record, the training-facing member.
+      # sos_adj_record_L{lag} = record_L{lag} * (sos_L{lag}/league_avg)^alpha
+      # (src/etl/features/sos_adjusted_record.py), so this is literally the
+      # unadjusted input to a feature that is already enabled. Measured
+      # r = 0.95 at the long lags.
+      #
+      # Also measured on its own terms: with both families present, all
+      # thirteen record_* columns were rejected at 0/20 hits, best importance
+      # 0.008 — an order of magnitude under the confirmed features. The
+      # adjustment is the point; the raw record adds nothing beside it.
       delta: true
       enabled: false
     point_differential:
+      # COUPLED — superseded by norm_point_differential, which is the
+      # training-facing member of this pair. See the redundancy map in
+      # .claude/skills/data-analyst/references/feature-catalog.md.
+      #
+      # norm_pts_diff = pts_diff / season_avg_total_pts, and that divisor is an
+      # expanding within-season mean that is near-constant after the season's
+      # first weeks. So the two families are an affine transform of each other
+      # *within* a season: measured Pearson r = 0.998 at every one of the
+      # thirteen lags, on all 49,175 training rows. The only information
+      # difference is between-season rescaling — which is the whole point of
+      # normalizing, and the reason norm wins the pair across a 46-season
+      # history where scoring pace ranges from the 1980s to now.
+      #
+      # This group was briefly enabled on 2026-08-12 because Boruta-SHAP
+      # confirmed raw L13/L34/L82 alongside their normalized twins. That was a
+      # misreading: at r = 0.998 two features split the SHAP credit and each
+      # still beats a shadow, so confirmation of both is the expected artifact,
+      # not evidence of independent signal. Test accuracy fell 66.44% -> 65.78%
+      # with them in. Boruta confirms a feature beats noise; it does not
+      # confirm a feature beats its own correlate.
       delta: true
       enabled: false
     norm_point_differential:
-      # ETL builds L82 (see features.yaml); the model stops at L55. One genuine
-      # override, not a copy of the ETL list.
-      lags: [1, 3, 5, 8, 13, 21, 34, 55]
+      # The training-facing member of the point-differential pair — era-neutral,
+      # which matters when training spans 1980/81 to now.
+      #
+      # ETL builds L82 (see features.yaml) and so does the model now. The cap at
+      # L55 was undocumented beyond "the model stops at L55", with no
+      # measurement behind it, and it was excluding a genuinely strong window:
+      # norm_pts_diff_avg_L82_delta is confirmed at 20/20 hits, importance
+      # 0.111-0.120. Unlike the raw group above, this is a lag inside an
+      # already-enabled group, so no redundancy question arises.
+      lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       delta: true
       enabled: true
 
     sos:
+      # COUPLED — the other input to sos_adj_record, the training-facing
+      # member. sos is the multiplier in
+      # record * (sos/league_avg)^alpha, so enabling both hands the model a
+      # product and one of its own factors. Also feeds
+      # adjusted_last_season_record via each team's end-of-season sos_L82.
+      #
+      # Measured: all eighteen columns rejected, best 0.015 at 5/20 hits.
+      # Schedule strength on its own says nothing about a team — only about its
+      # opponents. `delta: false` because the raw HT/VT pair is what this group
+      # would ship if it were ever enabled.
       delta: false
       enabled: false
     sos_adj_record:
+      # The training-facing member of the record / sos / gds cluster: record
+      # scaled by the difficulty that produced it. Three other groups are
+      # disabled in its favour — `record` and `sos` are its own inputs, `gds` is
+      # computed from it. See the redundancy map in the feature catalog.
+      #
       # location_lags only — the plain rolling variants lost to the at-location
       # ones. Declare `lags:` in a leaf config to bring them back.
       delta: true
       enabled: true
     gds:
+      # Game Difficulty Score: quality of the opponent you beat (or lost to),
+      # signed by result and nudged by venue.
+      #
+      # COUPLED — computed *from* sos_adj_record, which is the training-facing
+      # member. src/etl/features/game_difficulty_score.py::_add_opponent_quality
+      # takes opponent quality Q from _find_largest_sos_adj_col(), i.e.
+      # sos_adj_record_L82, falling back to cumulative win% (the `record`
+      # quantity) and then to the prior-season record. Every one of its inputs
+      # is a group disabled above. Measured r = 0.946 against sos_adj_record and
+      # 0.967 against record_L82.
+      #
+      # This is NOT a "no signal" disablement, and re-enabling it should not be
+      # dismissed out of hand. Twenty-four gds_* columns were computed on every
+      # ETL run and had never been through feature selection once. When they
+      # were, gds_L82_delta confirmed at 20/20 hits with importance 0.083-0.097
+      # — fifth of forty — and gds_L55_delta at 17/20. But it displaced its own
+      # parent when enabled beside it: sos_adj_record_L41_at_location went
+      # confirmed -> rejected and L20 confirmed -> tentative in the same run.
+      # That is substitution between coupled features, not two independent
+      # signals, and the pair was resolved in favour of the parent.
+      #
+      # If you revisit this, the experiment is gds-instead-of-sos_adj_record on
+      # held-out Brier, not gds-alongside-it. These are the windows to use:
+      #   lags: [55, 82]
+      #   location_lags: []
       delta: true
       enabled: false
     distance:
       delta: true
       enabled: true
     rested_days:
+      # Weakly coupled to back_to_back below — same calendar grid, and
+      # back_to_back > 0 implies rested_days == 0. Measured r = -0.53, under the
+      # 0.95 threshold, so both stay enabled and Boruta picks. It picks
+      # back_to_back: rested_days is rejected in every run examined. That is a
+      # redundancy resolving itself, which is what selection is for when the two
+      # features are not near-duplicates.
       delta: true
       enabled: true
     back_to_back:
@@ -138,12 +243,29 @@ feature_engineering:
       delta: true
       enabled: true
     streak:
+      # Rejected at 0/20 hits, importance 0.007. A streak is a coarse recoding
+      # of information the short point-differential windows already carry with
+      # margin attached — related to `record` in spirit but not derived from it,
+      # so this is a measured rejection, not a coupling disablement.
+      # llm_features.yaml enables it: a win streak is a thing sportswriters say,
+      # and that config selects for prose legibility.
       delta: true
       enabled: false
     last_season_record:
+      # COUPLED — superseded by adjusted_last_season_record, the training-facing
+      # member. Same builder chain (_team_season_win_pct -> _prior_season_lookup)
+      # with _apply_sos_to_season_record inserted in between, so the adjusted
+      # column is this one times a season SOS ratio. Measured r = 0.9985, the
+      # tightest pair in the pipeline after raw/normalized point differential.
+      #
+      # Measured on its own terms too: both columns rejected (best 0.014 at
+      # 4/20), while the adjusted at-location variant is the fourth strongest
+      # feature in the pool at 0.094-0.109.
       delta: true
       enabled: false
     adjusted_last_season_record:
+      # The training-facing member of the last-season pair. Also a consumer of
+      # `sos` (end-of-season sos_L82), which is disabled above.
       delta: true
       enabled: true
     home_and_road:
@@ -157,7 +279,63 @@ feature_engineering:
     indifference_flag:
       delta: true
       enabled: true
+    # The six groups below were one bundled "playoff_standings" group until
+    # 2026-08-12 (what compute_playoff_flags emits alongside indifference_flag
+    # and the conf_rank precursor, which lives in
+    # src/config/constants.py::INTERMEDIATE_COLUMNS instead of any group).
+    # Bundling meant enabled/delta could only be set for all of them at once.
+    # Exploding them lets each be independently enabled and independently
+    # re-tested.
+    #
+    # All six pass the redundancy rule, which is why this cluster survived the
+    # 2026-08-12 revert while gds and point_differential did not.
+    # compute_playoff_flags recomputes wins/losses from win_bool itself rather
+    # than reading the `record` tables, so there is no derivation edge to an
+    # enabled group. It is league-relative where `record` is absolute: two
+    # teams on 30-20 sit in different playoff positions depending on their
+    # conference. Measured against record_L82 (as the bundled group):
+    # games_behind_leader r = -0.80 — under the 0.95 threshold, and `record` is
+    # disabled anyway.
+    games_behind_leader:
+      # Confirmed at 20/20 hits in both audit passes (importance 0.029) — how
+      # far off the conference lead a team is says something neither win
+      # percentage nor point differential does.
+      delta: false
+      enabled: false
+    games_behind_above:
+      # Rejected at 0 hits inside the old bundled group. Re-tested here as its
+      # own group rather than dropped, since the bundle may have hidden signal
+      # behind games_behind_leader's SHAP credit.
+      delta: false
+      enabled: false
+    games_ahead_of_below:
+      # Rejected at 0 hits inside the old bundled group.
+      delta: false
+      enabled: false
+    clinched_playoff_berth:
+      # Rejected at 0 hits inside the old bundled group.
+      delta: false
+      enabled: true
+    eliminated_from_playoffs:
+      # Never reachable before this split: compute_playoff_flags always wrote
+      # it (games_features.csv has had eliminated_from_playoffs_HT/VT all
+      # along), but with no group naming it, inclusion mode dropped it every
+      # run. Untested, not rejected — feature_audit.yaml enables it to get its
+      # first Boruta pass.
+      delta: false
+      enabled: true
+    clinched_final_seed:
+      # Same story as eliminated_from_playoffs — computed every run, never
+      # reachable, untested until feature_audit.yaml enables it.
+      delta: true
+      enabled: true
     neutral_court:
+      # Measured and rejected: importance 0.00000, 0 hits, both audit passes.
+      # 347 of 51,399 post-1980/81 games are neutral-court — 0.68% — so a tree
+      # split on it buys almost nothing, and the games that are neutral are
+      # already described by the distance and rest features that made them
+      # unusual. Kept as a column: `is_neutral_court_game` drives a per-segment
+      # accuracy table in src/ml/evaluation/analysis.py.
       delta: false
       enabled: false
 

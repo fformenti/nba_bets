@@ -123,6 +123,24 @@ class FeaturesMapConfig(BaseModel):
     indifference_flag: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
     )
+    games_behind_leader: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    games_behind_above: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    games_ahead_of_below: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    clinched_playoff_berth: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    eliminated_from_playoffs: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
+    clinched_final_seed: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(enabled=False)
+    )
     neutral_court: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
     )

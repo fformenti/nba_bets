@@ -79,8 +79,8 @@ INTERMEDIATE_COLUMNS = [
     "total_losses_VT_on_road",
     "games_played_HT_at_home",
     "games_played_VT_on_road",
-    # "conf_rank_HT",
-    # "conf_rank_VT",
+    "conf_rank_HT",
+    "conf_rank_VT",
 ]
 
 DEFAULT_METADATA_COLUMNS = [
@@ -106,6 +106,15 @@ DEFAULT_METADATA_COLUMNS = [
     "overtimes",
     "postponed",
     "is_neutral_court_game",
+    # Not identity or plotting columns like the rest: sample weighting reads
+    # these two off the metadata frame (src/ml/training/weighting.py ramps a
+    # row's weight over each team's first saturation_K games).
+    # configs/train/_defaults.yaml has always listed them; this default did not,
+    # so a config that declined to override metadata_columns would take a
+    # KeyError in compute_sample_weights. Every shipped config includes
+    # _defaults.yaml, so nothing hit it — keep the two lists in agreement.
+    "games_played_HT",
+    "games_played_VT",
 ]
 
 

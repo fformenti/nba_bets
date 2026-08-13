@@ -26,6 +26,7 @@ configs/
 ├── train/
 │   ├── _defaults.yaml                  # Shared base: splits, filters, model hyperparameters, ML feature set
 │   ├── all_models.yaml                 # Overrides: sweep all four sklearn model families
+│   ├── feature_audit.yaml              # Diagnostic: every feature group on, for Boruta-SHAP coverage
 │   ├── llm_features.yaml               # Overrides: LLM feature set (adds win % and streak)
 │   └── xgboost.yaml                    # The deployed model: all games, xgboost
 ├── train_llm/

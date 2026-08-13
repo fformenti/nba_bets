@@ -37,7 +37,7 @@ from src.ml.evaluation.visualization import (
 from src.ml.features.selection import run_feature_selection
 from src.ml.features.engineering import identify_feature_types
 from src.ml.features.preprocessing import create_preprocessing_pipeline
-from src.ml.models.baseline import RecordDifferenceBaseline
+from src.ml.models.baseline import PointDifferentialBaseline, RecordDifferenceBaseline
 from src.ml.models.registry import ModelRegistry
 from src.utils.logging_config import get_logger
 
@@ -390,23 +390,29 @@ def train_single_model(
             tracker.set_tags({"model_type": "baseline"})
 
     # ====== Point Differential Baseline ======
-    #! TODO: Make this feature available even when it's not passed to train config
-    # logger.info(f"\n{'=' * 60}")
-    # logger.info("Point Differential Baseline")
-    # logger.info(f"{'=' * 60}")
+    # This was commented out behind "TODO: make this feature available even when
+    # it's not passed to train config". splits.py already solves that: it builds
+    # pts_diff_avg_L82_delta onto X_test_baseline from the untouched feature
+    # frame, so the column is there whether or not the experiment config enables
+    # the point_differential group. The commented body also called an older API
+    # (baseline_trainer, baseline_test_metrics) that no longer exists; this
+    # mirrors the record baseline above instead.
+    logger.info(f"\n{'=' * 60}")
+    logger.info("Point Differential Baseline")
+    logger.info(f"{'=' * 60}")
 
-    # baseline_model = PointDifferentialBaseline(feature_column="pts_diff_avg_L82_delta")
+    baseline_model = PointDifferentialBaseline(feature_column="pts_diff_avg_L82_delta")
+    models_to_train[baseline_model.name] = train_baseline_model(
+        baseline_model,
+        X_test_baseline,
+        y_test_baseline,
+    )
 
-    # models_to_train[baseline_model.name] = {
-    #     "pipeline": baseline_model,
-    #     "trainer": baseline_trainer,
-    #     "training_results": {},
-    #     "test_metrics": baseline_test_metrics,
-    # }
-
-    # with tracker.child_run(baseline_model.name):
-    #     tracker.log_metrics(baseline_test_metrics)
-    #     tracker.set_tags({"model_type": "baseline"})
+    if baseline_model.name in models_to_train and models_to_train[baseline_model.name]:
+        baseline_metrics = models_to_train[baseline_model.name].get("test_metrics", {})
+        with tracker.child_run(baseline_model.name):
+            tracker.log_metrics(baseline_metrics)
+            tracker.set_tags({"model_type": "baseline"})
 
     # dict.fromkeys dedups while preserving order: a name listed in both the
     # seeded baselines and config.model.train_models would otherwise be trained

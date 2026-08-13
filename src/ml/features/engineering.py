@@ -33,6 +33,21 @@ FEATURE_GROUP_PREFIXES = {
     "last_season_record": lambda _: ["last_season_record"],
     "adjusted_last_season_record": lambda _: ["adjusted_last_season_record"],
     "indifference_flag": lambda _: ["indifference_flag"],
+    # compute_playoff_flags emits eight columns per team; indifference_flag has
+    # its own group above (it is the OR of eliminated_from_playoffs and
+    # clinched_final_seed, computed inside compute_playoff_flags before either
+    # source column is exposed here). conf_rank is a pure precursor to the
+    # games-behind/-ahead formulas and the clinch logic, never a training
+    # candidate, so it is not a group at all — it lives in
+    # src/config/constants.py::INTERMEDIATE_COLUMNS instead. The six below were
+    # a single "playoff_standings" group until 2026-08-12; splitting them lets
+    # each be enabled/tested independently rather than as a block.
+    "games_behind_leader": lambda _: ["games_behind_leader"],
+    "games_behind_above": lambda _: ["games_behind_above"],
+    "games_ahead_of_below": lambda _: ["games_ahead_of_below"],
+    "clinched_playoff_berth": lambda _: ["clinched_playoff_berth"],
+    "eliminated_from_playoffs": lambda _: ["eliminated_from_playoffs"],
+    "clinched_final_seed": lambda _: ["clinched_final_seed"],
 }
 
 # Groups that have HT_at_home / VT_on_road location variants
@@ -45,6 +60,17 @@ LOCATION_VARIANT_GROUPS = {
     "sos_adj_record",
     "gds",
 }
+
+
+def _numeric(series: pd.Series) -> pd.Series:
+    """Cast a boolean column to int so ``home - away`` is defined.
+
+    ``clinched_playoff_berth`` and friends are written as booleans by the
+    aggregator and read back as booleans from the CSV; numpy refuses ``-`` on
+    bool, so the delta for those columns would raise rather than produce the
+    -1/0/1 that "one team has clinched and the other hasn't" should be.
+    """
+    return series.astype(int) if series.dtype == bool else series
 
 
 def create_delta_features(
@@ -101,10 +127,11 @@ def create_delta_features(
                 if home_col not in df.columns or away_col not in df.columns:
                     logger.debug(f"Skipping delta for {prefix}: columns not found")
                     continue
+                home, away = _numeric(df[home_col]), _numeric(df[away_col])
                 if prefix != "indifference_flag":
-                    df[f"{prefix}_delta"] = df[home_col] - df[away_col]
+                    df[f"{prefix}_delta"] = home - away
                 else:
-                    df[f"{prefix}_delta"] = df[away_col] - df[home_col]
+                    df[f"{prefix}_delta"] = away - home
                 created_features.append(f"{prefix}_delta")
                 columns_to_drop.extend([home_col, away_col])
 

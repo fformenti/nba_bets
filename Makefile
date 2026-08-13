@@ -10,7 +10,7 @@
         historical-etl full-rebuild predict-upcoming-games \
         process-results-pipeline daily-cycle
 
-TRAIN_CONFIG      ?= xgboost
+TRAIN_CONFIG      ?= all_models
 PREDICTION_CONFIG ?= predict_classifier
 LLM_CONFIG        ?= llama31_8b_qlora
 LLM_RUN           ?=
