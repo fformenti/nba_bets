@@ -23,7 +23,7 @@
 # What it IS good for: a group with no confirmed member anywhere in this pool
 # has no case for being enabled. That is how record, sos, streak,
 # last_season_record and neutral_court were retired with evidence, and how
-# playoff_standings — uncoupled, and confirmed — earned its place.
+# games_behind_leader — uncoupled, and confirmed — earned its place.
 #
 # Not a candidate for promotion. Read the artifact at
 # outputs/feature_audit/feature_selection/, not the test metrics: this trains
@@ -68,10 +68,10 @@ feature_engineering:
       enabled: true
     neutral_court:
       enabled: true
-    # eliminated_from_playoffs and clinched_final_seed have never been through
-    # Boruta before: they existed in games_features.csv but no group named them
-    # until the playoff_standings split, so inclusion mode dropped them every
-    # run. This is their first pass.
+    # winning_incentive gets its first Boruta pass here. The three clinch
+    # booleans it replaces were each offered raw in run 7de4ab20 and all six
+    # HT/VT columns were rejected; this run asks whether the collapsed ordinal
+    # does better than its parts.
     games_behind_leader:
       delta: false
       enabled: false
@@ -81,14 +81,8 @@ feature_engineering:
     games_ahead_of_below:
       delta: false
       enabled: false
-    clinched_playoff_berth:
-      delta: false
-      enabled: true
-    eliminated_from_playoffs:
-      delta: false
-      enabled: true
-    clinched_final_seed:
-      delta: false
+    winning_incentive:
+      delta: true
       enabled: true
 
 model:

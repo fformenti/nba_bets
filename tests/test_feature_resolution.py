@@ -11,7 +11,9 @@ from src.ml.config.schema import (
 )
 from src.ml.features.engineering import (
     CONFERENCE_FEATURES,
+    WINNING_INCENTIVE_VALUES,
     create_delta_features,
+    create_winning_incentive_features,
     resolve_feature_columns,
 )
 from src.config.paths import CONFIGS_TRAIN_DIR, TRAIN_DEFAULTS_CONFIG_PATH
@@ -240,6 +242,148 @@ class TestCreateDeltaResilience:
         assert "sos_adj_record_L13_delta" in result.columns
         assert "sos_adj_record_L10_at_location_delta" in result.columns
         assert list(result["sos_adj_record_L10_at_location_delta"]) == pytest.approx([0.4, -0.05])
+
+
+# ── winning_incentive ────────────────────────────────────────────────────────
+
+
+def _clinch_frame(rows: list[tuple[int, int, int]], suffix: str) -> pd.DataFrame:
+    """One frame per side, from (eliminated, clinched_berth, clinched_seed) rows."""
+    names = ("eliminated_from_playoffs", "clinched_playoff_berth", "clinched_final_seed")
+    return pd.DataFrame(
+        {
+            f"{name}_{suffix}": [bool(row[i]) for row in rows]
+            for i, name in enumerate(names)
+        }
+    )
+
+
+class TestWinningIncentive:
+    """The three clinch booleans are one ordinal spelled across three columns.
+
+    Only four of the eight combinations are producible — compute_playoff_flags
+    evaluates clinched_final_seed only when clinched_playoff_berth is true, and
+    an eliminated team has clinched neither — so the mapping is exhaustive by
+    construction and anything else is a broken builder, not a new case.
+    """
+
+    REACHABLE = [
+        ((0, 0, 0), "fighting", 1),
+        ((1, 0, 0), "eliminated", -1),
+        ((0, 1, 0), "fighting for seed", 1),
+        ((0, 1, 1), "resting for playoffs", 0),
+    ]
+
+    @pytest.mark.parametrize("suffix", ["HT", "VT"])
+    def test_every_reachable_combination_maps(self, suffix):
+        combos = [combo for combo, _, _ in self.REACHABLE]
+        result = create_winning_incentive_features(_clinch_frame(combos, suffix))
+        assert list(result[f"winning_incentive_label_{suffix}"]) == [
+            label for _, label, _ in self.REACHABLE
+        ]
+        assert list(result[f"winning_incentive_{suffix}"]) == [
+            value for _, _, value in self.REACHABLE
+        ]
+
+    def test_the_two_fighting_states_share_a_value(self):
+        """Deliberate, not an oversight: both mean the starters are playing."""
+        assert (
+            WINNING_INCENTIVE_VALUES["fighting"]
+            == WINNING_INCENTIVE_VALUES["fighting for seed"]
+        )
+
+    def test_unreachable_combination_raises(self):
+        """Eliminated *and* clinched cannot both be true. Never default silently."""
+        df = _clinch_frame([(1, 1, 0)], "HT")
+        with pytest.raises(ValueError, match="Unreachable playoff-flag combination"):
+            create_winning_incentive_features(df)
+
+    def test_source_columns_are_dropped(self):
+        """They stopped being feature groups, so nothing downstream drops them."""
+        df = _clinch_frame([(0, 0, 0)], "HT")
+        result = create_winning_incentive_features(df)
+        assert not [c for c in result.columns if c.startswith("clinched_")]
+        assert "eliminated_from_playoffs_HT" not in result.columns
+
+    def test_missing_source_columns_pass_through(self):
+        """A prediction frame built without the playoff table must not crash."""
+        df = pd.DataFrame({"record_L10_HT": [0.5]})
+        result = create_winning_incentive_features(df)
+        assert list(result.columns) == ["record_L10_HT"]
+
+    def test_delta_reads_home_minus_away(self):
+        """Not inverted: more incentive is better for the team holding it."""
+        df = pd.concat(
+            [_clinch_frame([(0, 1, 1)], "HT"), _clinch_frame([(0, 0, 0)], "VT")],
+            axis=1,
+        )
+        df = create_winning_incentive_features(df)
+        cfg = _all_disabled(winning_incentive=FeatureGroupConfig(enabled=True, delta=True))
+        result = create_delta_features(df, cfg)
+        # Home team is resting (0), visitor is still fighting (1) → 0 - 1.
+        assert list(result["winning_incentive_delta"]) == [-1]
+        assert "winning_incentive_HT" not in result.columns
+
+    def test_label_columns_survive_delta_creation(self):
+        """The labels are for EDA; no group names them, so nothing drops them."""
+        df = pd.concat(
+            [_clinch_frame([(1, 0, 0)], "HT"), _clinch_frame([(0, 0, 0)], "VT")],
+            axis=1,
+        )
+        df = create_winning_incentive_features(df)
+        cfg = _all_disabled(winning_incentive=FeatureGroupConfig(enabled=True, delta=True))
+        result = create_delta_features(df, cfg)
+        assert result["winning_incentive_label_HT"].tolist() == ["eliminated"]
+        assert result["winning_incentive_label_VT"].tolist() == ["fighting"]
+
+    def test_labels_are_not_resolved_as_features(self):
+        cfg = _all_disabled(winning_incentive=FeatureGroupConfig(enabled=True, delta=True))
+        assert _without_conference(cfg) == ["winning_incentive_delta"]
+
+
+# ── delta orientation ────────────────────────────────────────────────────────
+
+
+class TestDeltaOrientation:
+    """Every delta is signed so that a positive value favours the home team.
+
+    For most groups that is HT - VT, because more of the quantity is better.
+    For the groups in INVERTED_DELTA_GROUPS the quantity is lower-is-better —
+    travelling farther and playing more back-to-backs both hurt — so the
+    operands swap and the sign still points the same way.
+
+    This is what src/ml/llm/serialization.py::SYSTEM_PROMPT tells the model
+    ("Positive values favour the home team") and what a SHAP sign is read
+    against, so it is worth pinning rather than leaving to a code comment.
+    """
+
+    def test_higher_is_better_group_reads_home_minus_away(self):
+        cfg = _all_disabled(
+            rested_days=FeatureGroupConfig(enabled=True, delta=True),
+        )
+        df = pd.DataFrame({"rested_days_HT": [3.0, 1.0], "rested_days_VT": [1.0, 3.0]})
+        result = create_delta_features(df, cfg)
+        # Home rested 3 days to the visitor's 1 → home is better off → positive.
+        assert list(result["rested_days_delta"]) == pytest.approx([2.0, -2.0])
+
+    def test_distance_reads_away_minus_home(self):
+        cfg = _all_disabled(
+            distance=FeatureGroupConfig(enabled=True, lags=[1], delta=True),
+        )
+        df = pd.DataFrame({"distance_L1_HT": [0.0, 900.0], "distance_L1_VT": [900.0, 0.0]})
+        result = create_delta_features(df, cfg)
+        # Visitor flew 900 miles, home team did not travel → favours home →
+        # positive. The naive HT - VT would call that -900.
+        assert list(result["distance_L1_delta"]) == pytest.approx([900.0, -900.0])
+
+    def test_back_to_back_reads_away_minus_home(self):
+        cfg = _all_disabled(
+            back_to_back=FeatureGroupConfig(enabled=True, delta=True),
+        )
+        df = pd.DataFrame({"back_to_back_HT": [0, 2], "back_to_back_VT": [1, 0]})
+        result = create_delta_features(df, cfg)
+        # Visitor on a back-to-back, home team rested → favours home → positive.
+        assert list(result["back_to_back_delta"]) == pytest.approx([1.0, -2.0])
 
 
 # ── selection_mode default ───────────────────────────────────────────────────

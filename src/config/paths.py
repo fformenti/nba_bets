@@ -102,6 +102,11 @@ MANUAL_RESULTS_DIR = RAW_INCREMENTAL_DIR / "manual_results"
 # raw historical archive into it (the archive wins any gameId both hold);
 # `make append-game-results` adds the results inbox to it.
 INGESTED_GAMES_UPDATED_HISTORY_PATH = INGESTED_DIR / "games_updated_history.csv"
+# Polymarket's price per game at tip-off. Ingested rather than processed for the
+# same reason as the file above: nothing in this repo derives it. It is an
+# external observation that can only be re-fetched, never recomputed. Built by
+# `make build-polymarket-odds`; the benchmark the model is measured against.
+INGESTED_POLYMARKET_ODDS_PATH = INGESTED_DIR / "polymarket_game_odds.csv"
 
 # ===== Processed =====
 TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH = (
@@ -171,6 +176,7 @@ GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 ENRICHED_GAMES_VIZ_DIR = OUTPUTS_DIR / "enriched_games" / "viz"
 HOME_WIN_RATIO_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_by_season.png"
+HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_line_by_season.png"
 
 # LLM fine-tuning: checkpoints, downloaded resume snapshots and eval charts
 LLM_OUTPUTS_DIR = OUTPUTS_DIR / "llm"

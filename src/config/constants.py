@@ -81,6 +81,11 @@ INTERMEDIATE_COLUMNS = [
     "games_played_VT_on_road",
     "conf_rank_HT",
     "conf_rank_VT",
+    # Written by engineering.py::create_winning_incentive_features for EDA and
+    # plotting, alongside the numeric winning_incentive pair. They are strings,
+    # so exclusion mode handing them to a model is a crash, not a bad feature.
+    "winning_incentive_label_HT",
+    "winning_incentive_label_VT",
 ]
 
 DEFAULT_METADATA_COLUMNS = [

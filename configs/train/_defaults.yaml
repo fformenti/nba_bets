@@ -20,9 +20,9 @@ data:
   drop_na: true
 
 filters:
-  min_season: "1980/81"
+  min_season: "1996/97"
   minimum_games_train: 15
-  minimum_games_test: 5
+  minimum_games_test: 15
 
 weighting:
   # Within-season ramp only. There is deliberately no cross-season decay knob:
@@ -64,7 +64,7 @@ splitting:
   # calibration choice flipped between them on a ±0.0003 Brier margin. Two
   # seasons (1,965 rows) buys a steadier decision for 2.6% of the training rows.
   test_start_season: "2024/25"
-  val_seasons: 2
+  val_seasons: 3
   test_size: 0.2
   val_size: 0.2
   random_state: 42
@@ -102,6 +102,26 @@ feature_engineering:
   # Delta for every group lives here — including the disabled ones — so
   # create_delta_features and resolve_feature_columns stay consistent the moment
   # an experiment flips `enabled`.
+  #
+  # ── Two rules about `delta` ────────────────────────────────────────────────
+  # 1. Every group states `delta` explicitly. The schema default is `true`
+  #    (src/ml/config/schema.py::FeatureGroupConfig), so an omitted key does NOT
+  #    mean "no delta" — it means the opposite. Nothing here may rely on that.
+  #    tests/test_config_loading.py::test_every_feature_group_declares_delta_explicitly
+  #    enforces it against the raw YAML.
+  #    `delta: true`  → the group ships one `{prefix}_delta` per lag (plus
+  #                     `{prefix}_at_location_delta` for location-variant groups),
+  #                     and the raw `_HT`/`_VT` sources are dropped.
+  #    `delta: false` → the group ships the raw `_HT`/`_VT` pair instead.
+  #    Never both — see resolve_feature_columns.
+  #
+  # 2. A delta is oriented so that a POSITIVE value favours the home team. For
+  #    higher-is-better quantities that is `HT - VT`; for lower-is-better ones
+  #    (distance travelled, back-to-backs) the operands swap to `VT - HT`. Those
+  #    groups are named in engineering.py::INVERTED_DELTA_GROUPS. The convention
+  #    is not cosmetic: src/ml/llm/serialization.py::SYSTEM_PROMPT tells the
+  #    model "Positive values favour the home team", and a SHAP sign is read
+  #    against it.
   #
   # ── The redundancy rule ────────────────────────────────────────────────────
   # Several groups here are computed from each other: sos_adj_record from
@@ -164,28 +184,17 @@ feature_engineering:
     norm_point_differential:
       # The training-facing member of the point-differential pair — era-neutral,
       # which matters when training spans 1980/81 to now.
-      #
-      # ETL builds L82 (see features.yaml) and so does the model now. The cap at
-      # L55 was undocumented beyond "the model stops at L55", with no
-      # measurement behind it, and it was excluding a genuinely strong window:
-      # norm_pts_diff_avg_L82_delta is confirmed at 20/20 hits, importance
-      # 0.111-0.120. Unlike the raw group above, this is a lag inside an
-      # already-enabled group, so no redundancy question arises.
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       delta: true
       enabled: true
 
     sos:
+      # It's a precursor column should not be used for training
       # COUPLED — the other input to sos_adj_record, the training-facing
       # member. sos is the multiplier in
       # record * (sos/league_avg)^alpha, so enabling both hands the model a
       # product and one of its own factors. Also feeds
       # adjusted_last_season_record via each team's end-of-season sos_L82.
-      #
-      # Measured: all eighteen columns rejected, best 0.015 at 5/20 hits.
-      # Schedule strength on its own says nothing about a team — only about its
-      # opponents. `delta: false` because the raw HT/VT pair is what this group
-      # would ship if it were ever enabled.
       delta: false
       enabled: false
     sos_adj_record:
@@ -199,69 +208,38 @@ feature_engineering:
       delta: true
       enabled: true
     gds:
+      # It's a precursor column should not be used for training.
       # Game Difficulty Score: quality of the opponent you beat (or lost to),
       # signed by result and nudged by venue.
-      #
-      # COUPLED — computed *from* sos_adj_record, which is the training-facing
-      # member. src/etl/features/game_difficulty_score.py::_add_opponent_quality
-      # takes opponent quality Q from _find_largest_sos_adj_col(), i.e.
-      # sos_adj_record_L82, falling back to cumulative win% (the `record`
-      # quantity) and then to the prior-season record. Every one of its inputs
-      # is a group disabled above. Measured r = 0.946 against sos_adj_record and
-      # 0.967 against record_L82.
-      #
-      # This is NOT a "no signal" disablement, and re-enabling it should not be
-      # dismissed out of hand. Twenty-four gds_* columns were computed on every
-      # ETL run and had never been through feature selection once. When they
-      # were, gds_L82_delta confirmed at 20/20 hits with importance 0.083-0.097
-      # — fifth of forty — and gds_L55_delta at 17/20. But it displaced its own
-      # parent when enabled beside it: sos_adj_record_L41_at_location went
-      # confirmed -> rejected and L20 confirmed -> tentative in the same run.
-      # That is substitution between coupled features, not two independent
-      # signals, and the pair was resolved in favour of the parent.
-      #
-      # If you revisit this, the experiment is gds-instead-of-sos_adj_record on
-      # held-out Brier, not gds-alongside-it. These are the windows to use:
-      #   lags: [55, 82]
-      #   location_lags: []
       delta: true
       enabled: false
     distance:
+      # How far the home team (HT) and visitor (VT) traveled to the game.
+      lags: [1, 3, 7, 14]
       delta: true
+        # delta = distance_VT - distance_HT (negative = home team traveled farther)
       enabled: true
     rested_days:
-      # Weakly coupled to back_to_back below — same calendar grid, and
-      # back_to_back > 0 implies rested_days == 0. Measured r = -0.53, under the
-      # 0.95 threshold, so both stay enabled and Boruta picks. It picks
-      # back_to_back: rested_days is rejected in every run examined. That is a
-      # redundancy resolving itself, which is what selection is for when the two
-      # features are not near-duplicates.
+      # How many days since the last game for the home team (HT) and visitor (VT)
       delta: true
+        # delta = rested_days_HT - rested_days_VT (negative = home team more fatigued)
       enabled: true
     back_to_back:
-      # delta = back_to_back_HT - back_to_back_VT (negative = home team more fatigued)
+      # Consecutive games for the home team (HT) and visitor (VT)
       delta: true
+        # delta = back_to_back_VT - back_to_back_HT (negative = home team more fatigued)
       enabled: true
     streak:
-      # Rejected at 0/20 hits, importance 0.007. A streak is a coarse recoding
-      # of information the short point-differential windows already carry with
-      # margin attached — related to `record` in spirit but not derived from it,
-      # so this is a measured rejection, not a coupling disablement.
-      # llm_features.yaml enables it: a win streak is a thing sportswriters say,
-      # and that config selects for prose legibility.
+      # Consecutive wins/losses for the home team (HT) and visitor (VT)
+      # Positive integer means consecutive wins, negative integer means consecutive losses
       delta: true
+        # delta = streak_HT - streak_VT (negative = home team has less winning momentum than visitor)
       enabled: false
     last_season_record:
-      # COUPLED — superseded by adjusted_last_season_record, the training-facing
-      # member. Same builder chain (_team_season_win_pct -> _prior_season_lookup)
-      # with _apply_sos_to_season_record inserted in between, so the adjusted
-      # column is this one times a season SOS ratio. Measured r = 0.9985, the
-      # tightest pair in the pipeline after raw/normalized point differential.
-      #
-      # Measured on its own terms too: both columns rejected (best 0.014 at
-      # 4/20), while the adjusted at-location variant is the fourth strongest
-      # feature in the pool at 0.094-0.109.
+      # COUPLED — superseded by adjusted_last_season_record, the training-facing member of the pair.
+      # See the redundancy map in .claude/skills/data-analyst/references/feature-catalog.md.
       delta: true
+        # delta = last_season_record_HT - last_season_record_VT (negative = home team had a worse record than visitor last season)
       enabled: false
     adjusted_last_season_record:
       # The training-facing member of the last-season pair. Also a consumer of
@@ -276,66 +254,50 @@ feature_engineering:
       # collapsed or raw, is still unmeasured — llm_features.yaml keeps them raw.
       delta: true
       enabled: true
-    indifference_flag:
-      delta: true
-      enabled: true
-    # The six groups below were one bundled "playoff_standings" group until
-    # 2026-08-12 (what compute_playoff_flags emits alongside indifference_flag
-    # and the conf_rank precursor, which lives in
-    # src/config/constants.py::INTERMEDIATE_COLUMNS instead of any group).
-    # Bundling meant enabled/delta could only be set for all of them at once.
-    # Exploding them lets each be independently enabled and independently
-    # re-tested.
-    #
-    # All six pass the redundancy rule, which is why this cluster survived the
-    # 2026-08-12 revert while gds and point_differential did not.
-    # compute_playoff_flags recomputes wins/losses from win_bool itself rather
-    # than reading the `record` tables, so there is no derivation edge to an
-    # enabled group. It is league-relative where `record` is absolute: two
-    # teams on 30-20 sit in different playoff positions depending on their
-    # conference. Measured against record_L82 (as the bundled group):
-    # games_behind_leader r = -0.80 — under the 0.95 threshold, and `record` is
-    # disabled anyway.
     games_behind_leader:
-      # Confirmed at 20/20 hits in both audit passes (importance 0.029) — how
-      # far off the conference lead a team is says something neither win
-      # percentage nor point differential does.
+      # How many games a team is behing the conference leader
+      # Example1: team A has 10 wins and 10 losses and team B has 10 wins and 9 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 10 losses and team B has 10 wins and 10 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 9 losses and team B has 10 wins and 10 losses, team A is 1 game behind team B
+      # One single win adds +0.5 while one single loss adds -0.5
+      # This column should be only used for analysis and not for training as it is a derived feature from the record of the team and the record of the leader in the conference
       delta: false
       enabled: false
     games_behind_above:
-      # Rejected at 0 hits inside the old bundled group. Re-tested here as its
-      # own group rather than dropped, since the bundle may have hidden signal
-      # behind games_behind_leader's SHAP credit.
+      # How many games a team is behing the team above it in the conference standings
+      # Example1: team A has 10 wins and 10 losses and team B has 10 wins and 9 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 10 losses and team B has 10 wins and 10 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 9 losses and team B has 10 wins and 10 losses, team A is 1 game behind team B
+      # One single win adds +0.5 while one single loss adds -0.5
+      # It makes no sense to create a delta from this feature
+      # The idea is to capture a sense of urgency depending on how close a team is to gaining a better spot in the conference standings
       delta: false
       enabled: false
     games_ahead_of_below:
-      # Rejected at 0 hits inside the old bundled group.
+      # How many games a team is behing the team above it in the conference standings
+      # Example1: team A has 10 wins and 10 losses and team B has 10 wins and 9 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 10 losses and team B has 10 wins and 10 losses, team A is 0.5 game behind team B
+      # Example2: team A has 9 wins and 9 losses and team B has 10 wins and 10 losses, team A is 1 game behind team B
+      # One single win adds +0.5 while one single loss adds -0.5
+      # It makes no sense to create a delta from this feature
+      # The idea is to capture a sense of urgency depending on how close a team is to losing it's current spot in the conference standings
       delta: false
       enabled: false
-    clinched_playoff_berth:
-      # Rejected at 0 hits inside the old bundled group.
-      delta: false
-      enabled: true
-    eliminated_from_playoffs:
-      # Never reachable before this split: compute_playoff_flags always wrote
-      # it (games_features.csv has had eliminated_from_playoffs_HT/VT all
-      # along), but with no group naming it, inclusion mode dropped it every
-      # run. Untested, not rejected — feature_audit.yaml enables it to get its
-      # first Boruta pass.
-      delta: false
-      enabled: true
-    clinched_final_seed:
-      # Same story as eliminated_from_playoffs — computed every run, never
-      # reachable, untested until feature_audit.yaml enables it.
+    winning_incentive:
+      # How much a team still has to play for: -1 eliminated, 0 seed locked in
+      # and resting starters, 1 still fighting (for a berth or for a seed).
+      # Derived from the three clinch booleans by
+      # engineering.py::create_winning_incentive_features — those three are ETL
+      # precursors now, not groups of their own.
+      # delta: true — unlike the three booleans it replaces, this is ordinal and
+      # signed, so HT - VT is the quantity that matters: which team has more
+      # reason to play its starters tonight. Higher is better for the team
+      # holding it, so the plain HT - VT convention applies (not inverted).
       delta: true
       enabled: true
     neutral_court:
-      # Measured and rejected: importance 0.00000, 0 hits, both audit passes.
-      # 347 of 51,399 post-1980/81 games are neutral-court — 0.68% — so a tree
-      # split on it buys almost nothing, and the games that are neutral are
-      # already described by the distance and rest features that made them
-      # unusual. Kept as a column: `is_neutral_court_game` drives a per-segment
-      # accuracy table in src/ml/evaluation/analysis.py.
+      # Game-level scalar — one value per game, no HT/VT split, so no delta is
+      # definable. engineering.py special-cases it either way.
       delta: false
       enabled: false
 

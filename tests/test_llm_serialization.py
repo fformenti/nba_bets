@@ -164,3 +164,46 @@ def test_serialize_frame_aligns_metadata_by_index(features, meta):
 
     assert "Lakers" in texts[0], "row index 7 should carry index 7's metadata"
     assert "Celtics" in texts[1], "row index 3 should carry index 3's metadata"
+
+
+@pytest.mark.parametrize(
+    "column, expected",
+    [
+        (
+            "winning_incentive_HT",
+            "home team what the team still has to play for "
+            "(-1 eliminated, 0 seed locked in and resting, 1 still fighting)",
+        ),
+        (
+            "winning_incentive_VT",
+            "away team what the team still has to play for "
+            "(-1 eliminated, 0 seed locked in and resting, 1 still fighting)",
+        ),
+        ("norm_pts_diff_avg_L8_delta", "normalized point differential, last 8 games"),
+        ("back_to_back_delta", "playing on no rest"),
+    ],
+)
+def test_raw_team_columns_name_their_team_in_words(column, expected):
+    """A `delta: false` group ships its raw pair, suffix and all.
+
+    A column like `winning_incentive_HT` reaching a base model as "winning
+    incentive HT" spends tokens on a convention only this repo knows. No
+    shipping group is `delta: false` today, so the two examples here are
+    illustrative — they pin the rule, not a current config.
+    """
+    assert _parse_feature_name(column)[1] == expected
+
+
+def test_no_format_claims_a_universal_delta_formula():
+    """The prompt must not say deltas are home-minus-away — they are not all.
+
+    engineering.py::INVERTED_DELTA_GROUPS swaps the operands for distance and
+    back_to_back, and days_at_home_delta is a sum. One sentence cannot describe
+    all three, so SYSTEM_PROMPT carries the statement true of all of them
+    ("Positive values favour the home team") and no format restates the formula.
+    """
+    features = pd.Series({"distance_L1_delta": 900.0, "back_to_back_delta": 1.0})
+    for fmt in ("labeled", "markdown", "json"):
+        text = serialize_row(features, fmt=fmt)
+        assert "minus the away" not in text
+        assert "Positive values favour the home team" in text

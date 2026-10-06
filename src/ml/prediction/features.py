@@ -23,6 +23,7 @@ from src.ml.config.schema import ExperimentConfig
 from src.ml.features.engineering import (
     create_conference_features,
     create_delta_features,
+    create_winning_incentive_features,
     resolve_feature_columns,
 )
 from src.utils.logging_config import get_logger
@@ -220,11 +221,12 @@ def apply_model_feature_engineering(
     """
     feat_eng_config = experiment_config.feature_engineering
 
-    # Same two steps as the training path, in the same order — see
+    # Same three steps as the training path, in the same order — see
     # src/ml/datasets/splits.py::build_splits.
     logger.info("Creating delta features")
+    upcoming_with_features = create_winning_incentive_features(base_features.copy())
     upcoming_with_features = create_delta_features(
-        base_features.copy(),
+        upcoming_with_features,
         feat_eng_config.features,
     )
     upcoming_with_features = create_conference_features(upcoming_with_features)

@@ -1,6 +1,7 @@
 import math
 import re
 from itertools import accumulate
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
@@ -48,7 +49,10 @@ class RegressionTester:
     def post_process(value):
         if isinstance(value, str):
             value = value.replace("$", "").replace(",", "")
-            match = re.search(r"[-+]?\d*\.\d+|\d+", value)
+            # The sign must cover both alternatives: in the old
+            # ``[-+]?\d*\.\d+|\d+`` it bound to the decimal branch only, so
+            # "-7" fell through to ``\d+`` and parsed as +7.
+            match = re.search(r"[-+]?(?:\d*\.\d+|\d+)", value)
             return float(match.group()) if match else 0
         else:
             return value
@@ -316,7 +320,7 @@ class ClassificationTester:
         fig.update_xaxes(range=[min_val, max_val])
         fig.update_yaxes(range=[min_val, max_val])
         fig.update_layout(showlegend=False)
-        fig.show()
+        return fig
 
     def accuracy_trend_chart(self):
         n = len(self.corrects)
@@ -356,7 +360,7 @@ class ClassificationTester:
             template="plotly_white",
             showlegend=False,
         )
-        fig.show()
+        return fig
 
     def confidence_accuracy_chart(self):
         """Accuracy among top-k predictions by |predicted point_diff| (desc).
@@ -424,7 +428,7 @@ class ClassificationTester:
             template="plotly_white",
             showlegend=False,
         )
-        fig.show()
+        return fig
 
     def report(self):
         # Labels from sign: positive → 1, non-positive → 0
@@ -433,9 +437,9 @@ class ClassificationTester:
         acc = accuracy_score(y_true, y_pred)
         n_correct = sum(self.corrects)
         title = f"{self.title} results<br><b>Accuracy:</b> {acc:.1%} ({n_correct}/{self.size})"
-        self.accuracy_trend_chart()
-        self.confidence_accuracy_chart()
-        self.chart(title)
+        self.accuracy_trend_chart().show()
+        self.confidence_accuracy_chart().show()
+        self.chart(title).show()
 
     def run(self):
         for i in tqdm(range(self.size)):
@@ -449,3 +453,73 @@ class ClassificationTester:
             print(f"{COLOR_MAP[color]}{mark} ", end="")
         clear_output(wait=True)
         self.report()
+
+
+class BatchedClassificationTester(ClassificationTester):
+    """:class:`ClassificationTester` that scores ``batch_size`` rows per call.
+
+    ``batch_predictor(list[datapoint]) -> list[str]`` answers a whole chunk at
+    once, so a GPU model decodes the batch in one ``generate`` instead of one
+    prompt at a time. Grading and charts are the parent's, unchanged.
+    """
+
+    def __init__(
+        self,
+        batch_predictor,
+        data,
+        title=None,
+        size=DEFAULT_SIZE,
+        batch_size=16,
+        output_dir=None,
+    ):
+        super().__init__(batch_predictor, data, title=title, size=size)
+        self.batch_size = batch_size
+        self.output_dir = Path(output_dir) if output_dir else None
+
+    def run_batch(self, start: int) -> None:
+        rows = [self.data[i] for i in range(start, min(start + self.batch_size, self.size))]
+        values = self.predictor(rows)
+        if len(values) != len(rows):
+            raise ValueError(f"batch_predictor returned {len(values)} outputs for {len(rows)} rows")
+        for datapoint, value in zip(rows, values):
+            guess = self.post_process(value)
+            truth = ground_truth(datapoint)
+            correct = self.is_correct(guess, truth)
+            self.titles.append(f"game {datapoint['game_id']}")
+            self.guesses.append(guess)
+            self.truths.append(truth)
+            self.corrects.append(correct)
+            self.colors.append(self.color_for(correct))
+
+    def metrics(self) -> dict:
+        n_correct = sum(self.corrects)
+        return {"accuracy": n_correct / self.size, "n_correct": n_correct, "size": self.size}
+
+    def report(self):
+        m = self.metrics()
+        title = (
+            f"{self.title} results<br><b>Accuracy:</b> {m['accuracy']:.1%} "
+            f"({m['n_correct']}/{m['size']})"
+        )
+        figures = {
+            "accuracy_trend": self.accuracy_trend_chart(),
+            "confidence_accuracy": self.confidence_accuracy_chart(),
+            "scatter": self.chart(title),
+        }
+        if self.output_dir:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        for name, fig in figures.items():
+            fig.show()
+            if self.output_dir:
+                fig.write_html(self.output_dir / f"{name}.html")
+
+    def run(self) -> dict:
+        self.size = min(self.size, len(self.data))
+        with tqdm(total=self.size) as bar:
+            for start in range(0, self.size, self.batch_size):
+                self.run_batch(start)
+                bar.update(len(self.corrects) - bar.n)
+                bar.set_postfix(acc=f"{sum(self.corrects) / len(self.corrects):.1%}")
+        clear_output(wait=True)
+        self.report()
+        return self.metrics()

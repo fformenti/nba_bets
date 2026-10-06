@@ -30,6 +30,7 @@ from src.ml.datasets.splitters import season_split, temporal_split
 from src.ml.features.engineering import (
     create_conference_features,
     create_delta_features,
+    create_winning_incentive_features,
     resolve_feature_columns,
 )
 from src.ml.training.data_prep import load_and_validate_data, prepare_data
@@ -176,6 +177,7 @@ def build_splits(config: ExperimentConfig) -> Splits:
         X_test_baseline["pts_diff_avg_L82_HT"] - X_test_baseline["pts_diff_avg_L82_VT"]
     )
 
+    df = create_winning_incentive_features(df)
     df = create_delta_features(df, feat_eng_config.features)
     df = create_conference_features(df)
 

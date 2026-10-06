@@ -68,3 +68,38 @@ def test_merge_games_remaining_uses_season_schedule_length(balanced_mini_schedul
     schedule_len = 3
     assert (merged["games_played"] + merged["games_remaining"] == schedule_len).all()
     assert merged["games_remaining"].notna().all()
+
+
+def test_merge_games_remaining_never_goes_negative(balanced_mini_schedule):
+    """An unbalanced season must not hand a team negative games left.
+
+    ``total_season_games`` is one league-wide number, so any team that plays
+    more than the league average gets a negative remainder. The 2019/20 bubble
+    is the real case — 22 teams played ~72 games against an average of ~66 — and
+    a negative remainder puts ``max_wins`` *below* current wins inside
+    ``_rank_conference_snapshot``, which is the only way a team can come out
+    flagged as both clinched and eliminated. Seven rows did.
+    """
+    # Team 1 plays a seventh game after the others are done: 4 games against a
+    # league length of 3.
+    extra = pd.DataFrame(
+        {
+            "gameId": ["g7"],
+            "gameDate": pd.to_datetime(["2025-01-05"]),
+            "gameDateOnlyStr": ["2025-01-05"],
+            "season": ["2024/25"],
+            "hometeamId": [1],
+            "awayteamId": [4],
+            "winner": [1],
+            "homeScore": [101],
+            "awayScore": [99],
+            "hometeamConference": ["East"],
+            "awayteamConference": ["East"],
+        }
+    )
+    unbalanced = pd.concat([balanced_mini_schedule, extra], ignore_index=True)
+    team_games = _compute_cumulative_stats(_build_team_game_rows(unbalanced))
+    merged = _merge_games_remaining(team_games)
+
+    assert (merged["games_remaining"] >= 0).all()
+    assert (merged["post_games_remaining"] >= 0).all()

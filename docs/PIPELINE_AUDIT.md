@@ -271,9 +271,9 @@ The cost is Python-level iteration: 27M `numpy.searchsorted` calls and 980k
 `playoff_standings.py:335-379`.
 
 **This is not dead work.** The obvious move — gate the playoff table off, since
-`configs/features.yaml` never lists it — is wrong: `indifference_flag` comes from
-that table, and `indifference_flag_delta` was *selected by Boruta-SHAP* for the
-same-conference model. It is load-bearing.
+`configs/features.yaml` never lists it — is wrong: the three clinch booleans come
+from that table, and `winning_incentive` — an enabled feature — is derived from
+them. It is load-bearing.
 
 **Left unfixed, deliberately.** Both hot spots implement leakage-safe standings
 and strength-of-schedule semantics inside those loops. Rewriting them is a real

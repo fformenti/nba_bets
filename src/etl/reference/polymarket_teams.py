@@ -3,6 +3,23 @@
 Polymarket identifies teams by a three-letter abbreviation that does not
 always match ours, so the mapping is curated by hand and joined onto teamIds
 here. Consumed by ``src/betting/slugs.py`` when building market slugs.
+
+**One row per team, the current abbreviation.** These are ground truth from
+Gamma's ``GET /teams?league=nba``, whose ``abbreviation`` field agrees with every
+code below.
+
+Five teams did use a different code once — Warriors ``gs``, Wizards ``wsh``,
+Pelicans ``no``, Jazz ``utah`` (four characters), Spurs ``sa`` — but only through
+the 2024 playoffs and the first week of 2024/25, and not once after 2024-10-28.
+They are deliberately *not* carried here as variants. This table exists to build
+a slug for an upcoming game, where a retired code cannot apply; the historical
+backfill reads real slugs out of Gamma's listing instead of guessing them, so it
+never needs a retired code either. A variant column was tried and deleted after
+a full backfill matched 1,913 of 1,913 games without consulting it.
+
+Phoenix is worth one note because it looks like drift and is not: ``phx``
+resolves in every era and ``pho`` in none — that spelling comes from
+Basketball-Reference.
 """
 
 import pandas as pd
@@ -14,6 +31,12 @@ from src.config.paths import (
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# The season every row is pinned to. This is the *merge key* onto the teams
+# history table, not a claim about when an abbreviation was in use — franchises
+# have neither moved nor been created since 2021, so one season's teamIds cover
+# every historical game. Recency is expressed by `is_current`, not by this.
+ABV_MERGE_SEASON = "2025/26"
 
 nba_teams_abv = [
     {
@@ -199,15 +222,16 @@ nba_teams_abv = [
 ]
 
 
+OUTPUT_COLUMNS = ["teamId", "city", "team_name", "polymarket_abv", "season"]
+
+
 def build_polymarket_teams_lookup() -> None:
     """Join the hand-maintained abbreviations onto teamIds and persist them.
 
     Previously this ran at import time, so merely importing the module read
     and rewrote a CSV.
     """
-    teams_abv_df = pd.DataFrame(
-        nba_teams_abv, columns=["city", "team_name", "polymarket_abv", "season"]
-    )
+    teams_abv_df = pd.DataFrame(nba_teams_abv)
     teams_history_df = pd.read_csv(TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH)
 
     teams_abv_ids_df = teams_abv_df.merge(
@@ -217,8 +241,20 @@ def build_polymarket_teams_lookup() -> None:
         how="left",
     )
 
-    teams_abv_ids_df = teams_abv_ids_df[["teamId", "city", "team_name", "polymarket_abv", "season"]]
+    # A failed merge leaves teamId null, and `slugs.py` would then build slugs
+    # for 29 teams and raise a KeyError on the 30th, mid-slate. Catch it here.
+    unmatched = teams_abv_ids_df[teams_abv_ids_df["teamId"].isna()]
+    if not unmatched.empty:
+        offenders = sorted(unmatched["team_name"].unique().tolist())
+        raise ValueError(
+            f"{len(offenders)} team(s) have no teamId for season "
+            f"'{ABV_MERGE_SEASON}' in {TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH}: "
+            f"{offenders}. Run `make build-teams-history` first."
+        )
+
+    teams_abv_ids_df = teams_abv_ids_df[OUTPUT_COLUMNS]
     teams_abv_ids_df.to_csv(POLYMARKET_TEAMS_ABV_PATH, index=False)
+
     logger.info(
         f"Saved {len(teams_abv_ids_df)} team abbreviations to {POLYMARKET_TEAMS_ABV_PATH}"
     )

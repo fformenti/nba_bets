@@ -55,7 +55,7 @@ Do all of this from your laptop. Every minute spent fixing credentials on a runn
 
 | Setting | Value | Why |
 |---|---|---|
-| GPU | **RTX 4090 / A5000 (24 GB)** minimum, **L40S / A6000 (48 GB)** comfortable | 8-bit 8B weights are ~9 GB; the rest is activations at `max_sequence_length: 1024` |
+| GPU | **RTX 4090 / A5000 (24 GB)** minimum, **L40S / A6000 (48 GB)** comfortable | 8-bit 8B weights are ~9 GB; the rest is activations, which scale with the longest record (~440 tokens, measured at launch) |
 | Architecture | Ampere or newer | `training.bf16: true` and `optim: paged_adamw_32bit` require it. **T4 and V100 will not work** — bf16 is unsupported |
 | Template | RunPod official **PyTorch 2.x / CUDA 12.x** | CUDA driver + build tools already present |
 | Container disk | ≥ 60 GB | 16 GB of base-model shards plus `outputs/llm/<run>/checkpoint-*` with `save_total_limit: 10` |
@@ -297,7 +297,7 @@ Don't leave a 4090 idling overnight because evaluation finished at 2am.
 | `403` / "gated repo" when loading the model | Llama 3.1 license not accepted for the account owning your token. Preflight won't catch this — it only checks the dataset |
 | `No CUDA device visible` | Wrong template, or `uv sync` pulled a CPU-only torch. Check `uv run python -c "import torch; print(torch.version.cuda)"` |
 | `ModuleNotFoundError: peft` / `trl` / `bitsandbytes` | You ran `uv sync` without `--extra gpu` |
-| CUDA OOM | Set `per_device_train_batch_size: 1` and `gradient_accumulation_steps: 8` to hold the effective batch size at 8. Failing that, lower `data.max_sequence_length` from 1024 |
+| CUDA OOM | Set `per_device_train_batch_size: 1` and `gradient_accumulation_steps: 8` to hold the effective batch size at 8. Failing that, lower `lora.r` or shorten the prompt (`serialization_format`) |
 | `element 0 of tensors does not require grad` | Gradient checkpointing interacting with the k-bit model. As a fallback set `training.gradient_checkpointing: false` (costs memory) |
 | First step takes forever | 16 GB base-model download. Check `echo $HF_HOME` points at `/workspace` |
 | `ValueError: completion_only_loss ... not supported for language modeling datasets` | The dataset has a `text` column, so trl took the language-modeling path. Rebuild it with `make build-llm-dataset` — the schema must be `game_id` / `prompt` / `completion` |

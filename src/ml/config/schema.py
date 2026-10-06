@@ -120,9 +120,6 @@ class FeaturesMapConfig(BaseModel):
     home_and_road: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False)
     )
-    indifference_flag: FeatureGroupConfig = Field(
-        default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
-    )
     games_behind_leader: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(enabled=False)
     )
@@ -132,13 +129,7 @@ class FeaturesMapConfig(BaseModel):
     games_ahead_of_below: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(enabled=False)
     )
-    clinched_playoff_berth: FeatureGroupConfig = Field(
-        default_factory=lambda: FeatureGroupConfig(enabled=False)
-    )
-    eliminated_from_playoffs: FeatureGroupConfig = Field(
-        default_factory=lambda: FeatureGroupConfig(enabled=False)
-    )
-    clinched_final_seed: FeatureGroupConfig = Field(
+    winning_incentive: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(enabled=False)
     )
     neutral_court: FeatureGroupConfig = Field(
@@ -418,9 +409,20 @@ class LLMDataConfig(BaseModel):
         "language-modeling path over the prompt-completion one whenever a "
         "configured text column exists.",
     )
-    max_sequence_length: int = 1024
+    context_length: int = Field(
+        default=131072,
+        description="The base model's context window. Training fails if any "
+        "record's prompt+completion exceeds it. The truncation cap handed to "
+        "trl is not configured: it is measured from the dataset at launch.",
+    )
     max_train_samples: Optional[int] = Field(
         default=None, description="Cap training rows; useful for smoke tests."
+    )
+    max_eval_samples: Optional[int] = Field(
+        default=None,
+        description="Cap the in-training evaluation set to a seeded random "
+        "sample of this many rows. Every evaluation is a full forward pass over "
+        "it, so a smaller set buys more frequent evaluations.",
     )
     source_experiment_config: str = Field(
         default="configs/train/xgboost.yaml",
@@ -481,6 +483,17 @@ class LLMTrainerConfig(BaseModel):
     logging_steps: int = 50
     save_steps: int = 500
     save_total_limit: int = 10
+    eval_strategy: Literal["no", "steps", "epoch"] = Field(
+        default="steps",
+        description="When to score data.eval_split during training. 'no' skips "
+        "loading the eval split altogether.",
+    )
+    eval_steps: int = Field(
+        default=500,
+        description="Optimizer steps between evaluations (eval_strategy='steps'). "
+        "Kept equal to save_steps so every checkpoint has an eval score.",
+    )
+    per_device_eval_batch_size: int = 1
     seed: int = 42
     train_on_completion_only: bool = Field(
         default=True,
@@ -497,6 +510,8 @@ class LLMEvaluationConfig(BaseModel):
     size: int = 200
     max_new_tokens: int = 8
     seed: int = 42
+    # Prompts decoded per generate call; lower it if evaluation runs out of memory.
+    batch_size: int = 16
 
 
 class WandbConfig(BaseModel):

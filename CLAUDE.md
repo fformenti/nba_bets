@@ -35,7 +35,10 @@ falls back to it non-overriding, so the box's own exports still win.
   archive in (the archive wins any shared gameId, except that a postponed archive
   row never supersedes a played one), and `append-game-results` adds the results
   inbox. Everything else reads it. A second "seed" table is what made
-  `full-rebuild` silently discard the raw parse.
+  `full-rebuild` silently discard the raw parse. The rule governs *game
+  history*, not the directory: `polymarket_game_odds.csv` sits alongside it
+  because it is likewise an external observation nothing can regenerate
+  offline, but it holds odds rather than games and shares no writer.
 - **Two configs, two jobs.** `configs/features.yaml` decides which feature
   *tables* get built (ETL); `configs/train/*.yaml` decides which columns a model
   *consumes* (ML). Using one where the other belongs is a bug.

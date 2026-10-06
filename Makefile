@@ -1,12 +1,12 @@
 .PHONY: lint lint-fix format test \
         build-teams-history build-teams-locations build-distances-table \
-        build-polymarket-teams build-game-slug-lookup \
+        build-polymarket-teams build-game-slug-lookup build-polymarket-odds \
         ingest-raw-games parse-league-schedule process-ingested-games build-features \
         fetch-league-schedule fetch-upcoming-games fetch-game-results append-game-results \
         reconcile-postponed retry-unresolved migrate-incremental \
         predict-upcoming score-predictions bet-polymarket \
-        train build-llm-dataset train-llm evaluate-llm \
-        delete-experiment delete-model plot-home-win-ratio \
+        train build-llm-dataset train-llm evaluate-llm inspect-llm \
+        delete-experiment delete-model plot-home-win-ratio plot-home-win-ratio-line \
         historical-etl full-rebuild predict-upcoming-games \
         process-results-pipeline daily-cycle
 
@@ -111,7 +111,7 @@ score-predictions:
 # at the run this produces; otherwise the run URI is just logged for you to
 # promote later.
 #
-# Defaults to the single xgboost model. Sweep all four families — same features,
+# Sweep all four families — same features,
 # same splits, best one registered — with:
 #   make train TRAIN_CONFIG=all_models
 train:
@@ -130,6 +130,10 @@ train-llm:
 evaluate-llm:
 	uv run python -m src.cli.evaluate_llm --config configs/train_llm/$(LLM_CONFIG).yaml --run-name $(LLM_RUN)
 
+# Per-game raw outputs + first-token P(+)/P(-), to see why a sign is wrong.
+inspect-llm:
+	uv run python -m src.cli.inspect_llm --config configs/train_llm/$(LLM_CONFIG).yaml --run-name $(LLM_RUN) $(ARGS)
+
 # ─── Betting ────────────────────────────────────────────────────────────────
 
 bet-polymarket:
@@ -137,6 +141,13 @@ bet-polymarket:
 
 build-game-slug-lookup:
 	uv run python -m src.cli.build_game_slug_lookup
+
+# Historical market odds, the benchmark model accuracy is compared against.
+# Standalone by design: like the other reference builders, a data rebuild must
+# never depend on a network call. Re-running only fetches games it has not
+# priced yet, so it both backfills and keeps the current season up to date.
+build-polymarket-odds:
+	uv run python -m src.cli.build_polymarket_odds $(if $(START_SEASON),--start-season $(START_SEASON),) $(if $(REFRESH),--refresh,)
 
 # ─── Ops and analysis ───────────────────────────────────────────────────────
 
@@ -148,6 +159,9 @@ delete-model:
 
 plot-home-win-ratio:
 	uv run python -m src.cli.plot_home_win_ratio
+
+plot-home-win-ratio-line:
+	uv run python -m src.cli.plot_home_win_ratio_line
 
 # ─── Composite pipelines ────────────────────────────────────────────────────
 

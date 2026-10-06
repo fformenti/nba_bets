@@ -1,0 +1,123 @@
+description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts (T4 variant)"
+
+# Same as llama31_8b_qlora.yaml except compute/training dtype. Colab's T4 is
+# Turing (sm_75) and has no bf16 tensor cores, so bitsandbytes' int8 matmul
+# kernel has to downcast bf16 activations to fp16 on every quantized layer -
+# spamming "inputs will be cast from torch.bfloat16 to float16" warnings.
+# float16/fp16 here matches what the hardware actually computes in.
+
+# null -> a timestamped name is generated at launch and printed in the log.
+# Pin it (or pass --run-name) to resume an interrupted run.
+run_name: null
+
+base_model: "meta-llama/Meta-Llama-3.1-8B"
+
+hub:
+  user: "fformenti"
+  project_name: "nba-bets"
+  private: true
+  # Checkpoints are pushed to the Hub so a dropped connection is recoverable.
+  push_checkpoints: true
+
+data:
+  dataset_name: "fformenti/nba-bets"
+  train_split: "train"
+  eval_split: "validation"
+  # Evaluation only. Training deliberately names no text field — see
+  # LLMDataConfig.prompt_field and build_sft_config().
+  prompt_field: "prompt"
+  # Llama 3.1 context window. Training fails if any record exceeds it; the
+  # truncation cap itself is measured from the dataset at launch.
+  context_length: 131072
+  # null = train on the full split. The train split is date-sorted and the cap
+  # takes the first N rows, so a small value here means the oldest N games, not
+  # a sample. Use --max-train-samples for smoke tests instead.
+  max_train_samples: null
+  # null = score the whole eval_split at every evaluation. A number takes a
+  # seeded random sample of that many rows, for cheaper, more frequent evals.
+  max_eval_samples: null
+
+  # The LLM trains on exactly the games the sklearn models train on. Splits are
+  # produced by src/ml/datasets/splits.py from the config below, then serialized
+  # to text — same gameIds, same feature columns, only the encoding differs.
+  # Point this at the same config you compare against.
+  # LLM-specific feature set: same pipeline as the sklearn configs, but with
+  # win percentage and streak enabled. Swap back to configs/train/xgboost.yaml
+  # for a strict like-for-like comparison against the sklearn models.
+  source_experiment_config: "configs/train/llm_features.yaml"
+
+  # labeled | json | markdown.
+  # All three follow whatever feature columns the config produces, so new
+  # features reach the prompt automatically. labeled additionally renders
+  # human-readable names, which a base (non-instruct) model has more to work
+  # with.
+  serialization_format: "labeled"
+
+quantization:
+  # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
+  # overwrote it with 8bit, so 8bit reproduces what actually ran.
+  mode: "8bit"
+  # float16, not bfloat16: T4 has no bf16 tensor cores.
+  compute_dtype: "float16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.1
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  bias: "none"
+
+training:
+  epochs: 2
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  optimizer: "paged_adamw_32bit"
+  weight_decay: 0.001
+  max_grad_norm: 0.3
+  # fp16, not bf16: T4 has no bf16 tensor cores.
+  bf16: false
+  fp16: true
+  gradient_checkpointing: true
+  logging_steps: 50
+  # Lower than the notebook's 2000 so an interrupted run loses less work.
+  save_steps: 500
+  save_total_limit: 10
+  # Score eval_split during training (loss, mean_token_accuracy and
+  # first_token_accuracy, logged with an eval/ prefix). "no" skips it.
+  eval_strategy: "steps"
+  # Same cadence as save_steps, so every checkpoint pushed has an eval score.
+  eval_steps: 500
+  per_device_eval_batch_size: 1
+  seed: 42
+  # Loss over the completion only — the signed point differential — instead of
+  # over the whole sequence. The prompt is ~440 tokens and the answer is 2, so
+  # this is the difference between the sign carrying ~1/440 of the gradient and
+  # carrying half of it.
+  train_on_completion_only: true
+
+evaluation:
+  split: "test"
+  size: 200
+  max_new_tokens: 8
+  seed: 42
+  batch_size: 16
+
+tracking:
+  wandb:
+    enabled: true
+    project: "nba-bets"
+    watch: "gradients"
+  mlflow:
+    enabled: true
+    experiment_name: "nba_bets_llm"
+    # Local sqlite dies with an ephemeral GPU box - copy mlflow.db back after
+    # a run, or point this at a remote tracking server.
+    tracking_uri: "sqlite:///mlflow.db"
+
+paths:
+  output_dir: "outputs/llm"

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from itertools import cycle
 from typing import Optional
 from sklearn.base import BaseEstimator
 from sklearn.metrics import confusion_matrix, roc_curve, auc
@@ -13,6 +14,11 @@ from src.ml.utils.shap import extract_binary_shap_values
 # Set style
 sns.set_style("whitegrid")
 plt.rcParams["figure.figsize"] = (10, 6)
+
+# Colours for series compared against the model. `seagreen` is first because
+# Polymarket is the comparison that matters, and it reads as the market in every
+# figure that carries one.
+COMPARISON_COLORS = ["seagreen", "tomato", "mediumpurple"]
 
 
 def plot_residuals(
@@ -227,6 +233,8 @@ def plot_roc_curve(
     y_pred_proba: np.ndarray,
     title: str = "ROC Curve",
     figsize: tuple = (8, 8),
+    model_label: str = "ROC curve",
+    reference_curves: Optional[dict] = None,
 ) -> plt.Figure:
     """
     Plot ROC curve for binary classification models.
@@ -241,6 +249,13 @@ def plot_roc_curve(
         Plot title
     figsize : tuple, default=(8, 8)
         Figure size
+    model_label : str, default='ROC curve'
+        Legend label for the model's curve.
+    reference_curves : dict, optional
+        ``{label: probabilities}`` for curves to compare the model against — the
+        market, say. Every series must be scored on the same rows as
+        ``y_true``; a curve drawn from a different slate of games is not
+        comparable to the model's, whatever the legend claims.
 
     Returns
     -------
@@ -257,10 +272,22 @@ def plot_roc_curve(
     ax.plot(
         fpr,
         tpr,
-        color="darkorange",
+        color="steelblue" if reference_curves else "darkorange",
         lw=2,
-        label=f"ROC curve (AUC = {roc_auc:.4f})",
+        label=f"{model_label} (AUC = {roc_auc:.4f})",
     )
+
+    for (label, proba), color in zip(
+        (reference_curves or {}).items(), cycle(COMPARISON_COLORS)
+    ):
+        ref_fpr, ref_tpr, _ = roc_curve(y_true, proba)
+        ax.plot(
+            ref_fpr,
+            ref_tpr,
+            color=color,
+            lw=2,
+            label=f"{label} (AUC = {auc(ref_fpr, ref_tpr):.4f})",
+        )
 
     # Plot diagonal line (random classifier)
     ax.plot(
@@ -388,60 +415,77 @@ def _reliability_diagram_points(
 def plot_calibration_curve(
     y_true,
     y_pred_proba_uncalibrated: np.ndarray,
-    y_pred_proba_calibrated: np.ndarray,
+    y_pred_proba_calibrated: Optional[np.ndarray] = None,
     calibration_method: str = "sigmoid",
     n_bins: int = 10,
     title: str = "Calibration Curve (Reliability Diagram)",
     figsize: tuple = (12, 7),
+    y_pred_proba_market: Optional[np.ndarray] = None,
+    market_label: str = "Polymarket",
+    annotate_counts: bool = True,
 ) -> plt.Figure:
-    """Plot calibration curves comparing uncalibrated vs calibrated probabilities.
+    """Plot reliability diagrams for whichever probability series are given.
+
+    ``y_pred_proba_uncalibrated`` is always drawn. The calibrated series and the
+    market series are each optional, so this renders a model-vs-market figure on
+    a run where no calibrator was adopted — the market comparison does not depend
+    on calibration having happened.
+
+    ``annotate_counts`` labels every point with its bin count. Turn it off once a
+    third series is on the axes: the curves track each other closely by
+    construction, so three sets of counts land on top of one another and on top
+    of the curves. The two-series figure keeps them.
 
     With default ``n_bins=10``, bins are width 0.1: ``[0, 0.1)``, …, ``[0.9, 1.0]``.
     """
     from src.ml.evaluation.metrics import compute_brier_score
 
-    mean_pred_uncal, fraction_pos_uncal, n_per_bin_uncal = _reliability_diagram_points(
-        y_true, y_pred_proba_uncalibrated, n_bins
-    )
-    mean_pred_cal, fraction_pos_cal, n_per_bin_cal = _reliability_diagram_points(
-        y_true, y_pred_proba_calibrated, n_bins
-    )
-
-    brier_uncal = compute_brier_score(y_true, y_pred_proba_uncalibrated)
-    brier_cal = compute_brier_score(y_true, y_pred_proba_calibrated)
+    # (label, probabilities, colour, marker, annotation y-offset)
+    series = [
+        (
+            "Uncalibrated",
+            y_pred_proba_uncalibrated,
+            "steelblue",
+            "o-",
+            10,
+        )
+    ]
+    if y_pred_proba_calibrated is not None:
+        series.append(
+            (
+                f"Calibrated [{calibration_method}]",
+                y_pred_proba_calibrated,
+                "darkorange",
+                "s-",
+                -12,
+            )
+        )
+    if y_pred_proba_market is not None:
+        series.append((market_label, y_pred_proba_market, "seagreen", "^-", -24))
 
     fig, ax = plt.subplots(figsize=figsize)
 
     ax.plot(
         [0, 1], [0, 1], "--", color="gray", lw=1.5, label="Perfectly Calibrated"
     )
-    ax.plot(
-        mean_pred_uncal, fraction_pos_uncal, "o-",
-        color="steelblue", lw=2,
-        label=f"Uncalibrated (Brier={brier_uncal:.4f})",
-    )
-    ax.plot(
-        mean_pred_cal, fraction_pos_cal, "s-",
-        color="darkorange", lw=2,
-        label=f"Calibrated [{calibration_method}] (Brier={brier_cal:.4f})",
-    )
 
-    for pred_val, frac_val, n in zip(
-        mean_pred_uncal, fraction_pos_uncal, n_per_bin_uncal
-    ):
-        ax.annotate(
-            f"n={n}", (pred_val, frac_val),
-            textcoords="offset points", xytext=(0, 10),
-            ha="center", fontsize=8, color="steelblue",
+    for label, proba, color, marker, offset in series:
+        mean_pred, fraction_pos, n_per_bin = _reliability_diagram_points(
+            y_true, proba, n_bins
         )
-    for pred_val, frac_val, n in zip(
-        mean_pred_cal, fraction_pos_cal, n_per_bin_cal
-    ):
-        ax.annotate(
-            f"n={n}", (pred_val, frac_val),
-            textcoords="offset points", xytext=(0, -12),
-            ha="center", fontsize=8, color="darkorange",
+        brier = compute_brier_score(y_true, proba)
+        ax.plot(
+            mean_pred, fraction_pos, marker,
+            color=color, lw=2,
+            label=f"{label} (Brier={brier:.4f})",
         )
+        if annotate_counts:
+            for pred_val, frac_val, n in zip(mean_pred, fraction_pos, n_per_bin):
+                ax.annotate(
+                    f"n={n}", (pred_val, frac_val),
+                    textcoords="offset points", xytext=(0, offset),
+                    ha="center", fontsize=8, color=color,
+                )
 
     ax.set_xlabel("Mean Predicted Probability", fontsize=12)
     ax.set_ylabel("Fraction of Positives", fontsize=12)

@@ -14,6 +14,7 @@ from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.datasets.splits import build_splits
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 from sklearn.model_selection import KFold
 
 from src.ml.evaluation.metrics import (
@@ -25,7 +26,17 @@ from src.ml.evaluation.metrics import (
     get_model_display_name,
     print_metrics_summary,
 )
-from src.ml.evaluation.analysis import compute_season_phase_metrics, generate_analysis
+from src.ml.evaluation.analysis import (
+    compute_season_phase_metrics,
+    generate_analysis,
+    plot_season_phase_accuracy,
+)
+from src.ml.evaluation.polymarket_baseline import (
+    align_market_to_rows,
+    build_scored_frame,
+    compare_to_market,
+    load_market_probabilities,
+)
 from src.ml.evaluation.visualization import (
     plot_boruta_shap_results,
     plot_calibration_curve,
@@ -37,7 +48,12 @@ from src.ml.evaluation.visualization import (
 from src.ml.features.selection import run_feature_selection
 from src.ml.features.engineering import identify_feature_types
 from src.ml.features.preprocessing import create_preprocessing_pipeline
-from src.ml.models.baseline import PointDifferentialBaseline, RecordDifferenceBaseline
+from src.ml.models.baseline import (
+    HomeWinBaseline,
+    MarketProbabilityBaseline,
+    PointDifferentialBaseline,
+    RecordDifferenceBaseline,
+)
 from src.ml.models.registry import ModelRegistry
 from src.utils.logging_config import get_logger
 
@@ -80,7 +96,7 @@ def _oof_calibrated_proba(
         if method is None:
             oof[score_idx] = _positive_class_proba(base_pipeline, X_score)
             continue
-        probe = CalibratedClassifierCV(base_pipeline, method=method, cv="prefit")
+        probe = CalibratedClassifierCV(FrozenEstimator(base_pipeline), method=method)
         probe.fit(X_val.iloc[fit_idx], y_val.iloc[fit_idx])
         oof[score_idx] = _positive_class_proba(probe, X_score)
     return oof
@@ -106,6 +122,209 @@ def _positive_class_proba(estimator: Any, X: pd.DataFrame) -> np.ndarray:
     """P(home win) as a 1-D array, whatever shape predict_proba returns."""
     proba = estimator.predict_proba(X)
     return proba[:, 1] if proba.ndim > 1 else proba
+
+
+def _log_polymarket_baseline(
+    tracker: Any,
+    game_ids: pd.Series,
+    y_true: pd.Series,
+    pipeline: Any,
+    X_test: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Score the shipped model against Polymarket's tip-off prices, if we have them.
+
+    Never fatal. The odds table comes from a separate network step
+    (`make build-polymarket-odds`), and a training run that cannot reach
+    Polymarket — or is run before the backfill — should still finish and ship a
+    model. A missing benchmark is logged, not raised.
+    """
+    try:
+        scored = build_scored_frame(
+            game_ids=game_ids,
+            y_true=y_true,
+            y_pred=pipeline.predict(X_test),
+            y_pred_proba=_positive_class_proba(pipeline, X_test),
+        )
+        comparison = compare_to_market(scored)
+        if comparison.empty:
+            return
+
+        tables_dir = output_dir / "tables"
+        tables_dir.mkdir(parents=True, exist_ok=True)
+        comparison.to_csv(tables_dir / "polymarket_baseline.csv", index=False)
+
+        # The comparison table above scores every model on the whole test split,
+        # where the market row necessarily covers fewer games. This block is the
+        # like-for-like read: both sides, identical games.
+        logger.info(f"\n{'=' * 60}")
+        logger.info("Market Benchmark - identical games")
+        logger.info(f"{'=' * 60}")
+        display_cols = [
+            c
+            for c in ("source", "n_games", "accuracy", "roc_auc", "brier_score", "ece")
+            if c in comparison.columns
+        ]
+        logger.info("\n" + comparison[display_cols].to_string(index=False))
+
+        tracker.log_metrics(
+            {
+                f"vs_market_{row['source']}_{key}": value
+                for row in comparison.to_dict(orient="records")
+                for key, value in row.items()
+                if key not in ("scope", "source") and isinstance(value, (int, float, np.floating))
+            }
+        )
+    except FileNotFoundError as exc:
+        logger.info(f"Skipping Polymarket baseline: {exc}")
+    except Exception as exc:
+        logger.warning(f"Polymarket baseline failed: {exc}")
+
+
+def _save_market_comparison_plots(
+    metadata_test: pd.DataFrame,
+    y_test: pd.Series,
+    y_test_pred: np.ndarray,
+    y_test_proba: np.ndarray,
+    uncalibrated_proba: Optional[np.ndarray],
+    best_cal_proba: Optional[np.ndarray],
+    best_calibration_method: Optional[str],
+    y_pred_baseline: Optional[np.ndarray],
+    output_dir: Path,
+    model_name: str,
+) -> None:
+    """Model-vs-market twins of the ROC, calibration and season-phase figures.
+
+    Separate files rather than extra lines on the existing three, because they
+    are drawn on a different slate: the odds backfill starts at 2024/25 and drops
+    markets that never traded, so the market prices only part of the test split.
+    Every series here is sliced to the games *both* sides cover — the rule
+    :mod:`src.ml.evaluation.polymarket_baseline` already states — and the game
+    count goes in each title so the two twins can never be read as one.
+
+    Never fatal, for the same reason :func:`_log_polymarket_baseline` isn't.
+    """
+    try:
+        covered, market_proba = align_market_to_rows(metadata_test["gameId"])
+        n_covered = int(covered.sum())
+        if n_covered == 0:
+            logger.info("No test game is priced by Polymarket; skipping comparison plots.")
+            return
+
+        y_true = y_test[covered]
+        suffix = f" - {model_name} (n={n_covered} shared games)"
+
+        viz_dir = output_dir / "visualizations"
+        analysis_dir = output_dir / "analysis"
+        tables_dir = output_dir / "tables"
+        for directory in (viz_dir, analysis_dir, tables_dir):
+            directory.mkdir(parents=True, exist_ok=True)
+
+        fig_roc = plot_roc_curve(
+            y_true,
+            y_test_proba[covered],
+            title=f"ROC Curve vs Polymarket{suffix}",
+            model_label=model_name,
+            reference_curves={"Polymarket": market_proba},
+        )
+        fig_roc.savefig(viz_dir / "roc_curve_vs_market.png", dpi=300, bbox_inches="tight")
+        plt.close(fig_roc)
+
+        if uncalibrated_proba is not None:
+            fig_cal = plot_calibration_curve(
+                y_true,
+                uncalibrated_proba[covered],
+                best_cal_proba[covered] if best_cal_proba is not None else None,
+                calibration_method=best_calibration_method or "sigmoid",
+                y_pred_proba_market=market_proba,
+                title=f"Calibration Curve vs Polymarket{suffix}",
+                # Three near-coincident curves; the bin counts stay on the
+                # two-series `calibration_curve.png` next to this one.
+                annotate_counts=False,
+            )
+            fig_cal.savefig(
+                viz_dir / "calibration_curve_vs_market.png", dpi=300, bbox_inches="tight"
+            )
+            plt.close(fig_cal)
+
+        if (
+            "games_played_HT" in metadata_test.columns
+            and "games_played_VT" in metadata_test.columns
+        ):
+            # The market's hard call is just its favourite, as in `compare_to_market`.
+            comparisons = {"Polymarket": (market_proba >= 0.5).astype(int)}
+            if y_pred_baseline is not None:
+                comparisons["Record baseline"] = np.asarray(y_pred_baseline)[covered]
+
+            fig_phase, table = plot_season_phase_accuracy(
+                y_true,
+                y_test_pred[covered],
+                metadata_test.loc[covered],
+                comparison_preds=comparisons,
+                title=f"Accuracy by Season Phase vs Polymarket{suffix}",
+            )
+            fig_phase.savefig(
+                analysis_dir / "season_phase_accuracy_vs_market.png",
+                dpi=300,
+                bbox_inches="tight",
+            )
+            table.to_csv(tables_dir / "season_phase_accuracy_vs_market.csv", index=False)
+            plt.close(fig_phase)
+
+        logger.info(f"Market comparison plots saved ({n_covered} shared games).")
+    except FileNotFoundError as exc:
+        logger.info(f"Skipping Polymarket comparison plots: {exc}")
+    except Exception as exc:
+        logger.warning(f"Polymarket comparison plots failed: {exc}")
+
+
+def _market_reference_model(
+    metadata_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> Optional[dict]:
+    """Polymarket's tip-off prices as a reference row, or ``None`` if unavailable.
+
+    Scored only on the test games the market actually priced. That subset is
+    smaller than the split — the odds backfill starts at 2024/25 and drops
+    markets that never traded — so the returned metrics carry ``test_n_games``
+    and the comparison table prints it. Reading this row against the others
+    without that number would compare two different slates.
+
+    Never fatal, for the same reason ``_log_polymarket_baseline`` isn't: the odds
+    table comes from a separate network step (`make build-polymarket-odds`), and
+    a run made before the backfill should still ship a model.
+    """
+    try:
+        market = load_market_probabilities().drop_duplicates(subset="gameId")
+        probabilities = pd.Series(
+            market["market_home_win_probability"].to_numpy(),
+            index=pd.Index(market["gameId"], name="gameId"),
+        )
+
+        covered, _ = align_market_to_rows(metadata_test["gameId"], market=market)
+        if not covered.any():
+            logger.info("No test game is priced by Polymarket; skipping market reference.")
+            return None
+
+        game_ids = pd.to_numeric(metadata_test["gameId"], errors="coerce").astype("Int64")
+        covered_index = metadata_test.index[covered]
+        X_market = pd.DataFrame({"gameId": game_ids.loc[covered_index]})
+        model = MarketProbabilityBaseline(probabilities)
+        result = train_baseline_model(model, X_market, y_test.loc[covered_index])
+        if not result:
+            return None
+
+        result["test_metrics"]["test_n_games"] = len(covered_index)
+        logger.info(
+            f"Polymarket reference scored on {len(covered_index)} of "
+            f"{len(metadata_test)} test game(s)."
+        )
+        return result
+    except FileNotFoundError as exc:
+        logger.info(f"Skipping Polymarket reference model: {exc}")
+    except Exception as exc:
+        logger.warning(f"Polymarket reference model failed: {exc}")
+    return None
 
 
 def _extract_explicit_model_param_keys() -> dict[str, set[str]]:
@@ -414,6 +633,42 @@ def train_single_model(
             tracker.log_metrics(baseline_metrics)
             tracker.set_tags({"model_type": "baseline"})
 
+    # ====== Home Team Wins Reference ======
+    # The floor. Home advantage alone wins ~58% of NBA games, so this is the
+    # number every other row in the table has to be read against.
+    logger.info(f"\n{'=' * 60}")
+    logger.info("Home Team Wins Baseline")
+    logger.info(f"{'=' * 60}")
+
+    home_win_rate = float(y_train.mean())
+    baseline_model = HomeWinBaseline(home_win_rate=home_win_rate)
+    models_to_train[baseline_model.name] = train_baseline_model(
+        baseline_model,
+        X_test_baseline,
+        y_test_baseline,
+    )
+
+    if models_to_train.get(baseline_model.name):
+        baseline_metrics = models_to_train[baseline_model.name].get("test_metrics", {})
+        with tracker.child_run(baseline_model.name):
+            tracker.log_metrics(baseline_metrics)
+            tracker.log_params({"home_win_baseline_rate": round(home_win_rate, 4)})
+            tracker.set_tags({"model_type": "baseline"})
+
+    # ====== Polymarket Reference ======
+    # The ceiling. Beating the record baseline is table stakes; beating the
+    # market is the only version of the question that decides whether to bet.
+    logger.info(f"\n{'=' * 60}")
+    logger.info("Polymarket Baseline")
+    logger.info(f"{'=' * 60}")
+
+    market_reference = _market_reference_model(metadata_test, y_test)
+    if market_reference:
+        models_to_train["polymarket_baseline"] = market_reference
+        with tracker.child_run("polymarket_baseline"):
+            tracker.log_metrics(market_reference["test_metrics"])
+            tracker.set_tags({"model_type": "baseline"})
+
     # dict.fromkeys dedups while preserving order: a name listed in both the
     # seeded baselines and config.model.train_models would otherwise be trained
     # twice, which a multi-family sweep makes easy to do by accident.
@@ -512,10 +767,25 @@ def train_single_model(
             continue
 
     logger.info(f"\n{'=' * 60}")
-    logger.info("Model Comparison - Test Set Results")
+    logger.info("Model Comparison")
     logger.info(f"{'=' * 60}")
+    logger.info(
+        "The family that ships is the one with the highest VAL accuracy; the "
+        "test rows are reported, never selected on."
+    )
 
     for model_name, model_data in models_to_train.items():
+        # train_baseline_model returns None when a baseline raises, and with four
+        # reference rows that is no longer a hypothetical.
+        if not model_data:
+            continue
+        # Val first, because that is the row selection reads. Baselines are fit
+        # on the test split and have no val row at all.
+        print_metrics_summary(
+            model_data.get("val_metrics", {}),
+            model_name=model_name,
+            split="val",
+        )
         print_metrics_summary(
             model_data["test_metrics"],
             model_name=model_name,
@@ -528,18 +798,36 @@ def train_single_model(
     # Chosen on validation, not test. Selecting the family by test accuracy made
     # every reported test number optimistic by the size of the max over families.
     # Baselines are a reference line, not candidates: they are fit on the test
-    # split itself and have no validation score to compete with.
-    candidates = [name for name in models_to_train if "baseline" not in name]
+    # split itself and have no validation score to compete with. Ties on val
+    # accuracy break on val ROC AUC rather than on config listing order.
+    candidates = [
+        name
+        for name, data in models_to_train.items()
+        if "baseline" not in name and data
+    ]
     if not candidates:
         return {}
     best_model_name = max(
         candidates,
-        key=lambda name: models_to_train[name]["val_metrics"].get("val_accuracy", 0),
+        key=lambda name: (
+            models_to_train[name]["val_metrics"].get("val_accuracy", 0),
+            models_to_train[name]["val_metrics"].get("val_roc_auc", 0),
+        ),
     )
     best_model_data = models_to_train[best_model_name]
 
+    # Naming the criterion here is the difference between a reader seeing a
+    # deliberate choice and seeing a bug: whichever family tops the test rows
+    # above did not win unless it also topped this number.
+    best_val_accuracy = best_model_data["val_metrics"].get("val_accuracy")
+    selection_note = (
+        f" (selected on validation accuracy: {best_val_accuracy * 100:.2f}%)"
+        if best_val_accuracy is not None
+        else " (selected on validation accuracy)"
+    )
+
     logger.info(f"\n{'=' * 60}")
-    logger.info(f"Best Model: {get_model_display_name(best_model_name)}")
+    logger.info(f"Best Model: {get_model_display_name(best_model_name)}{selection_note}")
     logger.info(
         f"  {format_metrics_line(best_model_data['test_metrics'], prefix='test')}"
     )
@@ -667,7 +955,7 @@ def train_single_model(
                     # The probe only scored the method. The model that ships is
                     # refit on the whole validation split.
                     cal_model = CalibratedClassifierCV(
-                        best_pipeline, method=method, cv="prefit"
+                        FrozenEstimator(best_pipeline), method=method
                     )
                     cal_model.fit(X_val, y_val)
                     y_test_proba_cal = _positive_class_proba(cal_model, X_test)
@@ -764,6 +1052,20 @@ def train_single_model(
         best_metrics["test_ece_ratio"] = round(ece_uncal["ece_ratio"], 3)
     tracker.log_metrics(best_metrics)
     logger.info(f"Shipped model — {format_metrics_line(best_metrics, prefix='test')}")
+
+    # Test accuracy answers "is the model right?"; this answers "is it better
+    # than the market?", which is the only version of the question that decides
+    # whether to bet. Deliberately outside `save_visualizations` — it is a
+    # metric, not a chart — and non-fatal, since the odds table is fetched by a
+    # separate network step that a training run must not depend on.
+    _log_polymarket_baseline(
+        tracker=tracker,
+        game_ids=metadata_test["gameId"],
+        y_true=y_test,
+        pipeline=best_pipeline,
+        X_test=X_test,
+        output_dir=Path(paths_config.outputs),
+    )
 
     if eval_config.save_visualizations:
         logger.info("Generating visualizations...")
@@ -928,6 +1230,24 @@ def train_single_model(
         logger.info(
             f"Analysis saved to {output_dir / 'analysis'} and {output_dir / 'tables'}"
         )
+
+        # The market twins of the ROC, calibration and season-phase figures. Kept
+        # apart from `generate_analysis` because they are drawn on a narrower
+        # slate — the games Polymarket priced — and mixing the two would make
+        # every chart above ambiguous about which games it describes.
+        if y_test_proba is not None:
+            _save_market_comparison_plots(
+                metadata_test=metadata_test,
+                y_test=y_test,
+                y_test_pred=y_test_pred,
+                y_test_proba=y_test_proba,
+                uncalibrated_proba=uncalibrated_proba,
+                best_cal_proba=best_cal_proba,
+                best_calibration_method=best_calibration_method,
+                y_pred_baseline=_y_pred_baseline,
+                output_dir=output_dir,
+                model_name=best_model_name,
+            )
 
         tracker.log_artifacts(str(output_dir), artifact_path="outputs")
 

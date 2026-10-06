@@ -8,6 +8,42 @@
 #   lags:          rolling windows to compute (ETL + ML)
 #   location_lags: which lags also get home/road variants (ETL + ML)
 #
+# ── Which of these keys the ETL actually reads ───────────────────────────────
+# "ETL + ML" above is the general case, not the universal one. Three groups
+# below are exceptions, and knowing which is which is the difference between an
+# edit that changes the build and one that changes nothing:
+#
+#   record.location_lags drives the home/road tables for ALL THREE of record,
+#   point_differential and norm_point_differential — aggregator.py passes one
+#   `location_lags` argument (schema.py::location_lags reads `record` only) to
+#   calculate_home_record, calculate_home_pts_diff and
+#   calculate_norm_home_pts_diff alike. So `point_differential.location_lags`
+#   and `norm_point_differential.location_lags` are read by nothing in the ETL.
+#   They are NOT dead, though: the ML resolver reads each group's own key to
+#   name the `_at_location_delta` columns. Keep all three lists equal or
+#   training asks for columns the ETL never built. Pinned by
+#   tests/test_config_loading.py::test_location_lags_agree_across_families.
+#
+#   sos has no `location_lags` because there is no at-home/on-road SOS builder;
+#   the key would be read by nothing. `sos.lags` decides only which sos_L{lag}
+#   columns get *persisted*. The extra windows sos_adj_record's location
+#   variants need are unioned in automatically: aggregator.py computes SOS at
+#   set(sos_lags) | set(sos_adj_record.location_lags), then saves only the
+#   declared ones — which is why sos_L10/L20/L41 exist during the build and
+#   never reach the CSV.
+#
+#   sos_adj_record has no `lags` because the ETL does not read that key. Its
+#   plain sos_adj_record_L{lag}_HT/_VT columns are built from `record.lags`, so
+#   all nine windows are emitted regardless. Only `sos_adj_record.location_lags`
+#   is read here. On the ML side the same key IS read, and leaving it undeclared
+#   (-> []) is exactly what ships only the at-location variants to a model. See
+#   configs/train/_defaults.yaml.
+#
+# Two undeclared dependencies worth knowing before editing `sos.lags`:
+# emptying it skips the whole block that also builds adjusted_last_season_record
+# (aggregator.py `if sos_lags:`), and dropping 82 from it raises a KeyError in
+# last_season_record.py::_season_sos, which hard-codes sos_L82.
+#
 # `enabled` and `delta` are ML-only and live in configs/train/_defaults.yaml.
 # There used to be an `enabled` key on every group here, documented as "ML
 # only; ETL always computes all". It was read by nothing: the ETL never looks
@@ -18,9 +54,8 @@
 # `record: enabled: true` while no sklearn model had seen record in months.
 #
 # Groups with no lags at all (rested_days, back_to_back, streak, home_and_road,
-# indifference_flag, neutral_court, games_behind_leader, games_behind_above,
-# games_ahead_of_below, clinched_playoff_berth, eliminated_from_playoffs,
-# clinched_final_seed) have nothing to say to the ETL and are declared only in
+# neutral_court, games_behind_leader, games_behind_above, games_ahead_of_below,
+# winning_incentive) have nothing to say to the ETL and are declared only in
 # _defaults.yaml.
 
 feature_engineering:

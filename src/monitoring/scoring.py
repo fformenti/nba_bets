@@ -33,11 +33,7 @@ from src.config.paths import (
     UPCOMING_GAMES_RESULTS_DIR,
 )
 from src.etl.utils.common import read_json
-from src.ml.evaluation.metrics import (
-    compute_brier_score,
-    compute_classification_metrics,
-    compute_ece,
-)
+from src.ml.evaluation.metrics import compute_home_win_metrics
 from src.ml.prediction.pipeline import PREDICTION_KEY
 from src.utils.logging_config import get_logger
 
@@ -162,22 +158,10 @@ def join_predictions_to_outcomes(
     return scored
 
 
-def _metrics_for(group: pd.DataFrame) -> dict:
-    """Accuracy plus probabilistic metrics for one slice of scored games."""
-    y_true = group["actual_home_win"].astype(int)
-    y_pred = group["prediction"].astype(int).to_numpy()
-
-    metrics = {"n_games": len(group)}
-    metrics.update(compute_classification_metrics(y_true, y_pred))
-
-    if "home_win_probability" in group.columns:
-        proba = pd.to_numeric(group["home_win_probability"], errors="coerce")
-        if proba.notna().all():
-            values = proba.to_numpy()
-            metrics["brier_score"] = compute_brier_score(y_true.to_numpy(), values)
-            metrics["ece"] = compute_ece(y_true.to_numpy(), values)
-
-    return metrics
+# Scoring one slice of home-win calls lives in src/ml/evaluation/metrics.py, so
+# the Polymarket baseline is measured by the same function as the model rather
+# than a second copy that could drift from it.
+_metrics_for = compute_home_win_metrics
 
 
 def _breakdowns(scored: pd.DataFrame) -> list[dict]:

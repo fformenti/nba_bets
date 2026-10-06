@@ -32,23 +32,27 @@ FEATURE_GROUP_PREFIXES = {
     "streak": lambda _: ["streak"],
     "last_season_record": lambda _: ["last_season_record"],
     "adjusted_last_season_record": lambda _: ["adjusted_last_season_record"],
-    "indifference_flag": lambda _: ["indifference_flag"],
-    # compute_playoff_flags emits eight columns per team; indifference_flag has
-    # its own group above (it is the OR of eliminated_from_playoffs and
-    # clinched_final_seed, computed inside compute_playoff_flags before either
-    # source column is exposed here). conf_rank is a pure precursor to the
-    # games-behind/-ahead formulas and the clinch logic, never a training
-    # candidate, so it is not a group at all — it lives in
-    # src/config/constants.py::INTERMEDIATE_COLUMNS instead. The six below were
-    # a single "playoff_standings" group until 2026-08-12; splitting them lets
-    # each be enabled/tested independently rather than as a block.
+    # compute_playoff_flags emits several columns per team, and two of them are
+    # precursors rather than groups. conf_rank feeds the games-behind/-ahead
+    # formulas and the clinch logic and is never a training candidate, so it
+    # lives in src/config/constants.py::INTERMEDIATE_COLUMNS. The three clinch
+    # booleans were three independent groups from 2026-08-12 until 2026-08-18,
+    # when they collapsed into the single ordinal winning_incentive below —
+    # they are still computed by the ETL, but they reach a model only through
+    # create_winning_incentive_features, not as configurable groups.
     "games_behind_leader": lambda _: ["games_behind_leader"],
     "games_behind_above": lambda _: ["games_behind_above"],
     "games_ahead_of_below": lambda _: ["games_ahead_of_below"],
-    "clinched_playoff_berth": lambda _: ["clinched_playoff_berth"],
-    "eliminated_from_playoffs": lambda _: ["eliminated_from_playoffs"],
-    "clinched_final_seed": lambda _: ["clinched_final_seed"],
+    "winning_incentive": lambda _: ["winning_incentive"],
 }
+
+# Groups measuring a lower-is-better quantity, so the operands swap to
+# ``VT - HT``. Every delta in the pipeline is oriented so that a *positive*
+# value favours the home team; for distance travelled and back-to-backs, more
+# is worse, so the plain ``HT - VT`` would point the other way. That convention
+# is not cosmetic — src/ml/llm/serialization.py::SYSTEM_PROMPT states it to the
+# model verbatim, and a SHAP sign is read against it.
+INVERTED_DELTA_GROUPS = {"distance", "back_to_back"}
 
 # Groups that have HT_at_home / VT_on_road location variants
 LOCATION_VARIANT_GROUPS = {
@@ -63,14 +67,125 @@ LOCATION_VARIANT_GROUPS = {
 
 
 def _numeric(series: pd.Series) -> pd.Series:
-    """Cast a boolean column to int so ``home - away`` is defined.
+    """Cast a boolean column to int so arithmetic on it is defined.
 
-    ``clinched_playoff_berth`` and friends are written as booleans by the
-    aggregator and read back as booleans from the CSV; numpy refuses ``-`` on
-    bool, so the delta for those columns would raise rather than produce the
-    -1/0/1 that "one team has clinched and the other hasn't" should be.
+    The three clinch flags are written as booleans by the aggregator and read
+    back as booleans from the CSV; numpy refuses ``-`` on bool. That bites in
+    two places: ``create_winning_incentive_features`` keys on their integer
+    triple, and any future boolean group would take a delta rather than a
+    TypeError.
     """
     return series.astype(int) if series.dtype == bool else series
+
+
+# Label → ordinal for winning_incentive. The two "fighting" states deliberately
+# share a value: a team still chasing a berth and a team already in but still
+# chasing a seed are both playing their starters, which is the mechanism this
+# feature exists to capture. Edit the numbers here and nowhere else.
+WINNING_INCENTIVE_VALUES = {
+    "fighting": 1,
+    "fighting for seed": 1,
+    "resting for playoffs": 0,
+    "eliminated": -1,
+}
+
+# (eliminated_from_playoffs, clinched_playoff_berth, clinched_final_seed) → label.
+# Only four of the eight combinations are reachable, and that is a property of
+# the builder rather than of the data: src/etl/features/playoff_standings.py
+# ::_rank_conference_snapshot evaluates clinched_final_seed only when
+# clinched_playoff_berth is true, and a team that is eliminated has clinched
+# neither. Anything else means the builder changed — see the raise below.
+_WINNING_INCENTIVE_LABELS = {
+    (0, 0, 0): "fighting",
+    (1, 0, 0): "eliminated",
+    (0, 1, 0): "fighting for seed",
+    (0, 1, 1): "resting for playoffs",
+}
+
+_WINNING_INCENTIVE_SOURCES = (
+    "eliminated_from_playoffs",
+    "clinched_playoff_berth",
+    "clinched_final_seed",
+)
+
+
+def create_winning_incentive_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse the three clinch booleans into one ordinal, per team.
+
+    ``eliminated_from_playoffs``, ``clinched_playoff_berth`` and
+    ``clinched_final_seed`` are not three independent facts — they are one
+    ordinal quantity spelled across three columns: how much a team still has to
+    play for. Offered separately, all six ``_HT``/``_VT`` columns were rejected
+    by Boruta. Offered as one signed number they carry a sign that already
+    points the right way, so the group takes a plain ``HT - VT`` delta and is
+    *not* in ``INVERTED_DELTA_GROUPS``.
+
+    Emits, per team suffix:
+
+    ``winning_incentive_{HT,VT}``
+        -1 eliminated, 0 seed locked and resting, 1 still fighting.
+    ``winning_incentive_label_{HT,VT}``
+        The same thing in words, for EDA and plotting. Never enters the numeric
+        path: no group names it, so ``resolve_feature_columns`` never asks for
+        it.
+
+    The six source columns are dropped on the way out. They stopped being
+    feature groups when this function landed, so nothing downstream would drop
+    them, and a stray boolean pair surviving into an exclusion-mode feature
+    frame would silently re-add the very columns this collapse removed.
+
+    An unreachable combination raises rather than defaulting: a silent fallback
+    would turn a broken clinch builder into a plausible-looking feature.
+    """
+    df = df.copy()
+    columns_to_drop: list[str] = []
+
+    for suffix in (HOME_SUFFIX, AWAY_SUFFIX):
+        source_cols = [f"{name}_{suffix}" for name in _WINNING_INCENTIVE_SOURCES]
+        missing = [col for col in source_cols if col not in df.columns]
+        if missing:
+            logger.warning(
+                f"Skipping winning_incentive_{suffix}: missing {', '.join(missing)}"
+            )
+            continue
+
+        combos = pd.DataFrame(
+            {col: _numeric(df[col]).astype("Int64") for col in source_cols}
+        )
+        keys = pd.Series(
+            list(zip(*(combos[col] for col in source_cols))), index=df.index
+        )
+        labels = keys.map(_WINNING_INCENTIVE_LABELS)
+
+        unmapped = keys[labels.isna()]
+        if not unmapped.empty:
+            counts = unmapped.value_counts()
+            detail = ", ".join(
+                f"({', '.join('NA' if pd.isna(v) else str(int(v)) for v in combo)})"
+                f": {n} row(s)"
+                for combo, n in counts.items()
+            )
+            raise ValueError(
+                f"Unreachable playoff-flag combination in {suffix} columns "
+                f"(eliminated_from_playoffs, clinched_playoff_berth, "
+                f"clinched_final_seed) — {detail}. Only "
+                f"{sorted(_WINNING_INCENTIVE_LABELS)} are producible by "
+                "compute_playoff_flags; a new combination means the clinch "
+                "logic changed and this mapping has to change with it."
+            )
+
+        df[f"winning_incentive_label_{suffix}"] = labels
+        df[f"winning_incentive_{suffix}"] = labels.map(WINNING_INCENTIVE_VALUES).astype(
+            int
+        )
+        columns_to_drop.extend(source_cols)
+
+    if columns_to_drop:
+        df.drop(columns=columns_to_drop, inplace=True)
+        logger.info(
+            f"Created winning_incentive from {len(columns_to_drop)} clinch columns"
+        )
+    return df
 
 
 def create_delta_features(
@@ -78,11 +193,13 @@ def create_delta_features(
     features_config: FeaturesMapConfig,
 ) -> pd.DataFrame:
     """
-    Create delta features (home - away) based on feature group configuration.
+    Create delta features from the per-team columns, per feature group config.
 
     For each enabled feature group with ``delta=True``, creates
-    ``{prefix}_delta = {prefix}_HT - {prefix}_VT``.  Source HT/VT columns
-    are always dropped after delta creation.
+    ``{prefix}_delta = {prefix}_HT - {prefix}_VT`` — except for the groups in
+    ``INVERTED_DELTA_GROUPS``, where the operands swap so that a positive delta
+    still favours the home team. Source HT/VT columns are always dropped after
+    delta creation.
 
     Parameters
     ----------
@@ -128,10 +245,9 @@ def create_delta_features(
                     logger.debug(f"Skipping delta for {prefix}: columns not found")
                     continue
                 home, away = _numeric(df[home_col]), _numeric(df[away_col])
-                if prefix != "indifference_flag":
-                    df[f"{prefix}_delta"] = home - away
-                else:
-                    df[f"{prefix}_delta"] = away - home
+                if group_name in INVERTED_DELTA_GROUPS:
+                    home, away = away, home
+                df[f"{prefix}_delta"] = home - away
                 created_features.append(f"{prefix}_delta")
                 columns_to_drop.extend([home_col, away_col])
 
@@ -145,7 +261,10 @@ def create_delta_features(
                             f"Skipping location delta for {prefix}: columns not found"
                         )
                         continue
-                    df[f"{prefix}_at_location_delta"] = df[home_col] - df[away_col]
+                    home, away = _numeric(df[home_col]), _numeric(df[away_col])
+                    if group_name in INVERTED_DELTA_GROUPS:
+                        home, away = away, home
+                    df[f"{prefix}_at_location_delta"] = home - away
                     created_features.append(f"{prefix}_at_location_delta")
                     columns_to_drop.extend([home_col, away_col])
         # delta=False + enabled=True → raw HT/VT survive, nothing to drop
@@ -341,14 +460,6 @@ def resolve_feature_columns(
             # delta=False + enabled=True → raw HT/VT survive
             for prefix in prefixes:
                 columns.extend([f"{prefix}_{HOME_SUFFIX}", f"{prefix}_{AWAY_SUFFIX}"])
-
-    # # Indifference Flag Delta
-    # home_road_config = features_config.indifference_flag
-    # if home_road_config.enabled:
-    #     if home_road_config.delta:
-    #         columns.append("indifference_flag_delta")
-    #     else:
-    #         columns.extend(["days_at_home", "days_on_road"])
 
     # home_and_road special case
     home_road_config = features_config.home_and_road

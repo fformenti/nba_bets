@@ -67,8 +67,8 @@ values for the same gameIds, after the games were played and appended:
   **same** model; `distance_L14_delta` of the **all** model. In training they
   carry real travel; in production they are identically zero.
 - **`sos_*` and `sos_adj_record_*` differ by up to 0.014** on slate rows.
-- **`clinched_playoff_berth`, `clinched_final_seed`, `indifference_flag`** flip on
-  one row per slate. `indifference_flag_delta` is selected by two of three models.
+- **`clinched_playoff_berth`, `clinched_final_seed`** flip on one row per slate
+  (they reach a model through `winning_incentive` since 2026-08-18).
 
 The two-season history window is **not** the cause and is sound: for the 3,740
 *historical* rows in the prediction frame, SOS matches the ETL exactly at every

@@ -263,8 +263,15 @@ def _merge_games_remaining(
         on="season",
         how="left",
     )
-    g["games_remaining"] = g["total_season_games"] - g["games_played"]
-    g["post_games_remaining"] = g["games_remaining"] - 1
+    # Clamped at 0: a team cannot have negative games left, and one league-wide
+    # season length says otherwise whenever a season is not balanced. The 2019/20
+    # bubble is the case — 22 teams played ~72 games against a league average of
+    # ~66 — and a negative games_remaining makes max_wins fall *below* current
+    # wins, which is the only way _rank_conference_snapshot can flag a team as
+    # clinched and eliminated at once (7 rows did). Everywhere else the eliminated
+    # set is provably a subset of the clinch-blocker set.
+    g["games_remaining"] = (g["total_season_games"] - g["games_played"]).clip(lower=0)
+    g["post_games_remaining"] = (g["games_remaining"] - 1).clip(lower=0)
     return g.drop(columns=["total_season_games"])
 
 
@@ -677,12 +684,8 @@ def compute_playoff_flags(
                 "clinched_playoff_berth",
                 "eliminated_from_playoffs",
                 "clinched_final_seed",
-                "indifference_flag",
             ]
         )
 
     out = pd.concat(result_pieces, ignore_index=True)
-    out["indifference_flag"] = (
-        out["eliminated_from_playoffs"] | out["clinched_final_seed"]
-    ).astype(int)
     return out

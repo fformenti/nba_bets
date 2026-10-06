@@ -1,6 +1,7 @@
 """Tests for the _include-based config loading system."""
 
 import pytest
+import yaml
 
 from src.config.paths import CONFIGS_TRAIN_DIR, PROJECT_ROOT
 from src.ml.config.loader import (
@@ -206,6 +207,52 @@ class TestTrainConfigLoading:
         assert features.distance.delta is True
         assert features.streak.delta is True
 
+    def test_every_feature_group_declares_delta_explicitly(self):
+        """No group in _defaults.yaml may rely on the schema default for `delta`.
+
+        Read from the raw YAML, not the parsed config: pydantic fills the default
+        in, so a parsed config can never show a missing key. And the default is
+        `True` (schema.py::FeatureGroupConfig), which is the opposite of what an
+        omitted key reads like to someone editing this file — an absent `delta`
+        looks like "no delta" and silently produces one.
+
+        That misreading has already happened once: the three clinch flags were
+        rewritten without a `delta` key on the understanding that this meant they
+        would ship as raw HT/VT pairs. They were shipping as -1/0/1 deltas.
+        """
+        raw = yaml.safe_load((CONFIGS_TRAIN_DIR / "_defaults.yaml").read_text())
+        groups = raw["feature_engineering"]["features"]
+        missing = sorted(name for name, cfg in groups.items() if "delta" not in cfg)
+        assert not missing, (
+            "these groups in _defaults.yaml omit `delta`, so they silently "
+            f"inherit the schema default of True: {missing}. State it explicitly "
+            "— `delta: false` for a group that should ship its raw HT/VT pair."
+        )
+
+    def test_location_lags_agree_across_families(self):
+        """One ETL argument builds three families' location tables.
+
+        aggregator.py takes a single `location_lags`, and schema.py reads it off
+        `record` alone — that one list drives calculate_home_record,
+        calculate_home_pts_diff and calculate_norm_home_pts_diff alike. But
+        resolve_feature_columns reads each group's *own* location_lags to name
+        the `_at_location_delta` columns it asks for.
+
+        So the three lists must stay equal. If they diverge, the ETL keeps
+        building record's windows while training asks for a window nobody built,
+        and the only symptom is the MISSING FEATURE warning in splits.py — which
+        is a log line, not a failure.
+        """
+        features = load_experiment_config(XGBOOST).feature_engineering.features
+        assert (
+            features.point_differential.location_lags
+            == features.record.location_lags
+        )
+        assert (
+            features.norm_point_differential.location_lags
+            == features.record.location_lags
+        )
+
     def test_model_hyperparameter_defaults_from_defaults_yaml(self):
         """Classifier blocks inherit hyperparameter_tuning from _defaults.yaml."""
         config = load_experiment_config(XGBOOST)
@@ -238,31 +285,31 @@ class TestTrainConfigLoading:
         assert features.home_and_road.delta is True
         assert config.feature_selection.include_tentative is True
 
-    def test_only_games_behind_leader_survived_the_feature_audit(self):
-        """The feature audit enabled several groups; most were reverted.
+    def test_playoff_group_flags_match_the_documented_intent(self):
+        """Which of the four playoff groups ship, and in which shape.
 
-        `gds` and `point_differential` were confirmed by Boruta-SHAP and still
-        turned back off, because each sat next to a feature it is derived from or
-        near-duplicates (see COUPLED_GROUPS). Of the six groups exploded out of
-        the old bundled `playoff_standings`, only `games_behind_leader`
-        survived: no derivation edge to an enabled group, and it correlates
-        -0.80 with record_L82, under the 0.95 threshold. The other five were
-        rejected at 0 hits (or, for eliminated_from_playoffs/clinched_final_seed,
-        never reachable before the split).
+        The three games-behind/-ahead measures are off: each is a restatement of
+        a team's record against another team's record, which `sos_adj_record`
+        already carries in absolute terms. `winning_incentive` is on, as a
+        delta: the three clinch booleans it replaced were one ordinal spelled
+        across three columns, and once collapsed the quantity is signed, so
+        HT - VT says which team has more reason to play its starters.
 
-        Re-enabling any of these is a modelling decision that needs a
-        head-to-head against the group it duplicates — not another Boruta run.
+        `gds` and `point_differential` stay off for a different reason: each sits
+        next to a feature it is derived from or near-duplicates. Re-enabling one
+        is a modelling decision that needs a head-to-head against the group it
+        duplicates — not another Boruta run. See COUPLED_GROUPS.
         """
         features = load_experiment_config(XGBOOST).feature_engineering.features
         assert features.gds.enabled is False
         assert features.point_differential.enabled is False
-        assert features.games_behind_leader.enabled is True
-        assert features.games_behind_leader.delta is True
+
+        assert features.games_behind_leader.enabled is False
         assert features.games_behind_above.enabled is False
         assert features.games_ahead_of_below.enabled is False
-        assert features.clinched_playoff_berth.enabled is False
-        assert features.eliminated_from_playoffs.enabled is False
-        assert features.clinched_final_seed.enabled is False
+
+        assert features.winning_incentive.enabled is True
+        assert features.winning_incentive.delta is True
 
     @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
     def test_no_coupled_pairs_co_enabled(self, config_path):

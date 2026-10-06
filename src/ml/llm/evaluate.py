@@ -17,7 +17,7 @@ from src.ml.llm.finetune import (
     build_tokenizer,
     get_hf_token,
 )
-from src.ml.llm.testers import ClassificationTester
+from src.ml.llm.testers import BatchedClassificationTester
 
 from src.utils.logging_config import get_logger
 
@@ -36,16 +36,22 @@ def load_eval_dataset(config: LLMTrainingConfig, split: str):
     return dataset[split]
 
 
-def build_predictor(config: LLMTrainingConfig, hub_model_id: str, revision=None):
-    """Return a ``predictor(datapoint) -> str`` backed by the fine-tuned model."""
-    import torch
+def _load_adapter_model(config: LLMTrainingConfig, hub_model_id: str, revision=None):
+    """Load the tokenizer and the base model with the fine-tuned adapter applied."""
     from peft import PeftModel
 
     tokenizer = build_tokenizer(config)
     base_model = build_base_model(config, tokenizer)
     model = PeftModel.from_pretrained(base_model, hub_model_id, revision=revision)
     model.eval()
+    return tokenizer, model
 
+
+def build_predictor(config: LLMTrainingConfig, hub_model_id: str, revision=None):
+    """Return a ``predictor(datapoint) -> str`` backed by the fine-tuned model."""
+    import torch
+
+    tokenizer, model = _load_adapter_model(config, hub_model_id, revision=revision)
     max_new_tokens = config.evaluation.max_new_tokens
 
     def model_predict(item) -> str:
@@ -58,6 +64,36 @@ def build_predictor(config: LLMTrainingConfig, hub_model_id: str, revision=None)
     return model_predict
 
 
+def build_batch_predictor(config: LLMTrainingConfig, hub_model_id: str, revision=None):
+    """Return a ``predict_batch(datapoints) -> list[str]`` that decodes them together.
+
+    Prompts are left-padded so every row's prompt ends at the same column: the
+    generated tokens then start at one shared offset, and decoding is greedy so
+    the answers match :func:`build_predictor` row for row.
+    """
+    import torch
+
+    tokenizer, model = _load_adapter_model(config, hub_model_id, revision=revision)
+    # Decoder-only generation needs left padding; training keeps right padding.
+    tokenizer.padding_side = "left"
+    max_new_tokens = config.evaluation.max_new_tokens
+
+    def predict_batch(items) -> list[str]:
+        prompts = [item[config.data.prompt_field] for item in items]
+        inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
+        with torch.inference_mode():
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+        prompt_len = inputs["input_ids"].shape[1]
+        return tokenizer.batch_decode(output_ids[:, prompt_len:], skip_special_tokens=True)
+
+    return predict_batch
+
+
 def run_evaluation(
     config: LLMTrainingConfig,
     run_name: str,
@@ -68,7 +104,7 @@ def run_evaluation(
 ) -> dict[str, Any]:
     """Score the adapter for *run_name* and write charts to *output_dir*.
 
-    Returns the metrics dict from :class:`ClassificationTester` plus the
+    Returns the metrics dict from :class:`BatchedClassificationTester` plus the
     resolved split and hub model id.
     """
     from transformers import set_seed
@@ -80,14 +116,15 @@ def run_evaluation(
     logger.info(f"Evaluating {hub_model_id} on split '{split}' (n={size})")
 
     data = load_eval_dataset(config, split)
-    predictor = build_predictor(config, hub_model_id, revision=revision)
+    predict_batch = build_batch_predictor(config, hub_model_id, revision=revision)
 
     set_seed(config.evaluation.seed)
-    metrics = ClassificationTester(
-        predictor,
+    metrics = BatchedClassificationTester(
+        predict_batch,
         data,
         title=run_name,
         size=size,
+        batch_size=config.evaluation.batch_size,
         output_dir=output_dir,
     ).run()
 

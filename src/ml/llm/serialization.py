@@ -136,12 +136,19 @@ _STEM_LABELS = {
     "streak": "current win/loss streak",
     "last_season_record": "last season win percentage",
     "adjusted_last_season_record": "adjusted last-season win percentage",
-    "indifference_flag": "little left to play for",
     "days_at_home": "consecutive days at home",
     "days_on_road": "consecutive days on the road",
     "conference_diff_home_advantage_pct": "cross-conference home advantage",
     "conference_home_court_advantage_pct": "home conference's edge on its own floor",
+    "winning_incentive": (
+        "what the team still has to play for "
+        "(-1 eliminated, 0 seed locked in and resting, 1 still fighting)"
+    ),
 }
+
+# A group with `delta: false` ships its raw per-team pair, so the column keeps a
+# team suffix that means nothing to a model reading prose.
+_TEAM_SUFFIXES = {"_HT": "home team", "_VT": "away team"}
 
 # (section title, stems). First match wins; anything unmatched lands in "Other",
 # so a new feature is never silently dropped from the prompt.
@@ -157,9 +164,17 @@ _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             "last_season_record",
             "adjusted_last_season_record",
-            "indifference_flag",
             "conference_diff_home_advantage_pct",
             "conference_home_court_advantage_pct",
+        ),
+    ),
+    (
+        "Playoff position",
+        (
+            "winning_incentive",
+            "games_behind_leader",
+            "games_behind_above",
+            "games_ahead_of_below",
         ),
     ),
 )
@@ -171,12 +186,21 @@ _OTHER_SECTION = "Other"
 def _parse_feature_name(name: str) -> tuple[str, str, bool]:
     """Split a feature column into ``(stem, human label, is_venue)``.
 
-    Understands the ``<stem>[_L<lag>][_at_location][_delta]`` convention. An
-    unrecognized stem falls back to its own name with underscores spaced out —
+    Understands the ``<stem>[_L<lag>][_at_location][_delta|_HT|_VT]`` convention.
+    An unrecognized stem falls back to its own name with underscores spaced out —
     never raises, so an unfamiliar column degrades to a readable line instead of
     breaking the dataset build.
     """
     stem = name[: -len("_delta")] if name.endswith("_delta") else name
+
+    # A raw (delta: false) column names its team. Say which team in words:
+    # "home team" reads; "HT" is a convention only this repo knows.
+    team = None
+    for suffix, who in _TEAM_SUFFIXES.items():
+        if stem.endswith(suffix):
+            team = who
+            stem = stem[: -len(suffix)]
+            break
 
     is_venue = stem.endswith("_at_location")
     if is_venue:
@@ -191,6 +215,8 @@ def _parse_feature_name(name: str) -> tuple[str, str, bool]:
     label = _STEM_LABELS.get(stem, stem.replace("_", " "))
     if lag is not None:
         label += f", last {lag} game{'s' if lag != 1 else ''}"
+    if team is not None:
+        label = f"{team} {label}"
     return stem, label, is_venue
 
 
@@ -227,16 +253,14 @@ def _as_labeled(features: pd.Series, meta: Optional[pd.Series]) -> str:
 
     lines = []
 
-    # Stated once, at the top, rather than suffixed onto all ~27 labels. For a
-    # base model the sign convention is the single most useful sentence here:
-    # it is what ties every feature to the sign of the answer. Conditional so it
-    # stays true if a future feature set mixes in raw (non-delta) columns.
-    if any(str(name).endswith("_delta") for name in _safe_features(features).index):
-        # Says "minus", not "positive favours home" — SYSTEM_PROMPT already
-        # states the sign convention, and repeating it wastes the one sentence
-        # that explains *why* the numbers are signed the way they are.
-        lines.append("Each statistic is the home team's value minus the away team's.")
-        lines.append("")
+    # No per-format sentence about how a delta is computed. This used to say
+    # "Each statistic is the home team's value minus the away team's", which is
+    # not true of every group: engineering.py::INVERTED_DELTA_GROUPS swaps the
+    # operands for lower-is-better quantities (distance, back_to_back) and
+    # days_at_home_delta is a sum. One formula cannot describe all three, and a
+    # formula per label would cost more tokens than it buys. SYSTEM_PROMPT
+    # carries the statement that is true of all of them and is the one the model
+    # actually needs — positive values favour the home team.
 
     context = _context(meta)
     if context:

@@ -1,5 +1,6 @@
 """Metadata-based analysis: joins predictions with game metadata to surface model error patterns."""
 
+from itertools import cycle
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +10,16 @@ import pandas as pd
 import seaborn as sns
 
 sns.set_style("whitegrid")
+
+# Marker and colour per comparison series. Pinned by label rather than by
+# position so the market reads seagreen in every figure that carries it — the
+# same green as in the ROC and calibration twins — whatever order the caller
+# passes its comparisons in.
+SERIES_STYLES = {
+    "Polymarket": ("^--", "seagreen"),
+    "Record baseline": ("s--", "tomato"),
+}
+COMPARISON_STYLES = [("s--", "tomato"), ("^--", "seagreen"), ("D--", "mediumpurple")]
 
 
 def _build_analysis_df(
@@ -396,10 +407,20 @@ def plot_season_phase_accuracy(
     y_pred: np.ndarray,
     metadata: pd.DataFrame,
     bins: list[int] | None = None,
-    y_pred_baseline: Optional[np.ndarray] = None,
+    comparison_preds: Optional[dict] = None,
     title: str = "Accuracy by Season Phase (Games Played)",
     figsize: tuple = (10, 6),
 ) -> tuple[plt.Figure, pd.DataFrame]:
+    """Model accuracy per games-played bucket, against any number of comparisons.
+
+    ``comparison_preds`` is ``{label: hard predictions}`` — the record baseline,
+    the market, or both. Every series is bucketed by the *same* metadata rows, so
+    they are only comparable if they were predicted on the same games; slicing to
+    a mutual-coverage subset is the caller's job.
+
+    The returned table carries one ``accuracy_<label>`` column per series, so the
+    CSV written next to the figure says exactly what the figure shows.
+    """
     phase_stats = compute_season_phase_metrics(y_true, y_pred, metadata, bins=bins)
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -412,19 +433,49 @@ def plot_season_phase_accuracy(
     ax.plot(x, phase_stats["accuracy"], "o-", color="steelblue", lw=2, ms=7, label="Model accuracy")
     ax.axhline(y=overall_acc, color="steelblue", linestyle="--", lw=1.5, alpha=0.6, label=f"Model avg ({overall_acc:.1%})")
 
-    for xi, acc in zip(x, phase_stats["accuracy"]):
-        ax.annotate(f"{acc:.1%}", (xi, acc), xytext=(0, 8), textcoords="offset points",
-                    ha="center", fontsize=8, color="steelblue", fontweight="bold")
+    table = phase_stats.rename(columns={"accuracy": "accuracy_model"})
 
-    baseline_stats = None
-    if y_pred_baseline is not None:
-        baseline_stats = compute_season_phase_metrics(y_true, y_pred_baseline, metadata, bins=bins)
-        baseline_overall = (y_true.values == y_pred_baseline).mean()
-        ax.plot(x, baseline_stats["accuracy"], "s--", color="tomato", lw=2, ms=7, label="Record baseline accuracy")
-        ax.axhline(y=baseline_overall, color="tomato", linestyle=":", lw=1.5, alpha=0.6, label=f"Baseline avg ({baseline_overall:.1%})")
-        for xi, acc in zip(x, baseline_stats["accuracy"]):
-            ax.annotate(f"{acc:.1%}", (xi, acc), xytext=(0, -14), textcoords="offset points",
-                        ha="center", fontsize=8, color="tomato", fontweight="bold")
+    # Values by series, collected so the number labels can be laid out by rank
+    # below rather than at a fixed per-series offset. The series routinely sit
+    # within a point of each other, and fixed offsets pile the numbers on top of
+    # one another exactly where the chart is most worth reading.
+    drawn = [(np.asarray(phase_stats["accuracy"]), "steelblue")]
+
+    for (label, preds), fallback in zip(
+        (comparison_preds or {}).items(), cycle(COMPARISON_STYLES)
+    ):
+        marker, color = SERIES_STYLES.get(label, fallback)
+        stats = compute_season_phase_metrics(y_true, preds, metadata, bins=bins)
+        series_overall = (y_true.values == preds).mean()
+        ax.plot(x, stats["accuracy"], marker, color=color, lw=2, ms=7, label=f"{label} accuracy")
+        ax.axhline(y=series_overall, color=color, linestyle=":", lw=1.5, alpha=0.6,
+                   label=f"{label} avg ({series_overall:.1%})")
+        drawn.append((np.asarray(stats["accuracy"]), color))
+
+        column = f"accuracy_{label.lower().replace(' ', '_')}"
+        table = table.merge(
+            stats[["season_phase", "accuracy"]].rename(columns={"accuracy": column}),
+            on="season_phase",
+            how="left",
+        )
+
+    # One label per series per bucket, ordered by value: the leading series is
+    # labelled above the bucket's high point, the rest are stacked below its low
+    # point in descending order. Anchoring the lower labels to the bucket floor
+    # rather than to their own marker is what keeps them legible when two series
+    # land within a point of each other — colour and order say which is which.
+    for xi in x:
+        ranked = sorted(drawn, key=lambda series: series[0][xi], reverse=True)
+        floor = min(values[xi] for values, _ in ranked)
+        for rank, (values, color) in enumerate(ranked):
+            anchor, offset = (
+                (values[xi], 9) if rank == 0 else (floor, -(6 + 12 * rank))
+            )
+            ax.annotate(
+                f"{values[xi]:.1%}", (xi, anchor),
+                xytext=(0, offset), textcoords="offset points",
+                ha="center", fontsize=8, color=color, fontweight="bold",
+            )
 
     ax.set_xticks(list(x))
     ax.set_xticklabels(x_labels, rotation=45, ha="right")
@@ -432,16 +483,18 @@ def plot_season_phase_accuracy(
     ax.set_ylabel("Accuracy", fontsize=12)
     ax.set_title(title, fontsize=14, fontweight="bold")
 
-    y_min = phase_stats["accuracy"].min()
-    if baseline_stats is not None:
-        y_min = min(y_min, baseline_stats["accuracy"].min())
-    ax.set_ylim(max(0, y_min - 0.08), min(1.0, phase_stats["accuracy"].max() + 0.1))
+    accuracy_columns = [c for c in table.columns if c.startswith("accuracy_")]
+    y_min = table[accuracy_columns].min().min()
+    y_max = table[accuracy_columns].max().max()
+    # Headroom below scales with the series count: every series past the first
+    # stacks another row of labels under the bucket floor.
+    ax.set_ylim(max(0, y_min - (0.05 + 0.03 * len(drawn))), min(1.0, y_max + 0.1))
 
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    return fig, phase_stats
+    return fig, table
 
 
 # ---------------------------------------------------------------------------
@@ -521,7 +574,11 @@ def generate_analysis(
     if "games_played_HT" in metadata.columns and "games_played_VT" in metadata.columns:
         fig, table = plot_season_phase_accuracy(
             y_true, y_pred, metadata,
-            y_pred_baseline=y_pred_baseline,
+            comparison_preds=(
+                {"Record baseline": y_pred_baseline}
+                if y_pred_baseline is not None
+                else None
+            ),
             title=f"Accuracy by Season Phase{suffix}",
         )
         fig.savefig(analysis_dir / "season_phase_accuracy.png", dpi=300, bbox_inches="tight")

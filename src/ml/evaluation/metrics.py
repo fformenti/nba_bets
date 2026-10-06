@@ -1,5 +1,7 @@
 """Evaluation metrics utilities."""
 
+import logging
+
 import numpy as np
 import pandas as pd
 from typing import Dict, Optional
@@ -11,6 +13,8 @@ from sklearn.metrics import (
     roc_auc_score,
     brier_score_loss,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def compute_regression_metrics(
@@ -167,14 +171,57 @@ def compute_classification_metrics(
     return metrics
 
 
+def compute_home_win_metrics(
+    frame: pd.DataFrame,
+    truth_column: str = "actual_home_win",
+    prediction_column: str = "prediction",
+    probability_column: str = "home_win_probability",
+) -> Dict[str, float]:
+    """Accuracy plus probabilistic metrics for one slice of home-win calls.
+
+    The shared scoring path for anything that predicts "does the home team win"
+    — the live scorecard, and the Polymarket baseline it is compared against.
+    Both go through this function so a difference between them can only come
+    from the predictions, never from how they were scored.
+
+    The probability columns are optional: a source that emits only a hard call
+    gets accuracy, and one that emits a calibrated probability also gets Brier
+    and ECE.
+    """
+    y_true = frame[truth_column].astype(int)
+    y_pred = frame[prediction_column].astype(int).to_numpy()
+
+    values = None
+    if probability_column in frame.columns:
+        proba = pd.to_numeric(frame[probability_column], errors="coerce")
+        if proba.notna().all():
+            values = proba.to_numpy()
+
+    metrics = {"n_games": len(frame)}
+    # Passing the probabilities in rather than only using them below is what
+    # earns this a roc_auc. Without it a source that emits a calibrated
+    # probability was still ranked on its hard call alone.
+    metrics.update(compute_classification_metrics(y_true, y_pred, y_pred_proba=values))
+
+    if values is not None:
+        # Recomputed unrounded: compute_classification_metrics rounds to 4dp,
+        # and the market-vs-model gap here is routinely smaller than that.
+        metrics["brier_score"] = compute_brier_score(y_true.to_numpy(), values)
+        metrics["ece"] = compute_ece(y_true.to_numpy(), values)
+
+    return metrics
+
+
 MODEL_DISPLAY_NAMES = {
     "random_forest": "Random Forest",
     "gradient_boosting": "Gradient Boosting",
     "xgboost": "XGBoost",
     "lgbm": "LightGBM",
     "neural_network": "Neural Network",
-    "best_record_baseline": "Best Record Baseline",
+    "record_baseline": "Record Baseline",
     "point_differential_baseline": "Point Differential Baseline",
+    "home_win_baseline": "Home Team Wins Baseline",
+    "polymarket_baseline": "Polymarket Baseline",
 }
 
 def get_model_display_name(model_key: str) -> str:
@@ -200,12 +247,18 @@ def format_metrics_line(metrics: Dict[str, float], prefix: str = "") -> str:
     """
     acc_key = f"{prefix}_accuracy" if prefix else "accuracy"
     auc_key = f"{prefix}_roc_auc" if prefix else "roc_auc"
+    n_key = f"{prefix}_n_games" if prefix else "n_games"
 
     parts = []
     if acc_key in metrics:
         parts.append(f"Accuracy: {metrics[acc_key] * 100:.2f}%")
     if auc_key in metrics:
         parts.append(f"ROC AUC: {metrics[auc_key] * 100:.2f}%")
+    # Only some rows carry it. A row scored on a subset of the split — the
+    # market benchmark covers the games Polymarket listed, not all of them —
+    # must not be read as if it sat on the same games as the rows above it.
+    if parts and n_key in metrics:
+        parts.append(f"n={int(metrics[n_key])}")
 
     return " | ".join(parts)
 
@@ -233,4 +286,4 @@ def print_metrics_summary(
 
     display_name = get_model_display_name(model_name) if model_name else "Model"
     split_label = f" [{split.capitalize()}]" if split else ""
-    print(f"  {display_name}{split_label}: {line}")
+    logger.info(f"  {display_name}{split_label}: {line}")

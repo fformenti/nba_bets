@@ -182,6 +182,8 @@ Follow this step-by-step guide:
 4. **Configure lags** (if applicable) in the YAML config under `features.lags`, `features.location_lags`, or `features.distances_lags`
 
 5. **Handle delta transformation** (if applicable)
+   - Delta features were created to reduce dimensionality and capture relative performance between home and away teams
+   - Not all Delta features are created using the same logic most are home - away, others are away - home,and others home + away depending on the feature's semantics
    - Add to the feature list in `src/ml/features/engineering.py` `create_delta_features()`
    - Decide: does a delta (home - away) make sense for this feature?
    - Not all features need deltas — raw features like `days_at_home` are valid on their own

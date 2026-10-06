@@ -194,7 +194,65 @@ def _report_to(config: LLMTrainingConfig) -> list[str]:
     return reporters
 
 
-def build_sft_config(config: LLMTrainingConfig, run_name: str, output_dir: Path):
+def sequence_lengths(prompts, completions, tokenizer) -> list[int]:
+    """Token count of each prompt+completion, as trl tokenizes it for training.
+
+    trl 0.22 tokenizes the two fields separately: the prompt with special tokens
+    (BOS), the completion without, then appends EOS. Tokenizing the
+    concatenated string can merge tokens across the boundary and undercount.
+    """
+    prompt_ids = tokenizer(list(prompts))["input_ids"]
+    completion_ids = tokenizer(list(completions), add_special_tokens=False)["input_ids"]
+    return [len(p) + len(c) + 1 for p, c in zip(prompt_ids, completion_ids)]
+
+
+def check_context_length(
+    lengths_by_split: dict[str, list[int]],
+    game_ids_by_split: dict[str, list],
+    context_length: int,
+) -> int:
+    """Return the longest record across all splits; raise if it exceeds the context window."""
+    split, lengths = max(lengths_by_split.items(), key=lambda kv: max(kv[1]))
+    longest = max(lengths)
+    if longest > context_length:
+        game_id = game_ids_by_split[split][lengths.index(longest)]
+        raise ValueError(
+            f"Record game_id={game_id} in split '{split}' is {longest} tokens, "
+            f"over the model's context length of {context_length}."
+        )
+    return longest
+
+
+def resolve_max_length(config: LLMTrainingConfig, tokenizer) -> int:
+    """Measure prompt+completion lengths over every split and return the longest.
+
+    Covers the whole dataset, ignoring the sample caps, so the cap never
+    truncates a record any split contains.
+    """
+    import numpy as np
+    from datasets import load_dataset
+
+    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
+    lengths_by_split, game_ids_by_split = {}, {}
+    for name, split in dataset.items():
+        lengths = sequence_lengths(split["prompt"], split["completion"], tokenizer)
+        lengths_by_split[name] = lengths
+        game_ids_by_split[name] = split["game_id"]
+        logger.info(
+            f"Token lengths ({name}): max={max(lengths)} "
+            f"p99={int(np.percentile(lengths, 99))} rows={len(lengths)}"
+        )
+
+    longest = check_context_length(
+        lengths_by_split, game_ids_by_split, config.data.context_length
+    )
+    logger.info(f"max_length set to {longest} (context length {config.data.context_length}).")
+    return longest
+
+
+def build_sft_config(
+    config: LLMTrainingConfig, run_name: str, output_dir: Path, max_length: int
+):
     """Map the YAML config onto a trl ``SFTConfig``."""
     from trl import SFTConfig
 
@@ -204,14 +262,17 @@ def build_sft_config(config: LLMTrainingConfig, run_name: str, output_dir: Path)
         run_name=run_name,
         num_train_epochs=training.epochs,
         per_device_train_batch_size=training.per_device_train_batch_size,
-        per_device_eval_batch_size=1,
-        eval_strategy="no",
+        per_device_eval_batch_size=training.per_device_eval_batch_size,
+        eval_strategy=training.eval_strategy,
+        eval_steps=training.eval_steps,
         gradient_accumulation_steps=training.gradient_accumulation_steps,
         gradient_checkpointing=training.gradient_checkpointing,
         optim=training.optimizer,
         learning_rate=training.learning_rate,
         lr_scheduler_type=training.lr_scheduler_type,
-        warmup_ratio=training.warmup_ratio,
+        # transformers>=5.x merged warmup_ratio into warmup_steps: a float <1 is
+        # treated as a ratio of total steps, >=1 as an absolute step count.
+        warmup_steps=training.warmup_ratio,
         weight_decay=training.weight_decay,
         max_grad_norm=training.max_grad_norm,
         max_steps=-1,
@@ -219,6 +280,10 @@ def build_sft_config(config: LLMTrainingConfig, run_name: str, output_dir: Path)
         fp16=training.fp16,
         seed=training.seed,
         logging_steps=training.logging_steps,
+        # transformers defaults this from its own logger level, so anything that
+        # raises verbosity (TRANSFORMERS_VERBOSITY=error, a notebook calling
+        # set_verbosity_error) silently hides the progress bar. Pin it on.
+        disable_tqdm=False,
         save_strategy="steps",
         save_steps=training.save_steps,
         save_total_limit=training.save_total_limit,
@@ -230,8 +295,8 @@ def build_sft_config(config: LLMTrainingConfig, run_name: str, output_dir: Path)
         # dataset ships prompt+completion, so leaving this at its default (which
         # matches no column) is what selects the prompt-completion path.
         completion_only_loss=training.train_on_completion_only,
-        # The notebook defined MAX_SEQUENCE_LENGTH but never passed it.
-        max_length=config.data.max_sequence_length,
+        # Measured from the dataset (resolve_max_length), so nothing is truncated.
+        max_length=max_length,
         push_to_hub=config.hub.push_checkpoints,
         hub_strategy="every_save",
         hub_model_id=build_hub_model_id(config, run_name),
@@ -251,6 +316,90 @@ def load_train_dataset(config: LLMTrainingConfig):
         logger.info(f"Capped training set to {n} rows (max_train_samples).")
     logger.info(f"Training rows: {len(train)}")
     return train
+
+
+def load_eval_dataset(config: LLMTrainingConfig):
+    """Load the in-training evaluation split, honouring ``data.max_eval_samples``.
+
+    The cap takes a seeded random sample rather than the first N rows: the
+    split is date-sorted, and the first N would all come from one month.
+    """
+    from datasets import load_dataset
+
+    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
+    evaluation = dataset[config.data.eval_split]
+    if config.data.max_eval_samples:
+        n = min(config.data.max_eval_samples, len(evaluation))
+        evaluation = evaluation.shuffle(seed=config.training.seed).select(range(n))
+        logger.info(f"Sampled {n} eval rows (max_eval_samples).")
+    logger.info(f"Eval rows ({config.data.eval_split}): {len(evaluation)}")
+    return evaluation
+
+
+def first_completion_token_hits(logits, labels):
+    """Count rows whose first completion token is predicted correctly.
+
+    ``labels`` is the collator's output: prompt and padding positions are
+    ``-100``, so with completion-only loss the first unmasked label is the
+    first completion token - the sign of the point differential. Logits at
+    position ``i`` predict the token at ``i + 1``, hence the one-step shift.
+
+    Returns ``(correct, total)`` as 0-d tensors. Rows whose completion was
+    truncated away by ``max_length`` have no unmasked label and are excluded.
+    """
+    import torch
+
+    shift_labels = labels[:, 1:]
+    mask = shift_labels != -100
+    has_completion = mask.any(dim=1)
+    # argmax over a 0/1 mask returns the first 1; rows without one are dropped below.
+    first = mask.int().argmax(dim=1)
+    rows = torch.arange(labels.size(0), device=labels.device)
+
+    target = shift_labels[rows, first]
+    predicted = logits[rows, first].argmax(dim=-1)
+    correct = ((predicted == target) & has_completion).sum()
+    return correct, has_completion.sum()
+
+
+def build_trainer_class():
+    """``SFTTrainer`` that also logs ``first_token_accuracy``.
+
+    trl's own ``mean_token_accuracy`` averages over every completion token -
+    sign, magnitude and the appended EOS - so it cannot tell a model that gets
+    the winner right from one that only learned to stop. This adds the sign
+    alone, in train and eval, through the same ``_metrics`` buffer trl uses,
+    so it is averaged and logged (``eval_`` prefix included) alongside it.
+
+    Built inside a function because trl is a GPU-only extra and every module
+    under ``src/`` must import without it.
+    """
+    import torch
+    from trl import SFTTrainer
+
+    class FirstTokenAccuracySFTTrainer(SFTTrainer):
+        def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+            loss, outputs = super().compute_loss(
+                model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+            )
+            # Without completion-only loss the first unmasked label is a prompt
+            # token; liger returns no logits.
+            if (
+                "labels" in inputs
+                and self.args.completion_only_loss
+                and not self.args.use_liger_kernel
+            ):
+                with torch.no_grad():
+                    logits = outputs.logits[:, self.num_virtual_tokens :, :]
+                    correct, total = first_completion_token_hits(logits, inputs["labels"])
+                    correct = self.accelerator.gather_for_metrics(correct).sum()
+                    total = self.accelerator.gather_for_metrics(total).sum()
+                if total > 0:
+                    mode = "train" if self.model.training else "eval"
+                    self._metrics[mode]["first_token_accuracy"].append((correct / total).item())
+            return (loss, outputs) if return_outputs else loss
+
+    return FirstTokenAccuracySFTTrainer
 
 
 def run_training(
@@ -276,7 +425,6 @@ def run_training(
         ``run_name``, ``hub_model_id``, ``resumed_from`` and ``train_metrics``.
     """
     from huggingface_hub import login
-    from trl import SFTTrainer
 
     token = get_hf_token()
     login(token, add_to_git_credential=True)
@@ -295,15 +443,19 @@ def run_training(
     logger.info(f"Output dir:   {output_dir}")
     logger.info(f"Resuming from: {checkpoint or 'scratch'}")
 
-    train = load_train_dataset(config)
     tokenizer = build_tokenizer(config)
+    # Before the base model loads, so an over-length record fails cheaply.
+    max_length = resolve_max_length(config, tokenizer)
+    train = load_train_dataset(config)
+    evaluation = load_eval_dataset(config) if config.training.eval_strategy != "no" else None
     base_model = build_base_model(config, tokenizer)
 
-    trainer = SFTTrainer(
+    trainer = build_trainer_class()(
         model=base_model,
         train_dataset=train,
+        eval_dataset=evaluation,
         peft_config=build_lora_config(config),
-        args=build_sft_config(config, run_name, output_dir),
+        args=build_sft_config(config, run_name, output_dir, max_length),
     )
 
     result = trainer.train(resume_from_checkpoint=str(checkpoint) if checkpoint else None)

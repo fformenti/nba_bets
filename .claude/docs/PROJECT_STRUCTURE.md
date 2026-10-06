@@ -30,7 +30,8 @@ configs/
 │   ├── llm_features.yaml               # Overrides: LLM feature set (adds win % and streak)
 │   └── xgboost.yaml                    # The deployed model: all games, xgboost
 ├── train_llm/
-│   └── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
+│   ├── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
+│   └── llama31_8b_qlora_t4.yaml        # Same, but fp16/float16 — T4 has no bf16 tensor cores
 └── predict/
     └── predict_classifier.yaml         # The deployed model URI
 ```
@@ -61,11 +62,14 @@ src/
 │   ├── build_llm_dataset.py            # make build-llm-dataset
 │   ├── train_llm.py                    # make train-llm
 │   ├── evaluate_llm.py                 # make evaluate-llm
+│   ├── inspect_llm.py                  # make inspect-llm
 │   ├── place_bets.py                   # make bet-polymarket GAME_DATE=...
 │   ├── build_game_slug_lookup.py       # make build-game-slug-lookup
+│   ├── build_polymarket_odds.py        # make build-polymarket-odds
 │   ├── delete_experiment.py            # make delete-experiment EXPERIMENT=...
 │   ├── delete_model.py                 # make delete-model ARGS=...
-│   └── plot_home_win_ratio.py          # make plot-home-win-ratio
+│   ├── plot_home_win_ratio.py          # make plot-home-win-ratio
+│   └── plot_home_win_ratio_line.py     # make plot-home-win-ratio-line
 │
 ├── config/
 │   ├── paths.py                        # All data path constants
@@ -155,6 +159,7 @@ src/
 │   │   ├── dataset.py                  # build_llm_dataset() from build_splits()
 │   │   ├── finetune.py                 # QLoRA SFT: preflight, Hub resume, SFTTrainer
 │   │   ├── train.py                    # Run orchestration + tracking
+│   │   ├── diagnostics.py              # Raw outputs + first-token sign probabilities
 │   │   ├── evaluate.py                 # Score an adapter as a sign classifier
 │   │   └── testers.py                  # RegressionTester / ClassificationTester
 │   │
@@ -166,7 +171,8 @@ src/
 │   ├── evaluation/
 │   │   ├── metrics.py                  # Classification metrics, Brier, ECE
 │   │   ├── visualization.py            # Confusion matrix, ROC, calibration, SHAP
-│   │   └── analysis.py                 # Prediction error pattern analysis
+│   │   ├── analysis.py                 # Prediction error pattern analysis
+│   │   └── polymarket_baseline.py      # Model vs market, on mutually-covered games
 │   │
 │   ├── tracking/
 │   │   ├── mlflow_tracker.py           # MLflowTracker context manager
@@ -178,11 +184,12 @@ src/
 │       └── shap.py                     # SHAP output compatibility
 │
 ├── betting/                            # Polymarket — consumes model output, not modelling
-│   ├── slugs.py                        # slugify(), get_game_slug()
-│   ├── polymarket_client.py            # Gamma/CLOB HTTP; MarketSide; get_market_prices() seam
+│   ├── slugs.py                        # slugify(), get_game_slug(), slug candidates
+│   ├── polymarket_client.py            # Gamma/CLOB HTTP; MarketSide; market listing + price history
 │   ├── sizing.py                       # Edge-proportional stake sizing
 │   ├── bets.py                         # Build and save a daily buying strategy
-│   └── game_slugs.py                   # gameId → slug lookup for the test seasons
+│   ├── game_slugs.py                   # gameId → slug lookup for the test seasons
+│   └── polymarket_odds.py              # gameId → tip-off odds backfill (the market benchmark)
 │
 ├── monitoring/
 │   └── scoring.py                      # score_predictions(): live accuracy vs played games

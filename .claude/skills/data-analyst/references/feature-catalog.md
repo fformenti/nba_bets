@@ -302,7 +302,7 @@ the groupby ever stopped agreeing.
 
 | Function | Output columns | Merge suffix |
 |----------|---------------|--------------|
-| `compute_playoff_flags()` | `conf_rank`, `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed`, `indifference_flag` | `_HT`, `_VT` |
+| `compute_playoff_flags()` | `conf_rank`, `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed` | `_HT`, `_VT` |
 
 Conference standings and playoff status for every (team, game). The most complex builder in
 the ETL, and — until this audit — the one whose output was least reachable.
@@ -325,11 +325,6 @@ frame stopping in January holds ~690 games, reads as a 46-game season, and teams
 clinching berths in December. `season_lengths_from_schedule()` returns `{}` when the
 schedule has not been parsed (`full-rebuild` does not run `parse-league-schedule`), and
 callers fall back to counting.
-
-`indifference_flag = eliminated_from_playoffs | clinched_final_seed` — a team with nothing
-left to play for. Note `create_delta_features` **inverts** this one:
-`indifference_flag_delta = VT - HT`, so a positive value means the *visitor* is the one
-coasting, which favours the home team like every other feature's positive direction.
 
 Team-games with a null conference are skipped by the `groupby` and get NaN standings; the
 builder logs the count rather than ranking them as a pseudo-conference.
@@ -391,19 +386,41 @@ and drops both sources. Groups in `LOCATION_VARIANT_GROUPS` additionally build
 `{prefix}_at_location_delta = {prefix}_HT_at_home - {prefix}_VT_on_road`.
 
 For each **disabled** group, the HT/VT columns are dropped without a delta. This is why
-`enabled: false` leaves no trace in the frame.
+`enabled: false` leaves no trace in the frame. A group that is **enabled with
+`delta: false`** keeps its raw `_HT`/`_VT` pair instead — never both the pair and a delta.
+
+> **`delta` is not optional in practice.** `FeatureGroupConfig.delta` defaults to
+> **`True`**, which is the opposite of what an omitted key looks like to someone editing
+> `_defaults.yaml`. The three clinch flags were once rewritten without a `delta` key on
+> the understanding that this meant "raw pair"; they shipped as −1/0/1 deltas until
+> 2026-08-15. Every group now states it explicitly, enforced by
+> `test_every_feature_group_declares_delta_explicitly` against the raw YAML.
+
+**Sign convention: a positive delta always favours the home team.** For higher-is-better
+quantities that is `HT − VT`. For the lower-is-better ones the operands swap — those are
+named in `INVERTED_DELTA_GROUPS`:
+
+| Group | Formula | Why inverted |
+|---|---|---|
+| `distance` | `distance_L{lag}_VT - distance_L{lag}_HT` | the visitor travelling farther helps the host |
+| `back_to_back` | `back_to_back_VT - back_to_back_HT` | the visitor on a back-to-back helps the host |
+
+This is not cosmetic. `src/ml/llm/serialization.py::SYSTEM_PROMPT` states the convention
+to the model verbatim ("Positive values favour the home team"), and every SHAP sign is
+read against it. Until 2026-08-15 the code computed `HT − VT` for all groups, so those
+two families contradicted the prompt in every LLM example built from
+`llm_features.yaml`. Pinned by `tests/test_feature_resolution.py::TestDeltaOrientation`.
 
 Three special cases:
 
 | Case | Behaviour | Why |
 |------|-----------|-----|
-| `indifference_flag` | delta is `VT - HT`, inverted | positive should favour the home team, and it is the *visitor* having nothing to play for that helps |
-| `home_and_road` | delta is a **sum**: `days_at_home + days_on_road` | both push the same direction — a long homestand helps the host, a long road trip hurts the visitor — so summing collapses two columns into one without cancelling |
+| `home_and_road` | delta is a **sum**: `days_at_home + days_on_road` | both push the same direction — a long homestand helps the host, a long road trip hurts the visitor — so summing collapses two columns into one without cancelling. Already oriented positive-favours-home. |
 | `neutral_court` | game-level scalar, no HT/VT split, no delta | one value per game, not per team |
+| `winning_incentive` | derived before the delta pass by `create_winning_incentive_features`, then a plain `HT - VT` delta | the three clinch booleans are one ordinal spelled across three columns. Collapsed to −1 eliminated / 0 seed locked and resting / 1 still fighting, the quantity is signed, so a difference means "which team has more reason to play its starters". Not in `INVERTED_DELTA_GROUPS`: higher is already better for the team holding it. |
 
-Boolean columns are cast to int before subtraction (`_numeric`) — numpy refuses `-` on
-bool, which would otherwise make `clinched_playoff_berth_delta` raise instead of producing
-the -1/0/1 that "one team clinched and the other didn't" should be.
+Boolean columns are cast to int before use (`_numeric`) — numpy refuses `-` on bool, and
+the clinch flags are read as an integer triple by `create_winning_incentive_features`.
 
 ### `create_conference_features()`
 
@@ -442,10 +459,7 @@ momentum pair**, so this path is currently inert — available, not dead.
 ### `resolve_feature_columns()`
 
 The inclusion-mode column list. Must stay consistent with `create_delta_features` or the
-"MISSING FEATURE" warning fires. Note the commented-out `indifference_flag` block near the
-`home_and_road` special case — `indifference_flag` is handled by the generic
-`FEATURE_GROUP_PREFIXES` loop, so the block is a leftover; it also names the wrong columns
-(`days_at_home`/`days_on_road`).
+"MISSING FEATURE" warning fires.
 
 ### Selection mode
 
@@ -524,9 +538,6 @@ Every edge below is a place where the ETL computes one group's columns using ano
 
   last_season_record ──[terminal fallback]──→ sos, gds
 
-  eliminated_from_playoffs ┐
-  clinched_final_seed      ┴──→ indifference_flag
-
   rest grid ──→ rested_days, back_to_back, days_at_home, days_on_road
 
   east_record_* , west_record_* ──→ the two conference features
@@ -540,7 +551,6 @@ Every edge below is a place where the ETL computes one group's columns using ano
 | `last_season_record` → `gds`, `sos` | `build_prior_season_strength` — terminal fallback when an opponent has no games yet |
 | `last_season_record` + `sos` → `adjusted_last_season_record` | `last_season_record.py::_apply_sos_to_season_record`, using end-of-season `sos_L82` |
 | `pts_diff` → both point-differential families | `calculate_pts_diff` and `_compute_norm_pts_diff` are siblings off one column |
-| `eliminated_from_playoffs` + `clinched_final_seed` → `indifference_flag` | `playoff_standings.py::compute_playoff_flags`, final line |
 | rest grid → 4 columns | `rest_days.py::make_rested_days_table_season` |
 | `east_record_*` → conference features | `engineering.py::create_conference_features` |
 
@@ -568,18 +578,55 @@ Pearson r on the deltas, 49,175 rows, seasons ≥ 1980/81, after `dropna()`.
 | last season | **`adjusted_last_season_record`** | `last_season_record` | Same quantity corrected for the schedule that produced it. The adjusted at-location variant is a top-5 feature in every run; the raw pair is rejected. |
 | opponent quality | **`sos_adj_record`** over `gds` | `gds` | Felipe's call. `gds` is the derived member, and `sos_adj_record` must keep being *computed* either way since `gds` cannot be built without it — so retiring the parent would be retiring the child too. |
 | rest | **both** `rested_days` and `back_to_back` | — | r = −0.53 is under threshold, so selection is allowed to arbitrate. It does: `back_to_back` is confirmed in every run, `rested_days` rejected in every run. That is redundancy resolving itself correctly, which is what Boruta *is* good for when features are not near-duplicates. |
-| playoff standings | **`games_behind_leader`** (one of six exploded groups — see note below) | — | No derivation edge to an enabled group: `compute_playoff_flags` recomputes W/L from `win_bool` itself rather than reading the `record` tables. League-relative where `record` is absolute — two teams on 30-20 sit in different playoff positions depending on conference. `conf_rank` (precursor only, not a group — see `INTERMEDIATE_COLUMNS`) at −0.92 is the closest to the line; re-measure if `record` is ever re-enabled. |
+| playoff standings | **`winning_incentive`** — the three clinch flags collapsed into one ordinal (see note below) | `games_behind_leader`, `games_behind_above`, `games_ahead_of_below` | No derivation edge to an enabled group: `compute_playoff_flags` recomputes W/L from `win_bool` itself rather than reading the `record` tables. `winning_incentive` says something no rolling window can — that a team's remaining games no longer matter to it, which is the mechanism behind rested starters. The three games-behind/-ahead measures are restatements of one record against another, which `sos_adj_record` already carries in absolute terms. `conf_rank` (precursor only, not a group — see `INTERMEDIATE_COLUMNS`) at −0.92 against `record_L82` is the closest to the line; re-measure if `record` is ever re-enabled. |
 
 The single `playoff_standings` group was exploded into six independent groups
 (`games_behind_leader`, `games_behind_above`, `games_ahead_of_below`,
 `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed`) on
 2026-08-12 so each can be enabled and tested on its own instead of as a block.
-Only `games_behind_leader` ships (`enabled: true` in `_defaults.yaml`); the
-other five are `enabled: false` there and `enabled: true` in
-`feature_audit.yaml`, which gives `eliminated_from_playoffs`/
-`clinched_final_seed` their first-ever Boruta pass — they were previously
-unreachable (see §5). `conf_rank` was never one of the six; it moved to
-`INTERMEDIATE_COLUMNS` as a documented precursor.
+`conf_rank` was never one of the six; it moved to `INTERMEDIATE_COLUMNS` as a
+documented precursor.
+
+**Which of the six ship changed on 2026-08-15.** It was `games_behind_leader`
+alone, on its Boruta record (20/20 hits, importance 0.029–0.051). It is now the
+three clinch flags, and the three games-behind/-ahead measures are off. That was
+Felipe's call on mechanism rather than a selection artifact, and the reasoning is
+in `_defaults.yaml` at each group. The three clinch flags ship as **raw
+`_HT`/`_VT` boolean pairs, not deltas** — see the `create_delta_features` entry
+in §2 for why a delta destroys the distinction that matters. Their Boruta history
+was not a guide: every prior pass scored them as single delta columns, and
+`eliminated_from_playoffs`/`clinched_final_seed` had only ever been seen once at
+all (via `feature_audit.yaml`, after being unreachable — see §5).
+
+**They were re-measured on 2026-08-15 in the raw form, and all six were
+rejected** (run `7de4ab20`; best 0.017 at 3/20 hits). So the shipping config now
+offers three groups that selection drops — the model trains on 14 columns, none
+of them a clinch flag. That is not the same failure as a barren column (§5):
+these are reachable and measured, and the run is reproducible. But it does mean
+the mechanism argument above is currently unsupported by the data. Two honest
+readings, and this is Felipe's call:
+- *the flags carry nothing* — resting behaviour is already priced into the
+  rolling point-differential windows by the time it shows up, so drop them;
+- *the test is unfair* — clinching only happens in the last few weeks, so the
+  signal is confined to a slice of rows that a global mean-|SHAP| ranking
+  averages away. `outputs/xgboost/tables/season_phase_accuracy.csv` is where
+  that would show: the 70-80 and 80-82 buckets are the only ones where a clinch
+  flag can fire, and they hold 165 of 1,201 test rows.
+
+**Collapsed on 2026-08-18.** Felipe's answer to the two readings above was a
+third: the six columns were one ordinal quantity spelled across three booleans,
+and no ranking over six weak indicators was going to say otherwise. The three
+groups are now a single `winning_incentive` group — −1 eliminated, 0 seed locked
+in and resting, 1 still fighting (for a berth or for a seed; the two fighting
+states share a value deliberately) — derived in
+`engineering.py::create_winning_incentive_features` before the delta pass and
+shipped as one `winning_incentive_delta` column. Only four of the eight boolean
+combinations are producible, and an unreachable one raises rather than
+defaulting. The three booleans keep being computed by the ETL but are no longer
+groups: they exist only as inputs to this derivation. A `winning_incentive_label`
+pair (`_HT`/`_VT`, in words) rides along for EDA and is listed in
+`INTERMEDIATE_COLUMNS` so it never reaches a model. Boruta has not seen the
+collapsed form yet — `feature_audit.yaml` is where that pass happens.
 
 ### Configs checked against the map
 
@@ -587,7 +634,7 @@ As of 2026-08-12, after the revert:
 
 | config | enabled groups | coupled pairs co-enabled |
 |---|---|---|
-| `xgboost.yaml` | norm_point_differential, sos_adj_record, distance, rested_days, back_to_back, adjusted_last_season_record, home_and_road, indifference_flag, games_behind_leader | **none** |
+| `xgboost.yaml` | norm_point_differential, sos_adj_record, distance, rested_days, back_to_back, adjusted_last_season_record, home_and_road, winning_incentive | **none** |
 | `all_models.yaml` | identical to xgboost | **none** |
 | `llm_features.yaml` | the above + streak, home_and_road raw | **none** |
 | `feature_audit.yaml` | everything | **all 7, by design — exempt** |
@@ -611,6 +658,46 @@ The hazard is real though: adding a lag to `features.yaml` for an ETL reason cha
 *training* feature set of every enabled group that has no override. Check the enabled-groups
 dump after any edit to `features.yaml`.
 
+### Which lag keys the ETL actually reads
+
+`features.yaml` is "the ETL file" only in the general case. Three groups are exceptions,
+and the asymmetry is the single most confusing thing in the config pair — an edit to a
+key nothing reads looks like it worked.
+
+| key | read by ETL | read by ML |
+|---|---|---|
+| `record.lags`, `point_differential.lags`, `norm_point_differential.lags`, `distance.lags`, `sos.lags`, `gds.lags`, `gds.location_lags` | yes | yes |
+| `record.location_lags` | yes — and it drives the location tables for **all three** of record / point_differential / norm_point_differential | yes (record only) |
+| `point_differential.location_lags`, `norm_point_differential.location_lags` | **no** | yes |
+| `sos_adj_record.location_lags` | yes | yes |
+| `sos_adj_record.lags` | **no** | yes |
+| `last_season_record.location_lags`, `adjusted_last_season_record.location_lags` | no | no — the prefix lambda ignores its argument, so `[]` still yields the `_at_location_delta` column |
+| `delta`, `enabled` | never | yes |
+
+Three consequences:
+
+- **`sos` has no `location_lags`** because there is no at-home/on-road SOS builder; the
+  key would be read by nothing. `sos.lags` decides only which `sos_L{lag}` columns get
+  *persisted*. The extra windows `sos_adj_record`'s location variants need are unioned in
+  automatically — `aggregator.py` computes SOS at
+  `set(sos_lags) | set(sos_adj_record.location_lags)`, then saves only the declared ones.
+  That is why `sos_L10/L20/L41` exist inside the build and never reach the CSV.
+- **`sos_adj_record` has no `lags`** because the ETL does not read that key — the plain
+  `sos_adj_record_L{lag}_HT/_VT` columns come from `record.lags`, so all nine windows are
+  emitted regardless. On the ML side the same key *is* read, and leaving it undeclared
+  (→ `[]`) is precisely what ships only the at-location variants.
+- **The three location lists must stay equal.** `point_differential.location_lags` and
+  `norm_point_differential.location_lags` are decorative to the ETL but live to
+  `resolve_feature_columns`. Diverge them and training asks for a window nobody built;
+  the only symptom is the MISSING FEATURE warning in `splits.py`, which is a log line and
+  not a failure. Pinned by
+  `tests/test_config_loading.py::test_location_lags_agree_across_families`.
+
+Two undeclared dependencies on `sos.lags` specifically: emptying it skips the whole
+`if sos_lags:` block that also builds `adjusted_last_season_record`, and dropping `82`
+from it raises `KeyError` in `last_season_record.py::_season_sos`, which hard-codes
+`sos_L82`.
+
 ---
 
 ## 4. Column ledger
@@ -627,22 +714,38 @@ status depends on what it competes against: **shipping** = `outputs/xgboost` (ru
 `outputs/feature_audit` pass B (94 offered, every group on, coupled pairs included — read
 §3 before drawing anything from that column).
 
+> **Re-measured 2026-08-15** after the playoff-group change (`games_behind_leader` out,
+> the three clinch flags in as raw `_HT`/`_VT` pairs) and the `distance`/`back_to_back`
+> sign flip. Run `7de4ab20`, still 34 columns offered, **12 confirmed + 2 tentative = 14
+> trained on** (was 11 + 4 = 15). Test accuracy **67.11%**, Brier **0.2103**, ROC AUC
+> 72.44% — against 66.44% / 0.2094 before. Both moves are **inside noise** on a 1,201-row
+> test set (SE ≈ 1.4pp on accuracy, so +0.67pp is ~0.5 SE). The `shipping` column below
+> is this run.
+>
+> **The six raw clinch columns were all rejected** — best `eliminated_from_playoffs_HT`
+> at 0.017, 3/20 hits; `clinched_playoff_berth_VT` at 0.001, 0/20. That is their
+> first measurement in raw form, and it is unambiguous. They are offered and dropped,
+> so nothing reaches the model from that group. See the note in §3 before acting on it.
+>
+> **Dropping `games_behind_leader` cost nothing measurable**, despite its 20/20 record
+> (0.029–0.051) in four prior runs. Consistent with the §3 argument that it restates a
+> record comparison `sos_adj_record` already carries.
+
 | Column | Group | shipping | audit | Notes |
 |---|---|---|---|---|
 | `norm_pts_diff_avg_L82_delta` | `norm_point_differential` | ✅ **0.280** (#1) | ✅ 0.120 | **lag added by this audit.** Importance more than doubled once its raw twin was removed |
 | `norm_pts_diff_avg_L55_delta` | `norm_point_differential` | ✅ 0.145 (#2) | ✅ 0.114 | |
 | `adjusted_last_season_record_at_location_delta` | `adjusted_last_season_record` | ✅ 0.109 (#3) | ✅ 0.094 | top-5 in every run |
 | `norm_pts_diff_avg_L34_delta` | `norm_point_differential` | ✅ 0.094 | ✅ 0.036 | |
-| `back_to_back_delta` | `back_to_back` | ✅ 0.085 | ✅ 0.084 | top-6 in every run |
-| `games_behind_leader_delta` | `games_behind_leader` | ✅ 0.051 | ✅ 0.029 | **group created by this audit, later exploded from `playoff_standings` into its own group (2026-08-12)** |
+| `back_to_back_delta` | `back_to_back` | ✅ 0.085 | ✅ 0.084 | top-6 in every run. **Sign flipped 2026-08-15** to `VT − HT` — magnitude and rank are unaffected (a sign flip is a monotone transform of one column), but a SHAP direction read from an older run points the wrong way |
+| ~~`games_behind_leader_delta`~~ | `games_behind_leader` | ✅ 0.051 | ✅ 0.029 | **no longer offered as of 2026-08-15** — group disabled. Its Boruta record was the best of the six playoff groups, so this is the one row where the new config overrides a measurement: the group restates one team's record against another's, which `sos_adj_record` carries absolutely. Revisit head-to-head, not with another Boruta pass |
 | `norm_pts_diff_avg_L41_at_location_delta` | `norm_point_differential` | ✅ 0.042 | ✅ 0.040 | |
 | `norm_pts_diff_avg_L13_delta` | `norm_point_differential` | ✅ 0.042 | ✅ 0.020 | |
 | `sos_adj_record_L20_at_location_delta` | `sos_adj_record` | ✅ 0.030 | ✗ | confirmed → tentative → confirmed as `gds` was enabled then reverted |
 | `sos_adj_record_L41_at_location_delta` | `sos_adj_record` | ✅ 0.026 | ✗ | confirmed → **rejected** → confirmed, same cause |
 | `norm_pts_diff_avg_L8_delta` | `norm_point_differential` | ✅ 0.026 | ~ 0.017 | |
 | `norm_pts_diff_avg_L21_delta` | `norm_point_differential` | ~ 0.023 | ✗ | |
-| `indifference_flag_delta` | `indifference_flag` | ~ 0.021 | ~ 0.019 | sign is inverted, see §2 |
-| `distance_L14_delta` | `distance` | ~ 0.021 | ✗ | |
+| `distance_L14_delta` | `distance` | ~ 0.021 | ✗ | **sign flipped 2026-08-15** to `VT − HT`, same caveat as `back_to_back_delta` |
 | `norm_pts_diff_avg_L20_at_location_delta` | `norm_point_differential` | ~ 0.020 | ✗ | |
 | `days_at_home_delta` (= `days_at_home + days_on_road`) | `home_and_road` | ✗ 0.018 | ✗ | raw pair kept instead in `llm_features.yaml` |
 | `adjusted_last_season_record_delta` | `adjusted_last_season_record` | ✗ 0.018 | ✗ | the at-location variant carries the group |
@@ -650,8 +753,8 @@ status depends on what it competes against: **shipping** = `outputs/xgboost` (ru
 | `sos_adj_record_L{5,10}_at_location_delta` | `sos_adj_record` | ✗ | ✗ | |
 | `distance_L{1,3,7}_delta` | `distance` | ✗ | ✗ | |
 | `rested_days_delta` | `rested_days` | ✗ 0.005 | ✗ | rejected in every run; `back_to_back` carries the rest signal |
-| `games_behind_above_delta`, `games_ahead_of_below_delta`, `clinched_playoff_berth_delta` | `games_behind_above`, `games_ahead_of_below`, `clinched_playoff_berth` | ✗ | ✗ | offered each run, dropped each run. `conf_rank` never produces a `_delta` column — it is a precursor in `INTERMEDIATE_COLUMNS`, not a group |
-| `eliminated_from_playoffs_delta`, `clinched_final_seed_delta` | `eliminated_from_playoffs`, `clinched_final_seed` | — | — | reachable for the first time as of the 2026-08-12 group split (previously computed but unreachable by any group — see §5); not yet run through Boruta |
+| `winning_incentive_delta` | `winning_incentive` | — | — | **the shipping form as of 2026-08-18**, replacing the six raw clinch columns. Never measured in this shape; `feature_audit.yaml` is its first pass. The form it replaced — raw boolean pairs, `delta: false`, shipped 2026-08-15 — had all six rejected in run `7de4ab20`: `eliminated_from_playoffs_HT` 0.017 at 3/20 the best, `clinched_playoff_berth_VT` 0.001 at 0/20 the worst |
+| ~~`games_behind_above_delta`, `games_ahead_of_below_delta`~~, ~~`clinched_playoff_berth_delta`~~ | `games_behind_above`, `games_ahead_of_below` | ✗ | ✗ | offered each run, dropped each run; **no longer offered as of 2026-08-15**. `conf_rank` never produces a `_delta` column — it is a precursor in `INTERMEDIATE_COLUMNS`, not a group |
 | `conference_diff_home_advantage_pct`, `conference_home_court_advantage_pct` | built in `engineering.py` | ✗ | ✗ | rejected in **every** run examined — see §6 |
 | `streak_delta`, `days_at_home`, `days_on_road` | various | — | — | `llm_features.yaml` only; **never measured**, nothing trains from that config |
 
@@ -679,7 +782,8 @@ These are **not barren**: they are live groups with a documented reason to stay 
 | `east_record_adjusted`, `west_record_adjusted`, `east_record_at_east`, `west_record_at_west` | the two conference features | `create_conference_features`, then dropped |
 | `record_L82_HT`, `record_L82_VT` | `record_L82_delta` for `RecordDifferenceBaseline` | `splits.py` builds it onto `X_test_baseline` |
 | `pts_diff_avg_L82_HT`, `pts_diff_avg_L82_VT` | `pts_diff_avg_L82_delta` for `PointDifferentialBaseline` **and** the active `pts_diff_avg_L82_delta` feature | `splits.py`; baseline re-enabled by this audit |
-| `eliminated_from_playoffs_{HT,VT}`, `clinched_final_seed_{HT,VT}` | `indifference_flag` (still) **and**, as of the 2026-08-12 group split, their own `eliminated_from_playoffs`/`clinched_final_seed` groups | `indifference_flag` is computed inside `compute_playoff_flags`, **before** the merge — that dependency is unaffected. The merged `_HT`/`_VT` copies are no longer barren: they now also feed their own delta columns (see §4) |
+| `clinched_playoff_berth_{HT,VT}`, `eliminated_from_playoffs_{HT,VT}`, `clinched_final_seed_{HT,VT}` | `winning_incentive`, since 2026-08-18 | `create_winning_incentive_features`, which drops all six after deriving the ordinal. Briefly shipped columns themselves (2026-08-15 to 2026-08-18) |
+| `winning_incentive_label_{HT,VT}` | EDA and plotting only | written beside the numeric pair, listed in `INTERMEDIATE_COLUMNS`; string-valued, so it must never reach a model |
 | `conf_rank_{HT,VT}` | `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, and the clinch logic | computed inside `compute_playoff_flags`; listed in `INTERMEDIATE_COLUMNS`, deliberately never its own group |
 | `total_wins_*`, `total_losses_*`, `games_played_HT_at_home`, `games_played_VT_on_road`, `pts_diff`, `distance` | divisors / intermediates | listed in `INTERMEDIATE_COLUMNS`; `pts_diff` also feeds every point-differential builder |
 | `season_avg_total_pts` | `norm_pts_diff` denominator | internal to `point_differential.py`, never merged |
@@ -726,7 +830,7 @@ two; that was the error §3 now prevents.
 | Columns | Count | Status when found | Action |
 |---|---|---|---|
 | `conf_rank_{HT,VT}`, `games_behind_leader_{HT,VT}`, `games_behind_above_{HT,VT}`, `games_ahead_of_below_{HT,VT}`, `clinched_playoff_berth_{HT,VT}` | 10 | **No feature group existed.** `compute_playoff_flags` emitted them, `aggregator.py` merged them, and `resolve_feature_columns` had no entry for them, so inclusion mode dropped all ten every run. `INTERMEDIATE_COLUMNS` still carries `# "conf_rank_HT", # "conf_rank_VT"` commented out — the trace of an unfinished attempt. | **Fixed.** Added a `playoff_standings` group (`FEATURE_GROUP_PREFIXES`, `FeaturesMapConfig`, `_defaults.yaml`). `games_behind_leader_delta` is now confirmed at 20/20 hits in both audit passes. **Further exploded 2026-08-12 — see next row.** |
-| `games_behind_above_{HT,VT}`, `games_ahead_of_below_{HT,VT}`, `clinched_playoff_berth_{HT,VT}` (0/20 hits inside the bundle above), `eliminated_from_playoffs_{HT,VT}`, `clinched_final_seed_{HT,VT}` (never reachable at all) | 10 | The bundled `playoff_standings` group forced these five to share `enabled`/`delta` with the confirmed `games_behind_leader`, and gave the two precursor columns no path to a model. `conf_rank_{HT,VT}` stayed uncommented-out and unreachable. | **Fixed 2026-08-12.** Exploded into six independent groups: `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed` (`FEATURE_GROUP_PREFIXES`, `FeaturesMapConfig`, `_defaults.yaml`, `feature_audit.yaml`). `eliminated_from_playoffs`/`clinched_final_seed` get their first Boruta pass via `feature_audit.yaml`. `conf_rank` moved into `INTERMEDIATE_COLUMNS` (uncommented) as a documented precursor, not a group. |
+| `games_behind_above_{HT,VT}`, `games_ahead_of_below_{HT,VT}`, `clinched_playoff_berth_{HT,VT}` (0/20 hits inside the bundle above), `eliminated_from_playoffs_{HT,VT}`, `clinched_final_seed_{HT,VT}` (never reachable at all) | 10 | The bundled `playoff_standings` group forced these five to share `enabled`/`delta` with the confirmed `games_behind_leader`, and gave the two precursor columns no path to a model. `conf_rank_{HT,VT}` stayed uncommented-out and unreachable. | **Fixed 2026-08-12.** Exploded into six independent groups: `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed` (`FEATURE_GROUP_PREFIXES`, `FeaturesMapConfig`, `_defaults.yaml`, `feature_audit.yaml`). `eliminated_from_playoffs`/`clinched_final_seed` got their first Boruta pass via `feature_audit.yaml`; the three clinch groups were then collapsed into `winning_incentive` on 2026-08-18. `conf_rank` moved into `INTERMEDIATE_COLUMNS` (uncommented) as a documented precursor, not a group. |
 | `sos_L{1..82}_{HT,VT}` | 18 | Same shape: `sos_adj_record` and `gds` consume the in-memory SOS table upstream, never these merged columns. Group was `enabled: false`. | **Measured, left off.** All 18 rejected (best 0.015 at 5/20). `_defaults.yaml` now records that rather than leaving a bare `enabled: false`. |
 | `sos_adj_record_L{1..82}_{HT,VT}` (non-location) | 18 | The plain rolling variants; `_defaults.yaml` declares `location_lags` only. Also feed GDS upstream, in-memory. | **Left off, comment already existed** ("the plain rolling variants lost to the at-location ones"). |
 | `record_L*_{HT,VT}`, `record_L*_at_{home,road}` | 26 | `record` is off everywhere: it is the unadjusted input to `sos_adj_record`, r = 0.95. | **Left as-is, now with the coupling documented.** The ETL must keep building them — `calculate_sos_adjusted_record` intersects `record_lags` with `sos_lags`, so trimming the list breaks the feature that replaced them. **Precursor, not barren.** |
@@ -823,7 +927,9 @@ What survived the revert, and why it is not nothing:
   independent runs. Later exploded (2026-08-12) into six independent groups —
   `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`,
   `clinched_playoff_berth`, `eliminated_from_playoffs`, `clinched_final_seed` — so each can
-  be enabled and tested on its own; only `games_behind_leader` ships.
+  be enabled and tested on its own. At the time only `games_behind_leader` shipped; as of
+  2026-08-15 it was the three clinch flags instead, as raw HT/VT pairs, and as of
+  2026-08-18 those three are one `winning_incentive` ordinal — see §3.
 - `gds` and `point_differential` were reverted, but they are no longer *unmeasured*. Their
   `enabled: false` now carries the correlation, the Boruta result, and the experiment to run
   if anyone revisits them.
