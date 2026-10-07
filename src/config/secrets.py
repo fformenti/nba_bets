@@ -4,7 +4,8 @@ Resolution order:
 
 1. the real process environment — direnv locally, ``export`` on a GPU box
 2. a repo-local ``.env``, loaded non-overriding, for machines without direnv
-3. ``RuntimeError`` naming the variable and saying where to put it
+3. Colab's Secrets panel, which never populates ``os.environ`` on its own
+4. ``RuntimeError`` naming the variable and saying where to put it
 
 Values never live in the repo. Locally they come from ``~/.secrets/nba_bets.env``
 (mode 600), wired up by the repo's ``.envrc``. ``override=False`` is what makes
@@ -38,13 +39,31 @@ OPENAI_ENV_VAR = "OPENAI_API_KEY"
 SERPER_ENV_VAR = "SERPER_API_KEY"
 
 
+def _colab_secret(name: str) -> str | None:
+    """Colab's Secrets panel doesn't populate os.environ; ask it directly."""
+    try:
+        from google.colab import userdata
+    except ImportError:
+        return None
+    try:
+        return userdata.get(name)
+    except Exception:  # SecretNotFoundError, or notebook access not granted
+        return None
+
+
 def require_env(name: str, hint: str = "", secrets_file: str = SECRETS_FILE) -> str:
     """Return the variable's value, or raise a message that says how to fix it."""
     value = os.environ.get(name)
     if not value:
+        value = _colab_secret(name)
+        if value:
+            # Libraries that read the environment themselves (wandb) see it too.
+            os.environ[name] = value
+    if not value:
         message = (
             f"{name} is not set. Add it to {secrets_file} and run `direnv reload`, "
-            "or export it directly when running on a remote box."
+            "export it directly when running on a remote box, or add it to Colab "
+            "Secrets with notebook access enabled."
         )
         if hint:
             message = f"{message} {hint}"
