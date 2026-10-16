@@ -107,6 +107,7 @@ CANONICAL_INGESTED_COLUMNS = [
     "gameId",
     "gameDate",
     "gameDateOnlyStr",
+    "gameTime",
     "season",
     "hometeamPrename",
     "hometeamName",
@@ -129,6 +130,18 @@ CANONICAL_INGESTED_COLUMNS = [
     "gameLocation",
     "awayteamLocation",
 ]
+
+
+def add_game_time(df: pd.DataFrame) -> pd.DataFrame:
+    """Set ``gameTime``, the tip-off as ``HH:MM`` (ET wall clock), from ``gameDate``.
+
+    League-wide season-to-date aggregates order games by (date, gameTime) slot,
+    so a game sees every earlier tip-off but none of the games it shares a slot
+    with — 61% of modern games tip at the same minute as another. Derived, not
+    stored independently: every source's gameDate already carries the tip time.
+    """
+    tip_off = pd.to_datetime(df["gameDate"], errors="coerce")
+    return df.assign(gameTime=tip_off.dt.strftime("%H:%M"))
 
 
 def get_teams_locations(df: pd.DataFrame) -> pd.DataFrame:

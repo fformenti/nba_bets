@@ -15,6 +15,9 @@
 
 data:
   path: "data/processed/regular_season/games_features.csv"
+  # TARGET_VARIABLE: one of RESPONSE_VARIABLES (src/config/constants.py) —
+  # win_bool (classification), margin or margin_scaled (regression). The other
+  # two restate the outcome and are always dropped from the features.
   target_column: "win_bool"
   date_column: "gameDate"
   drop_na: true
@@ -126,17 +129,17 @@ feature_engineering:
   # ── The redundancy rule ────────────────────────────────────────────────────
   # Several groups here are computed from each other: sos_adj_record from
   # `record` and `sos`, gds from sos_adj_record, adjusted_last_season_record
-  # from last_season_record and `sos`, and the two point-differential families
-  # from one shared pts_diff column. Where one group is derived from another,
-  # OR the two measure r > 0.95 on the training rows, exactly one of them is
-  # enabled and the comment at the disabled one names the winner and why.
+  # from last_season_record and `sos`, and the two margin families from one
+  # shared margin column. Where one group is derived from another, OR the two
+  # measure r > 0.95 on the training rows, exactly one of them is enabled and
+  # the comment at the disabled one names the winner and why.
   #
   # Do not resolve such a pair with Boruta-SHAP. Two features at r ≈ 1 split the
   # SHAP credit between them and each still beats its shadow, so *both* get
   # confirmed — which reads as "two independent signals" and is nothing of the
-  # kind. That misreading enabled point_differential beside
-  # norm_point_differential (r = 0.998) and gds beside its own parent
-  # sos_adj_record on 2026-08-12, and cost 0.66pp of test accuracy. Boruta
+  # kind. That misreading enabled margin beside margin_scaled (r = 0.998) and
+  # gds beside its own parent sos_adj_record on 2026-08-12, and cost 0.66pp of
+  # test accuracy. Boruta
   # confirms a feature beats noise; only mechanism and held-out metrics can say
   # whether it beats its own correlate.
   #
@@ -158,22 +161,24 @@ feature_engineering:
       # adjustment is the point; the raw record adds nothing beside it.
       delta: true
       enabled: false
-    point_differential:
-      # COUPLED — superseded by norm_point_differential, which is the
-      # training-facing member of this pair. See the redundancy map in
+    margin:
+      # COUPLED — superseded by margin_scaled, which is the training-facing
+      # member of this pair. See the redundancy map in
       # .claude/skills/data-analyst/references/feature-catalog.md.
       #
-      # norm_pts_diff = pts_diff / season_avg_total_pts, and that divisor is an
-      # expanding within-season mean that is near-constant after the season's
-      # first weeks. So the two families are an affine transform of each other
-      # *within* a season: measured Pearson r = 0.998 at every one of the
-      # thirteen lags, on all 49,175 training rows. The only information
-      # difference is between-season rescaling — which is the whole point of
-      # normalizing, and the reason norm wins the pair across a 46-season
-      # history where scoring pace ranges from the 1980s to now.
+      # margin_scaled = margin / margin_std, and that divisor is a
+      # trailing 1000-game league std that barely moves within a season. So
+      # the two families are an affine transform of each other *within* a
+      # season: measured Pearson r = 0.998 at every one of the
+      # thirteen lags, on all 49,175 training rows (measured when the divisor
+      # was season-to-date average total points; the argument is unchanged).
+      # The only information difference is between-season rescaling — which is
+      # the whole point of normalizing, and the reason the scaled version wins
+      # the pair across a history where margin spread drifted from ~13 to
+      # ~15.7 points.
       #
       # This group was briefly enabled on 2026-08-12 because Boruta-SHAP
-      # confirmed raw L13/L34/L82 alongside their normalized twins. That was a
+      # confirmed raw L13/L34/L82 alongside their scaled twins. That was a
       # misreading: at r = 0.998 two features split the SHAP credit and each
       # still beats a shadow, so confirmation of both is the expected artifact,
       # not evidence of independent signal. Test accuracy fell 66.44% -> 65.78%
@@ -181,9 +186,9 @@ feature_engineering:
       # confirm a feature beats its own correlate.
       delta: true
       enabled: false
-    norm_point_differential:
-      # The training-facing member of the point-differential pair — era-neutral,
-      # which matters when training spans 1980/81 to now.
+    margin_scaled:
+      # The training-facing member of the margin pair — era-neutral, which
+      # matters when training spans 1980/81 to now.
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       delta: true
       enabled: true

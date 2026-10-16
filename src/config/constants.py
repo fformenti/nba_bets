@@ -52,9 +52,16 @@ GAME_ID_TYPE_PREFIX = {
 # Only these game types belong in the regular-season table.
 REGULAR_SEASON_GAME_TYPE = "Regular Season"
 
+# Outcome columns. A model trains on exactly one — data.target_column in the
+# experiment config — and the rest restate the same result, so every one of them
+# is dropped from the features. win_bool is the classification target; margin
+# (points) and margin_scaled (season margin std units) are regression targets.
+RESPONSE_VARIABLES = ["win_bool", "margin", "margin_scaled"]
+
 ENRICHED_COLUMNS = [
     "win_bool",
-    "pts_diff",
+    "margin",
+    "margin_scaled",
     "games_played_HT",
     "games_played_VT",
     "total_wins_HT",
@@ -67,7 +74,11 @@ ENRICHED_COLUMNS = [
 # Delta-input columns (HT/VT pairs) are handled by create_delta_features().
 # days_at_home/days_on_road are handled by the home_and_road feature group.
 INTERMEDIATE_COLUMNS = [
-    "pts_diff",
+    # Tip-off wall clock, a string — not a model input. And the league margin
+    # scale, joined per date: the LLM target scaling reads margin_std off
+    # games_enriched.
+    "gameTime",
+    "margin_std",
     "distance",
     "total_wins_HT",
     "total_losses_HT",
@@ -129,7 +140,7 @@ DEFAULT_METADATA_COLUMNS = [
 # so intermediate results (e.g. SOS feeding sos_adj_record, or the season-to-date
 # scoring average that normalises point differential) are not truncated.
 #
-# 6dp because norm_pts_diff values sit around 0.05 — the 4dp used elsewhere
+# 6dp because margin_scaled values sit around 0.05 — the 4dp used elsewhere
 # would leave them with only three significant figures.
 CSV_FLOAT_FORMAT = "%.6f"
 

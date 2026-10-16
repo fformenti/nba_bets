@@ -67,15 +67,15 @@ Historical (make historical-etl):
     → [process-ingested-games] → data/processed/regular_season/
     → [build-features]         → data/processed/regular_season/games_features.csv
 
-The daily loop (make daily-cycle):
-  [fetch-upcoming-games]   league schedule → data/raw/incremental/upcoming_games/
-  [predict-upcoming]       → data/predictions/upcoming_games_predictions.csv
-       ⋯ games are played ⋯
+The daily loop (make daily-cycle) — results first, then the new slate:
   [fetch-game-results]     ResultsSource → upcoming_games_results/
   [score-predictions]      predictions ⋈ outcomes → prediction_scorecard.csv + MLflow
   [append-game-results]    → data/ingested/games_updated_history.csv
   [process-ingested-games]
   [build-features]         history now includes the games just played
+  [fetch-upcoming-games]   league schedule → data/raw/incremental/upcoming_games/
+  [predict-upcoming]       → data/predictions/upcoming_games_predictions.csv
+       ⋯ games are played; the next cycle scores them ⋯
 
   [bet-polymarket]         predictions → Polymarket API
 ```

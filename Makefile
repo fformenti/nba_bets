@@ -192,17 +192,21 @@ process-results-pipeline:
 	$(MAKE) process-ingested-games
 	$(MAKE) build-features
 
-# The full loop: predict → play → score → fold into history → predict again off
-# the updated history. Run with SOURCE=placeholder to exercise it without a
-# live results feed.
+# The full loop: score yesterday's predictions → fold the results into history
+# → predict today's slate off that history. Results come first so a slate is
+# predicted from exactly the history training will later see for it: the league
+# margin scale (margin_std) is keyed to the last earlier date with a game, and
+# predicting before yesterday's results land would scale off the day before.
+# Pending payloads persist between runs, so the results step still finds them.
+# Run with SOURCE=placeholder to exercise it without a live results feed.
 daily-cycle:
 	$(MAKE) fetch-league-schedule
 	$(MAKE) parse-league-schedule
 	$(MAKE) reconcile-postponed
-	$(MAKE) fetch-upcoming-games
-	$(MAKE) predict-upcoming
 	$(MAKE) fetch-game-results
 	$(MAKE) score-predictions
 	$(MAKE) append-game-results
 	$(MAKE) process-ingested-games
 	$(MAKE) build-features
+	$(MAKE) fetch-upcoming-games
+	$(MAKE) predict-upcoming

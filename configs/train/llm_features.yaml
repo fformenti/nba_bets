@@ -9,7 +9,7 @@
 # Same pipeline and same splits as the sklearn configs — only the column
 # selection differs. What is turned on here is turned on for legibility to a
 # language model pretrained on sports prose: a win/loss streak is stated in
-# plain English in every NBA recap ever written, whereas `norm_pts_diff_avg_L8`
+# plain English in every NBA recap ever written, whereas `margin_scaled_avg_L8`
 # is not.
 #
 # The tradeoff: the LLM sees columns the sklearn models do not, so a run against

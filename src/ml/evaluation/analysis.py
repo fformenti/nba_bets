@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from src.ml.evaluation.visualization import stamp_timestamp
+
 sns.set_style("whitegrid")
 
 # Marker and colour per comparison series. Pinned by label rather than by
@@ -96,6 +98,7 @@ def plot_error_by_team(
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, axis="x")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, team_stats.reset_index().rename(columns={"index": "team"})
 
@@ -144,6 +147,7 @@ def plot_accuracy_by_season(
     ax1.set_title(title, fontsize=14, fontweight="bold")
     ax1.grid(True, alpha=0.3)
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, season_stats.reset_index()
 
@@ -190,6 +194,7 @@ def plot_conference_matchup_accuracy(
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, axis="x")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, matchup_stats.reset_index()
 
@@ -236,6 +241,7 @@ def plot_overtime_accuracy(
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, axis="y")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, ot_stats.reset_index()
 
@@ -284,6 +290,7 @@ def plot_neutral_court_accuracy(
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3, axis="y")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, court_stats.reset_index()
 
@@ -341,6 +348,7 @@ def plot_score_margin_calibration(
     ax.grid(True, alpha=0.3)
     plt.colorbar(scatter, ax=ax, label="Predicted Probability")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, bin_stats.reset_index()
 
@@ -493,6 +501,7 @@ def plot_season_phase_accuracy(
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig, table
 

@@ -611,16 +611,16 @@ def train_single_model(
     # ====== Point Differential Baseline ======
     # This was commented out behind "TODO: make this feature available even when
     # it's not passed to train config". splits.py already solves that: it builds
-    # pts_diff_avg_L82_delta onto X_test_baseline from the untouched feature
+    # margin_avg_L82_delta onto X_test_baseline from the untouched feature
     # frame, so the column is there whether or not the experiment config enables
-    # the point_differential group. The commented body also called an older API
+    # the margin group. The commented body also called an older API
     # (baseline_trainer, baseline_test_metrics) that no longer exists; this
     # mirrors the record baseline above instead.
     logger.info(f"\n{'=' * 60}")
     logger.info("Point Differential Baseline")
     logger.info(f"{'=' * 60}")
 
-    baseline_model = PointDifferentialBaseline(feature_column="pts_diff_avg_L82_delta")
+    baseline_model = PointDifferentialBaseline(feature_column="margin_avg_L82_delta")
     models_to_train[baseline_model.name] = train_baseline_model(
         baseline_model,
         X_test_baseline,

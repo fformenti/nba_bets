@@ -1,11 +1,12 @@
 """Pydantic schemas for experiment configuration."""
 
 from typing import Any, Dict, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 from src.config.constants import (
     DEFAULT_METADATA_COLUMNS,
     INTERMEDIATE_COLUMNS,
+    RESPONSE_VARIABLES,
 )
 
 _DEFAULT_CLASSIFIER_MODEL_NAMES: tuple[str, ...] = (
@@ -21,9 +22,24 @@ class DataConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     path: str | None = None
+    # One of RESPONSE_VARIABLES; the others are dropped from the features.
     target_column: str = "win_bool"
     date_column: str = "gameDate"
     drop_na: bool = True
+
+    @field_validator("target_column")
+    @classmethod
+    def target_is_a_response_variable(cls, value: str) -> str:
+        if value not in RESPONSE_VARIABLES:
+            raise ValueError(
+                f"data.target_column must be one of {RESPONSE_VARIABLES}, got {value!r}"
+            )
+        return value
+
+    @property
+    def task_type(self) -> Literal["classification", "regression"]:
+        """win_bool is classified; margin and margin_scaled are regressed."""
+        return "classification" if self.target_column == "win_bool" else "regression"
 
 
 class WeightingConfig(BaseModel):
@@ -77,7 +93,7 @@ class MomentumPairConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     feature: str = Field(
-        description="Feature prefix used in delta column names, e.g. 'pts_diff_avg' or 'record'."
+        description="Feature prefix used in delta column names, e.g. 'margin_avg' or 'record'."
     )
     short: int = Field(description="Short window lag.")
     long: int = Field(description="Long window lag.")
@@ -100,10 +116,10 @@ class FeaturesMapConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     record: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
-    point_differential: FeatureGroupConfig = Field(
+    margin: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(enabled=False)
     )
-    norm_point_differential: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
+    margin_scaled: FeatureGroupConfig = Field(default_factory=FeatureGroupConfig)
     sos: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False)
     )
@@ -153,6 +169,12 @@ class FeatureEngineeringConfig(BaseModel):
         default=0.10,
         description="Home/away adjustment factor for Game Difficulty Score.",
     )
+    conference_record_saturation_games: int = Field(
+        default=20,
+        description="games_played_east_vs_west at which the conference-matchup "
+        "features fully favor the current season's record. Below this, the "
+        "value ramps linearly from last season's final record at 0 games.",
+    )
     features: FeaturesMapConfig = Field(default_factory=FeaturesMapConfig)
     momentum_pairs: list[MomentumPairConfig] = Field(
         default_factory=list,
@@ -184,7 +206,7 @@ class FeatureEngineeringConfig(BaseModel):
 
         flat_field_map = {
             "record_lags": ("record", "lags"),
-            "point_differential_lags": ("point_differential", "lags"),
+            "point_differential_lags": ("margin", "lags"),
             "location_lags": ("record", "location_lags"),
             "distances_lags": ("distance", "lags"),
             "sos_lags": ("sos", "lags"),
@@ -197,9 +219,9 @@ class FeatureEngineeringConfig(BaseModel):
                 features.setdefault(group, {})[field] = data.pop(old_key)
                 migrated = True
 
-        # Copy location_lags to point_differential as well (they shared it)
+        # Copy location_lags to margin as well (they shared it)
         if "record" in features and "location_lags" in features["record"]:
-            features.setdefault("point_differential", {})["location_lags"] = features[
+            features.setdefault("margin", {})["location_lags"] = features[
                 "record"
             ]["location_lags"]
 
@@ -217,12 +239,12 @@ class FeatureEngineeringConfig(BaseModel):
         return self.features.record.lags
 
     @property
-    def point_differential_lags(self) -> list[int]:
-        return self.features.point_differential.lags
+    def margin_lags(self) -> list[int]:
+        return self.features.margin.lags
 
     @property
-    def norm_point_differential_lags(self) -> list[int]:
-        return self.features.norm_point_differential.lags
+    def margin_scaled_lags(self) -> list[int]:
+        return self.features.margin_scaled.lags
 
     @property
     def location_lags(self) -> list[int]:
@@ -431,14 +453,29 @@ class LLMDataConfig(BaseModel):
         "makes the two families comparable — same gameIds, same features, only "
         "the encoding differs.",
     )
-    serialization_format: Literal["labeled", "json", "markdown"] = Field(
+    serialization_format: Literal["labeled", "json", "markdown", "per_team"] = Field(
         default="labeled",
-        description="How a feature row becomes prompt text. All three formats "
-        "are schema-driven off the actual feature columns, so a feature added "
-        "in configs/features.yaml reaches the prompt with no code change. "
-        "'labeled' (default) additionally renders human-readable feature names "
-        "in grouped sections, which suits a base model with no instruction "
-        "tuning.",
+        description="How a feature row becomes prompt text. 'labeled', 'json' "
+        "and 'markdown' are schema-driven off the actual feature columns, so a "
+        "feature added in configs/features.yaml reaches the prompt with no code "
+        "change; 'labeled' (default) additionally renders human-readable feature "
+        "names in grouped sections. 'per_team' renders the fixed layout of "
+        "src/ml/llm/prompt_template_per_team.md, with features chosen by "
+        "prompt_config.",
+    )
+    target_reference_std: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Era-scale the completion: margin * target_reference_std / "
+        "margin_std, so every season shares one margin spread. Evaluation "
+        "rescales predictions back to real points per game. None trains on raw "
+        "points.",
+    )
+    prompt_config: str = Field(
+        default="configs/llm_prompt/per_team.yaml",
+        description="Prompt config for the 'per_team' format: which features "
+        "appear, team rows vs home − away delta, and the games-played "
+        "thresholds. Ignored by the other formats.",
     )
 
 

@@ -29,7 +29,7 @@ from src.config.secrets import HF_TOKEN_ENV_VAR, require_env
 from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig, LLMTrainingConfig
 from src.ml.datasets.splits import Splits, build_splits
-from src.ml.llm.serialization import serialize_frame
+from src.ml.llm.serialization import load_prompt_config, serialize_frame
 from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -42,9 +42,15 @@ SPLIT_NAMES = {"train": "X_train", "validation": "X_val", "test": "X_test"}
 
 # The completion the model learns to produce. Read from ``games_enriched`` — the
 # untouched source frame — rather than from the feature frame or metadata:
-# pts_diff is an intermediate column deliberately kept out of both, and sourcing
+# margin is an intermediate column deliberately kept out of both, and sourcing
 # it here means the LLM needs no change to the shared experiment config.
-TARGET_COLUMN = "pts_diff"
+TARGET_COLUMN = "margin"
+
+# Trailing league margin std (src/etl/features/point_differential.py).
+# Margin spread drifted from ~13 to ~15.7 points across the training window, so
+# a raw-points target teaches an old era's magnitudes; scaling by this puts
+# every season on one spread, and evaluation multiplies the spread back in.
+ERA_SCALE_COLUMN = "margin_std"
 
 
 def _format_completion(point_diff: float) -> str:
@@ -59,12 +65,38 @@ def _format_completion(point_diff: float) -> str:
     return f"{'+' if value >= 0 else '-'}{abs(value)}"
 
 
+def era_scale(splits: Splits, index: pd.Index, reference_std: Optional[float]) -> pd.Series:
+    """Per-game ``margin_std / reference_std``.
+
+    Dividing a real margin by it gives
+    the completion the model learns, multiplying a completion by it gives real
+    points back. All ones when ``reference_std`` is None (unscaled target).
+    """
+    if reference_std is None:
+        return pd.Series(1.0, index=index)
+    scale = splits.games_enriched.loc[index, ERA_SCALE_COLUMN] / reference_std
+    if scale.isna().any() or (scale <= 0).any():
+        raise ValueError(
+            f"'{ERA_SCALE_COLUMN}' is missing or non-positive for "
+            f"{int(scale.isna().sum() + (scale <= 0).sum())} row(s). Rebuild features "
+            "with `make build-features`."
+        )
+    return scale
+
+
 def build_split_dataset(
     splits: Splits,
     split_name: str,
     serialization_format: str,
+    prompt_config: Optional[dict] = None,
+    reference_std: Optional[float] = None,
 ) -> "Dataset":
-    """Serialize one split into a HuggingFace ``Dataset``."""
+    """Serialize one split into a HuggingFace ``Dataset``.
+
+    With ``reference_std`` set, the completion is the margin rescaled to an era
+    whose margin std is ``reference_std``; ``margin`` and ``margin_scale``
+    ride along so evaluation can score in real points.
+    """
     from datasets import Dataset
 
     features = getattr(splits, SPLIT_NAMES[split_name])
@@ -77,8 +109,17 @@ def build_split_dataset(
         )
     target = splits.games_enriched.loc[features.index, TARGET_COLUMN]
 
-    prompts = serialize_frame(features, metadata, fmt=serialization_format)
-    completions = [_format_completion(v) for v in target]
+    # games_enriched is the untouched feature table: per_team reads both teams'
+    # raw values and the games-played counters from it, not from `features`.
+    prompts = serialize_frame(
+        features,
+        metadata,
+        fmt=serialization_format,
+        raw=splits.games_enriched,
+        prompt_config=prompt_config,
+    )
+    scale = era_scale(splits, features.index, reference_std)
+    completions = [_format_completion(v) for v in target / scale]
 
     logger.info(f"{split_name}: {len(prompts)} rows ({serialization_format})")
     return Dataset.from_dict(
@@ -86,6 +127,8 @@ def build_split_dataset(
             "game_id": [int(g) for g in metadata["gameId"]],
             "prompt": prompts,
             "completion": completions,
+            "margin": [float(v) for v in target],
+            "margin_scale": [float(v) for v in scale],
         }
     )
 
@@ -121,9 +164,19 @@ def build_llm_dataset(
     )
     splits = build_splits(experiment_config)
 
+    prompt_config = None
+    if llm_config.data.serialization_format == "per_team":
+        prompt_config = load_prompt_config(llm_config.data.prompt_config)
+
     dataset = DatasetDict(
         {
-            name: build_split_dataset(splits, name, llm_config.data.serialization_format)
+            name: build_split_dataset(
+                splits,
+                name,
+                llm_config.data.serialization_format,
+                prompt_config,
+                reference_std=llm_config.data.target_reference_std,
+            )
             for name in SPLIT_NAMES
         }
     )

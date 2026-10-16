@@ -124,15 +124,27 @@ REGULAR_SEASON_GAMES_FEATURES_PATH = REGULAR_SEASON_DIR / "games_features.csv"
 TEAMS_HOME_RECORDS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_record.csv"
 TEAMS_AWAY_RECORDS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_record.csv"
 TEAMS_RECORDS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_records.csv"
-TEAMS_HOME_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_pts_diff.csv"
-TEAMS_AWAY_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_pts_diff.csv"
-TEAMS_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_pts_diff.csv"
+TEAMS_HOME_MARGIN_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_margin.csv"
+TEAMS_AWAY_MARGIN_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_margin.csv"
+TEAMS_MARGIN_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_margin.csv"
 EAST_WEST_RECORDS_PATH = REGULAR_SEASON_FEATURES_DIR / "east_west_record.csv"
 EAST_WEST_RECORDS_AT_EAST_PATH = (
     REGULAR_SEASON_FEATURES_DIR / "east_west_record_at_east.csv"
 )
 EAST_WEST_RECORDS_AT_WEST_PATH = (
     REGULAR_SEASON_FEATURES_DIR / "east_west_record_at_west.csv"
+)
+# Prior season's *final* conference-matchup record, one row per season — the
+# fallback blended in early in the next season while games_played_east_vs_west
+# is still small. See src/etl/features/east_vs_west.py::make_last_season_east_west_record.
+LAST_SEASON_EAST_WEST_RECORDS_PATH = (
+    REGULAR_SEASON_FEATURES_DIR / "last_season_east_west_record.csv"
+)
+LAST_SEASON_EAST_WEST_RECORDS_AT_EAST_PATH = (
+    REGULAR_SEASON_FEATURES_DIR / "last_season_east_west_record_at_east.csv"
+)
+LAST_SEASON_EAST_WEST_RECORDS_AT_WEST_PATH = (
+    REGULAR_SEASON_FEATURES_DIR / "last_season_east_west_record_at_west.csv"
 )
 RESTED_DAYS_PATH = REGULAR_SEASON_FEATURES_DIR / "rested_days.csv"
 TEAMS_DISTANCES_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_distances.csv"
@@ -143,13 +155,16 @@ LAST_SEASON_ADJ_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_adj_rec
 LAST_SEASON_ADJ_HOME_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_adj_home_record.csv"
 LAST_SEASON_ADJ_AWAY_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "last_season_adj_away_record.csv"
 TEAMS_STREAKS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_streaks.csv"
+TEAMS_HOME_STREAKS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_streaks.csv"
+TEAMS_AWAY_STREAKS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_streaks.csv"
 TEAMS_SOS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos.csv"
 TEAMS_SOS_ADJ_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos_adj_record.csv"
 TEAMS_SOS_ADJ_HOME_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos_adj_home_record.csv"
 TEAMS_SOS_ADJ_AWAY_RECORD_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_sos_adj_away_record.csv"
-TEAMS_HOME_NORM_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_norm_pts_diff.csv"
-TEAMS_AWAY_NORM_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_norm_pts_diff.csv"
-TEAMS_NORM_PTS_DIFF_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_norm_pts_diff.csv"
+TEAMS_HOME_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_margin_scaled.csv"
+TEAMS_AWAY_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_margin_scaled.csv"
+TEAMS_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_margin_scaled.csv"
+MARGIN_STD_PATH = REGULAR_SEASON_FEATURES_DIR / "margin_std.csv"
 TEAMS_GDS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds.csv"
 TEAMS_GDS_HOME_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_home.csv"
 TEAMS_GDS_AWAY_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_away.csv"

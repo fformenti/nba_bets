@@ -298,8 +298,8 @@ intraday or backfill a season of slates one day at a time.
 
 ## F8 — `fillna(0.0)` on rolling averages conflates "no data" with "average" (low)
 
-`pts_diff_avg_L{lag}` and `norm_pts_diff` fill missing rolling values with 0.0
-(`src/etl/features/point_differential.py:60,128`). For a normalized point
+`margin_avg_L{lag}` and `margin_scaled` fill missing rolling values with 0.0
+(`src/etl/features/point_differential.py:60,128`). For a scaled point
 differential, 0.0 means "exactly league-average team", which is a real claim
 about a team with no games played. `filters.minimum_games_train: 5` masks most
 of it. Leaving these NaN and letting the configured imputer act would be more

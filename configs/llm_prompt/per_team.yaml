@@ -1,0 +1,42 @@
+# Prompt config for the 'per_team' serialization format
+# (src/ml/llm/serialization.py, layout in src/ml/llm/prompt_template_per_team.md).
+#
+# Decides which features the prompt shows and how. It does NOT decide which
+# games are in each split — that is still data.source_experiment_config.
+#
+# Rules that are hard-coded, not configured here:
+#   - Lag tables keep every window shorter than games played, plus the first
+#     window that covers all of them (19 or 21 games -> up to L21; 22 -> L34).
+#     The more-played team of the two decides; venue tables count venue games.
+#   - The conference line appears only when the teams are in different
+#     conferences.
+
+thresholds:
+  # Drop "Adj Last-season win%" once BOTH teams have played at least this many games.
+  last_season_min_games: 13
+  # Drop "Adj Last-season venue win%" once the home team has this many home games
+  # AND the away team this many road games.
+  last_season_venue_min_games: 7
+  # Show "Playoffs" only once BOTH teams have played more than this many games.
+  playoffs_min_games: 50
+
+# feature: team | delta
+#   team  -> a Home row and an Away row
+#   delta -> one "Home−Away" row
+# Delete a line to drop the feature. Display order is fixed in code.
+# playoffs and conference_matchup are team-only (no meaningful difference).
+features:
+  streak: team
+  venue_streak: team
+  days_at_venue: team
+  rest_days: team
+  back_to_back: team
+  playoffs: team
+  last_season_record: team
+  last_season_venue_record: team
+  win_pct: team
+  pt_diff: team
+  venue_win_pct: team
+  venue_pt_diff: team
+  travel: team
+  conference_matchup: team

@@ -38,8 +38,8 @@ def as_emitted(name: str, fmt: str) -> str:
 def emitted_feature_names(text: str, fmt: str) -> set[str]:
     """Feature names actually present in a prompt.
 
-    Compared as names rather than substrings: ``pts_diff_avg_L5_delta`` is a
-    legitimate feature that contains the leaking column ``pts_diff`` as a
+    Compared as names rather than substrings: ``margin_avg_L5_delta`` is a
+    legitimate feature that contains the leaking column ``margin`` as a
     substring, so a naive ``in`` check would fire on healthy output.
     """
     if fmt == "markdown":
@@ -61,7 +61,7 @@ def features() -> pd.Series:
     return pd.Series(
         {
             "record_L82_delta": 0.125,
-            "pts_diff_avg_L5_delta": -3.5,
+            "margin_avg_L5_delta": -3.5,
             "rested_days_delta": 1.0,
             "east_wins_pct_L1": 0.48,
             "days_at_home": 4,
@@ -85,7 +85,7 @@ def meta() -> pd.Series:
             "winner": 1,
             "homeScore": 112,
             "awayScore": 99,
-            "pts_diff": 13,
+            "margin": 13,
         }
     )
 
@@ -116,12 +116,12 @@ def test_no_outcome_leakage(features, meta, fmt):
 @pytest.mark.parametrize("fmt", FORMATS)
 def test_leaking_feature_column_is_stripped(features, meta, fmt):
     """Even if an outcome column reaches the feature frame, it is filtered out."""
-    contaminated = pd.concat([features, pd.Series({"pts_diff": 13.0})])
+    contaminated = pd.concat([features, pd.Series({"margin": 13.0})])
     names = emitted_feature_names(serialize_row(contaminated, meta, fmt=fmt), fmt)
 
-    assert as_emitted("pts_diff", fmt) not in names
+    assert as_emitted("margin", fmt) not in names
     # ...while the similarly-named legitimate feature survives.
-    assert as_emitted("pts_diff_avg_L5_delta", fmt) in names
+    assert as_emitted("margin_avg_L5_delta", fmt) in names
 
 
 @pytest.mark.parametrize("fmt", FORMATS)
@@ -179,7 +179,7 @@ def test_serialize_frame_aligns_metadata_by_index(features, meta):
             "away team what the team still has to play for "
             "(-1 eliminated, 0 seed locked in and resting, 1 still fighting)",
         ),
-        ("norm_pts_diff_avg_L8_delta", "normalized point differential, last 8 games"),
+        ("margin_scaled_avg_L8_delta", "normalized point differential, last 8 games"),
         ("back_to_back_delta", "playing on no rest"),
     ],
 )

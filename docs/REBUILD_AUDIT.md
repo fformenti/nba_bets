@@ -138,8 +138,8 @@ required loading both model artifacts and reading `feature_names_in_`.
 
 ### F6 — The two feature paths emit different column sets (low)
 
-The prediction path produces `pts_diff_HT/VT/...` and `win_bool_HT/VT/...` that
-the ETL path does not; the ETL produces `neutral_court`, `pts_diff`, `win_bool`
+The prediction path produces `margin_HT/VT/...` and `win_bool_HT/VT/...` that
+the ETL path does not; the ETL produces `neutral_court`, `margin`, `win_bool`
 and the three location columns that the prediction path does not. Harmless today
 because no model selects them, but it is the same class of divergence as F1 and
 nothing prevents a future feature from landing on the wrong side of it.
@@ -168,7 +168,7 @@ All six fixed, plus a seventh the fixes themselves turned up.
 | F3 | `atomic_write_csv`, which creates the directory and writes via a temp file | `src/etl/process_ingested_games.py` |
 | F4 | Four parity regressions on a synthetic mini-league, needing nothing from `data/` | `tests/test_train_serve_parity.py` |
 | F5 | Selected / confirmed / tentative / rejected feature names logged as a JSON artifact | `src/ml/training/experiment.py` |
-| F6 | `win_bool`, `pts_diff` and `neutral_court` set on the slate so both paths emit the same columns | `src/ml/prediction/features.py` |
+| F6 | `win_bool`, `margin` and `neutral_court` set on the slate so both paths emit the same columns | `src/ml/prediction/features.py` |
 
 ### F7 — SOS read opponents' records at tip-off time, not game day
 

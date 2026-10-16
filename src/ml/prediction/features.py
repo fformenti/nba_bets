@@ -13,11 +13,12 @@ from __future__ import annotations
 import pandas as pd
 
 from src.config.paths import DEFAULT_FEATURES_CONFIG_PATH, PREDICTION_FEATURES_DIR
+from src.config.constants import RESPONSE_VARIABLES
 from src.etl.features.aggregator import (
     create_features_tables_from_config,
     merge_features,
 )
-from src.etl.utils.common import enrich_games_locations, get_nba_season
+from src.etl.utils.common import add_game_time, enrich_games_locations, get_nba_season
 from src.ml.config.loader import load_features_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.features.engineering import (
@@ -56,6 +57,8 @@ def fix_upcoming_games_cols(
         df["gameDateOnlyStr"] = pd.to_datetime(df["gameDate"], errors="coerce").dt.strftime(
             "%Y-%m-%d"
         )
+    if "gameTime" not in df.columns and "gameDate" in df.columns:
+        df = add_game_time(df)
     if "season" not in df.columns and "gameDate" in df.columns:
         df["season"] = pd.to_datetime(df["gameDate"], errors="coerce").apply(get_nba_season)
     columns_to_drop = ["arenaCity", "arenaName"]
@@ -75,14 +78,15 @@ def fix_upcoming_games_cols(
     df["attendance"] = None
     df["gameType"] = "Regular Season"
 
-    # `win_bool` and `pts_diff` exist on the ETL's historical frame, and
+    # `win_bool`, `margin` and `margin_scaled` exist on the ETL's historical frame, and
     # join_games_and_teams_feature only suffixes columns the games frame does not
     # already have. Without them here the prediction path grew a set of
-    # win_bool_HT / pts_diff_VT / ... columns the training path never had — the
+    # win_bool_HT / margin_VT / ... columns the training path never had — the
     # same silent divergence between the two feature paths that let the distance
     # bug below go unnoticed.
     df["win_bool"] = 0
-    df["pts_diff"] = 0
+    df["margin"] = 0
+    df["margin_scaled"] = 0
 
     # Likewise `neutral_court`, which the ETL adds in make_features. Deriving it
     # here rather than calling add_neutral_court keeps the prediction path free
@@ -229,7 +233,9 @@ def apply_model_feature_engineering(
         upcoming_with_features,
         feat_eng_config.features,
     )
-    upcoming_with_features = create_conference_features(upcoming_with_features)
+    upcoming_with_features = create_conference_features(
+        upcoming_with_features, feat_eng_config.conference_record_saturation_games
+    )
 
     return upcoming_with_features
 
@@ -259,13 +265,13 @@ def build_features_for_prediction(
 def prepare_features_for_model(
     df: pd.DataFrame,
     experiment_config: ExperimentConfig,
-    target_column: str,
 ) -> pd.DataFrame:
     """
     Prepare features DataFrame for model prediction.
 
     In inclusion mode, only columns declared in the experiment config are kept.
-    In exclusion mode (legacy), metadata and intermediate columns are dropped.
+    In exclusion mode (legacy), metadata, intermediate and every response
+    column (RESPONSE_VARIABLES) are dropped.
 
     Parameters
     ----------
@@ -273,8 +279,6 @@ def prepare_features_for_model(
         Input DataFrame with all columns
     experiment_config : ExperimentConfig
         Experiment configuration
-    target_column : str
-        Target column name
 
     Returns
     -------
@@ -307,7 +311,7 @@ def prepare_features_for_model(
         intermediate_columns = feat_eng_config.intermediate_columns
         exclude_columns = feat_eng_config.exclude_columns
         columns_to_exclude = (
-            metadata_columns + intermediate_columns + [target_column] + (exclude_columns or [])
+            metadata_columns + intermediate_columns + RESPONSE_VARIABLES + (exclude_columns or [])
         )
         X = df.drop(columns=[col for col in columns_to_exclude if col in df.columns])
 

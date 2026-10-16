@@ -77,7 +77,7 @@ class RecordDifferenceBaseline(ThresholdBaseline):
 class PointDifferentialBaseline(ThresholdBaseline):
     """Baseline classifier based on point differential average delta."""
 
-    def __init__(self, feature_column: str = "pts_diff_avg_L82_delta"):
+    def __init__(self, feature_column: str = "margin_avg_L82_delta"):
         super().__init__(
             feature_column=feature_column,
             name="point_differential_baseline",
@@ -86,7 +86,7 @@ class PointDifferentialBaseline(ThresholdBaseline):
 
 
 def create_baseline_model(
-    feature_column: str = "pts_diff_avg_delta",
+    feature_column: str = "margin_avg_delta",
 ) -> PointDifferentialBaseline:
     """Create a baseline model instance."""
     return PointDifferentialBaseline(feature_column=feature_column)

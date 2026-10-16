@@ -19,7 +19,9 @@ from typing import Literal, Optional
 
 import pandas as pd
 
-SerializationFormat = Literal["labeled", "json", "markdown"]
+from src.config.constants import RESPONSE_VARIABLES
+
+SerializationFormat = Literal["labeled", "json", "markdown", "per_team"]
 
 SYSTEM_PROMPT = (
     "You are responsible for predicting the outcome of a basketball game.\n"
@@ -44,13 +46,12 @@ LEAKING_COLUMNS = frozenset(
         "winnerteamConference",
         "homeScore",
         "awayScore",
-        "pts_diff",
-        "win_bool",
         "total_wins_HT",
         "total_losses_HT",
         "total_wins_VT",
         "total_losses_VT",
     }
+    | set(RESPONSE_VARIABLES)
 )
 
 # Contextual metadata that is safe and genuinely useful to state in the prompt.
@@ -117,15 +118,15 @@ def _as_markdown(features: pd.Series, meta: Optional[pd.Series]) -> str:
 # --- 'labeled' format -------------------------------------------------------
 #
 # The base Llama checkpoint has no instruction tuning to lean on, so the prompt
-# has to carry its own meaning. `norm_pts_diff_avg_L8_delta` means nothing to a
+# has to carry its own meaning. `margin_scaled_avg_L8_delta` means nothing to a
 # model pretrained on prose; "normalized point differential, last 8 games" leans
 # on what it already knows. These labels decode the column-naming convention
 # rather than enumerating columns, so a feature added in configs/features.yaml
 # still reaches the prompt with no change here.
 
 _STEM_LABELS = {
-    "norm_pts_diff_avg": "normalized point differential",
-    "pts_diff_avg": "point differential",
+    "margin_scaled_avg": "normalized point differential",
+    "margin_avg": "point differential",
     "record": "win percentage",
     "sos_adj_record": "strength-of-schedule adjusted win percentage",
     "sos": "strength of schedule",
@@ -153,7 +154,7 @@ _TEAM_SUFFIXES = {"_HT": "home team", "_VT": "away team"}
 # (section title, stems). First match wins; anything unmatched lands in "Other",
 # so a new feature is never silently dropped from the prompt.
 _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Recent form", ("norm_pts_diff_avg", "pts_diff_avg", "record", "gds", "streak")),
+    ("Recent form", ("margin_scaled_avg", "margin_avg", "record", "gds", "streak")),
     ("Strength of schedule", ("sos_adj_record", "sos")),
     (
         "Rest and travel",
@@ -294,6 +295,233 @@ def _as_labeled(features: pd.Series, meta: Optional[pd.Series]) -> str:
     return "\n".join(lines).rstrip()
 
 
+# --- 'per_team' format ------------------------------------------------------
+#
+# Renders the layout in prompt_template_per_team.md. Unlike the formats above,
+# it does not iterate whatever columns exist: it reads a fixed, explicit set of
+# columns from the *raw* feature-table row (games_enriched), which still holds
+# both teams' values and the games-played counters the per-game rules need.
+# Which of those features appear, and as team rows or a home − away delta, is
+# chosen by the prompt config (configs/llm_prompt/*.yaml).
+
+PER_TEAM_HEADER = (
+    "Predict the final NBA score margin (home − away) from pre-game stats.\n"
+    "Adj Win% = win percentage adjusted for strength of schedule, in percent. "
+    "Ln = last n games.\n"
+    "Scaled Margin = team's avg point differential in hundredths of the season's "
+    "margin standard deviation, so 100 = one std (positive = outscored opponents)."
+)
+PER_TEAM_SUFFIX = "Home margin ="
+
+# Single-value features: key -> (label, home column, away column, value kind).
+# Display order is the order here.
+PER_TEAM_SCALARS = {
+    "streak": ("Streak", "streak_HT", "streak_VT", "signed"),
+    "venue_streak": ("Venue streak", "streak_HT_at_home", "streak_VT_on_road", "signed"),
+    # Home team's days at home, away team's days on the road.
+    "days_at_venue": ("Days at venue", "days_at_home", "days_on_road", "int"),
+    "rest_days": ("Rest days", "rested_days_HT", "rested_days_VT", "int"),
+    "back_to_back": ("Back-to-back", "back_to_back_HT", "back_to_back_VT", "int"),
+    "playoffs": ("Playoffs", None, None, "playoffs"),
+    "last_season_record": (
+        "Adj Last-season win%",
+        "adjusted_last_season_record_HT",
+        "adjusted_last_season_record_VT",
+        "pct",
+    ),
+    "last_season_venue_record": (
+        "Adj Last-season venue win%",
+        "adjusted_last_season_record_HT_at_home",
+        "adjusted_last_season_record_VT_on_road",
+        "pct",
+    ),
+}
+
+# Lag tables: key -> (label, home column, away column, windows, column header,
+# value kind, games counter used to bound the windows). `{n}` is the window.
+# A None counter means the windows are days, not games, so they are never cut.
+_OVERALL = ("games_played_HT", "games_played_VT")
+_VENUE = ("games_played_HT_at_home", "games_played_VT_on_road")
+_GAME_LAGS = (3, 5, 8, 13, 21, 34, 55, 82)
+_VENUE_LAGS = (5, 10, 20, 41)
+
+PER_TEAM_TABLES = {
+    "win_pct": (
+        "Adj Win%", "sos_adj_record_L{n}_HT", "sos_adj_record_L{n}_VT",
+        _GAME_LAGS, "L{n}", "pct", _OVERALL,
+    ),
+    "pt_diff": (
+        "Scaled Margin", "margin_scaled_avg_L{n}_HT", "margin_scaled_avg_L{n}_VT",
+        _GAME_LAGS, "L{n}", "pct", _OVERALL,
+    ),
+    "venue_win_pct": (
+        "Adj Venue win%", "sos_adj_record_L{n}_HT_at_home", "sos_adj_record_L{n}_VT_on_road",
+        _VENUE_LAGS, "L{n}", "pct", _VENUE,
+    ),
+    "venue_pt_diff": (
+        "Scaled Margin Venue", "margin_scaled_avg_L{n}_HT_at_home",
+        "margin_scaled_avg_L{n}_VT_on_road", _VENUE_LAGS, "L{n}", "pct", _VENUE,
+    ),
+    "travel": (
+        "Avg km/day", "distance_L{n}_HT", "distance_L{n}_VT",
+        (1, 3, 7, 14), "{n}d", "int", None,
+    ),
+}
+
+# The conference line is its own sentence, not a table row.
+CONFERENCE_MATCHUP = "conference_matchup"
+
+# A difference of these means nothing, so they only render as team values.
+_TEAM_ONLY = {"playoffs", CONFERENCE_MATCHUP}
+
+PER_TEAM_FEATURES = (*PER_TEAM_SCALARS, *PER_TEAM_TABLES, CONFERENCE_MATCHUP)
+
+
+def load_prompt_config(path) -> dict:
+    """Read and check a prompt config (configs/llm_prompt/*.yaml)."""
+    from src.ml.config.loader import load_yaml_config
+
+    config = load_yaml_config(path)
+    for key, mode in config.get("features", {}).items():
+        if key not in PER_TEAM_FEATURES:
+            raise ValueError(
+                f"Unknown prompt feature '{key}' in {path}. "
+                f"Expected one of {list(PER_TEAM_FEATURES)}."
+            )
+        if mode not in ("team", "delta"):
+            raise ValueError(f"Prompt feature '{key}' in {path}: mode must be team or delta, got '{mode}'.")
+        if mode == "delta" and key in _TEAM_ONLY:
+            raise ValueError(f"Prompt feature '{key}' in {path} can only be shown as 'team'.")
+    for name in ("last_season_min_games", "last_season_venue_min_games", "playoffs_min_games"):
+        if name not in config.get("thresholds", {}):
+            raise ValueError(f"Prompt config {path} is missing thresholds.{name}.")
+    return config
+
+
+def bound_lags(lags: tuple[int, ...], games: int) -> tuple[int, ...]:
+    """Every window shorter than ``games``, plus the first that covers them all.
+
+    With 19 (or 21) games played, L21 already holds the whole season; L34 and
+    beyond would repeat it. With 22 games, L34 adds the one game L21 misses.
+    """
+    covering = [n for n in lags if n >= games]
+    return tuple(n for n in lags if n < games) + tuple(covering[:1])
+
+
+def hidden_features(raw: pd.Series, thresholds: dict) -> set[str]:
+    """Features the per-game rules drop for this game, whatever the config says."""
+    games = min(raw["games_played_HT"], raw["games_played_VT"])
+    venue_games = min(raw["games_played_HT_at_home"], raw["games_played_VT_on_road"])
+
+    hidden = set()
+    if games >= thresholds["last_season_min_games"]:
+        hidden.add("last_season_record")
+    if venue_games >= thresholds["last_season_venue_min_games"]:
+        hidden.add("last_season_venue_record")
+    if not games > thresholds["playoffs_min_games"]:
+        hidden.add("playoffs")
+    if raw["hometeamConference"] == raw["awayteamConference"]:
+        hidden.add(CONFERENCE_MATCHUP)
+    return hidden
+
+
+def _playoff_status(raw: pd.Series, team: str) -> str:
+    """First flag that holds, in order: seed locked, clinched, eliminated."""
+    if raw[f"clinched_final_seed_{team}"]:
+        return "seed locked"
+    if raw[f"clinched_playoff_berth_{team}"]:
+        return "clinched"
+    if raw[f"eliminated_from_playoffs_{team}"]:
+        return "eliminated"
+    return "in race"
+
+
+def _format_cell(value, kind: str, signed: bool = False) -> str:
+    """``pct`` values are fractions shown as whole percent; every number is an integer."""
+    if pd.isna(value):
+        return "-"
+    number = round(float(value) * 100) if kind == "pct" else round(float(value))
+    if (signed or kind == "signed") and number > 0:
+        return f"+{number}"
+    return str(number)
+
+
+def _grid(rows: list[list[str]]) -> list[str]:
+    """First column left-aligned, the rest right-aligned, two spaces apart."""
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    return [
+        (row[0].ljust(widths[0]) + "".join(f"  {c.rjust(w)}" for c, w in zip(row[1:], widths[1:], strict=True))).rstrip()
+        for row in rows
+    ]
+
+
+def _scalar_blocks(raw: pd.Series, shown: dict[str, str]) -> list[str]:
+    team_rows, delta_rows = [], []
+    for key, (label, home_col, away_col, kind) in PER_TEAM_SCALARS.items():
+        if key not in shown:
+            continue
+        if kind == "playoffs":
+            team_rows.append([label, _playoff_status(raw, "HT"), _playoff_status(raw, "VT")])
+        elif shown[key] == "team":
+            team_rows.append([label, _format_cell(raw[home_col], kind), _format_cell(raw[away_col], kind)])
+        else:
+            delta_rows.append([label, _format_cell(raw[home_col] - raw[away_col], kind, signed=True)])
+
+    blocks = []
+    if team_rows:
+        blocks.append("\n".join(_grid([["Team", "Home", "Away"], *team_rows])))
+    if delta_rows:
+        blocks.append("\n".join(_grid([["Team", "Home−Away"], *delta_rows])))
+    return blocks
+
+
+def _lag_table(raw: pd.Series, key: str, mode: str) -> str:
+    label, home_col, away_col, lags, head, kind, counter = PER_TEAM_TABLES[key]
+    if counter is not None:
+        # The more-played team decides, so neither team loses a window it needs.
+        lags = bound_lags(lags, int(max(raw[counter[0]], raw[counter[1]])))
+
+    home = [raw[home_col.format(n=n)] for n in lags]
+    away = [raw[away_col.format(n=n)] for n in lags]
+
+    rows = [[label, *(head.format(n=n) for n in lags)]]
+    if mode == "team":
+        rows.append(["Home", *(_format_cell(v, kind) for v in home)])
+        rows.append(["Away", *(_format_cell(v, kind) for v in away)])
+    else:
+        rows.append(
+            ["Home−Away", *(_format_cell(h - a, kind, signed=True) for h, a in zip(home, away, strict=True))]
+        )
+    return "\n".join(_grid(rows))
+
+
+def _conference_line(raw: pd.Series) -> Optional[str]:
+    conf = str(raw["hometeamConference"]).lower()
+    if conf not in ("east", "west"):
+        return None
+    overall = _format_cell(raw[f"{conf}_record_adjusted"], "pct")
+    floor = _format_cell(raw[f"{conf}_record_at_{conf}"], "pct")
+    return (
+        "Conference matchup this season (home conf vs away conf): "
+        f"{overall}% overall, {floor}% on home-conf floor"
+    )
+
+
+def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
+    """The whole prompt, header to ``PER_TEAM_SUFFIX``."""
+    hidden = hidden_features(raw, prompt_config["thresholds"])
+    shown = {k: m for k, m in prompt_config.get("features", {}).items() if k not in hidden}
+
+    blocks = [PER_TEAM_HEADER, *_scalar_blocks(raw, shown)]
+    blocks.extend(_lag_table(raw, key, shown[key]) for key in PER_TEAM_TABLES if key in shown)
+    if CONFERENCE_MATCHUP in shown:
+        line = _conference_line(raw)
+        if line is not None:
+            blocks.append(line)
+    blocks.append(PER_TEAM_SUFFIX)
+    return "\n\n".join(blocks)
+
+
 _SERIALIZERS = {
     "labeled": _as_labeled,
     "json": _as_json,
@@ -305,6 +533,8 @@ def serialize_row(
     features: pd.Series,
     meta: Optional[pd.Series] = None,
     fmt: SerializationFormat = "markdown",
+    raw: Optional[pd.Series] = None,
+    prompt_config: Optional[dict] = None,
 ) -> str:
     """Render one feature row as the prompt text shown to the model.
 
@@ -315,19 +545,33 @@ def serialize_row(
     meta : pd.Series, optional
         Matching row of the metadata frame (team names, season, date). Only the
         non-leaking columns in ``CONTEXT_META_COLUMNS`` are used.
-    fmt : {'labeled', 'json', 'markdown'}
-        Encoding. All three follow whatever columns exist. ``labeled`` is the
-        default: it additionally renders human-readable feature names, which a
-        base (non-instruct) model has more to work with.
+    fmt : {'labeled', 'json', 'markdown', 'per_team'}
+        Encoding. The first three follow whatever columns exist. ``labeled``
+        additionally renders human-readable feature names, which a base
+        (non-instruct) model has more to work with. ``per_team`` ignores
+        ``features`` and renders a fixed set of columns from ``raw`` as laid
+        out in prompt_template_per_team.md.
+    raw : pd.Series, optional
+        Matching row of the untouched feature table (``Splits.games_enriched``).
+        Required for ``per_team``.
+    prompt_config : dict, optional
+        Output of :func:`load_prompt_config`. Required for ``per_team``.
 
     Returns
     -------
     str
-        Prompt text ending in ``PROMPT_SUFFIX``, ready for a completion.
+        Prompt text ending in ``PROMPT_SUFFIX`` (``PER_TEAM_SUFFIX`` for
+        ``per_team``), ready for a completion.
     """
+    if fmt == "per_team":
+        if raw is None or prompt_config is None:
+            raise ValueError("serialization_format 'per_team' needs both `raw` and `prompt_config`.")
+        return _as_per_team(raw, prompt_config)
+
     if fmt not in _SERIALIZERS:
         raise ValueError(
-            f"Unknown serialization_format '{fmt}'. Expected one of {sorted(_SERIALIZERS)}."
+            f"Unknown serialization_format '{fmt}'. "
+            f"Expected one of {sorted([*_SERIALIZERS, 'per_team'])}."
         )
 
     body = _SERIALIZERS[fmt](features, meta)
@@ -338,16 +582,22 @@ def serialize_frame(
     features: pd.DataFrame,
     metadata: Optional[pd.DataFrame] = None,
     fmt: SerializationFormat = "markdown",
+    raw: Optional[pd.DataFrame] = None,
+    prompt_config: Optional[dict] = None,
 ) -> list[str]:
-    """Serialize every row of ``features``, aligning ``metadata`` by index."""
+    """Serialize every row of ``features``, aligning ``metadata`` and ``raw`` by index."""
     if metadata is not None:
         metadata = metadata.reindex(features.index)
+    if raw is not None:
+        raw = raw.reindex(features.index)
 
     return [
         serialize_row(
             features.loc[idx],
             metadata.loc[idx] if metadata is not None else None,
             fmt=fmt,
+            raw=raw.loc[idx] if raw is not None else None,
+            prompt_config=prompt_config,
         )
         for idx in features.index
     ]

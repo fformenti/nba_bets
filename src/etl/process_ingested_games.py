@@ -6,7 +6,7 @@ from src.config.paths import (
     REGULAR_SEASON_GAMES_PATH,
     INGESTED_GAMES_UPDATED_HISTORY_PATH,
 )
-from src.etl.utils.common import atomic_write_csv, game_type_from_id
+from src.etl.utils.common import add_game_time, atomic_write_csv, game_type_from_id
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -100,6 +100,9 @@ def process_ingested_games() -> None:
 
     parsed_played_games = ingested_games[ingested_games["postponed"] == 0]
     regular_season_games = filter_regular_season_games(parsed_played_games)
+    # An ingested table written before gameTime existed carries no such column;
+    # it is derived from gameDate, so re-deriving here is always safe.
+    regular_season_games = add_game_time(regular_season_games)
     # atomic_write_csv rather than to_csv: it creates the directory (a fresh
     # clone has no data/processed/regular_season, and this step used to be the
     # one place in the pipeline that assumed it existed) and it writes via a

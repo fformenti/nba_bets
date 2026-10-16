@@ -20,13 +20,26 @@ DEFAULT_SIZE = 200
 
 
 def ground_truth(datapoint) -> float:
-    """The true point differential for one dataset row.
+    """The true point differential for one dataset row, in real points.
 
-    Read from the ``completion`` column — the signed integer the model is
-    trained to produce — so the target has exactly one definition shared by
-    training and scoring. ``int`` parses the leading ``+`` natively.
+    Datasets built with era scaling carry the unscaled margin as ``margin``;
+    the completion there is in reference-era points. Older datasets have only
+    the completion, which then *is* the real margin — ``int`` parses the
+    leading ``+`` natively.
     """
+    if "margin" in datapoint:
+        return float(datapoint["margin"])
     return float(int(datapoint["completion"]))
+
+
+def margin_scale(datapoint) -> float:
+    """Factor taking a completion-unit margin back to real points.
+
+    ``margin_std / reference_std`` for the league spread over the game's
+    trailing window — the same causal estimate the target was scaled by — and 1.0 for a
+    dataset built unscaled. Positive, so it never changes a predicted winner.
+    """
+    return float(datapoint.get("margin_scale", 1.0))
 
 
 class RegressionTester:
@@ -68,7 +81,7 @@ class RegressionTester:
     def run_datapoint(self, i):
         datapoint = self.data[i]
         value = self.predictor(datapoint)
-        guess = self.post_process(value)
+        guess = self.post_process(value) * margin_scale(datapoint)
         truth = ground_truth(datapoint)
         error = abs(guess - truth)
         color = self.color_for(error, truth)
@@ -266,7 +279,7 @@ class ClassificationTester:
     def run_datapoint(self, i):
         datapoint = self.data[i]
         value = self.predictor(datapoint)
-        guess = self.post_process(value)
+        guess = self.post_process(value) * margin_scale(datapoint)
         truth = ground_truth(datapoint)
         correct = self.is_correct(guess, truth)
         color = self.color_for(correct)
@@ -482,7 +495,7 @@ class BatchedClassificationTester(ClassificationTester):
         if len(values) != len(rows):
             raise ValueError(f"batch_predictor returned {len(values)} outputs for {len(rows)} rows")
         for datapoint, value in zip(rows, values):
-            guess = self.post_process(value)
+            guess = self.post_process(value) * margin_scale(datapoint)
             truth = ground_truth(datapoint)
             correct = self.is_correct(guess, truth)
             self.titles.append(f"game {datapoint['game_id']}")

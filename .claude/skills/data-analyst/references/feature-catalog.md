@@ -120,24 +120,37 @@ Two families in one module, and the distinction matters.
 
 | Function | Output columns | Merge suffix |
 |----------|---------------|--------------|
-| `calculate_pts_diff()` | `pts_diff_avg_L{lag}` | `_HT`, `_VT` |
-| `calculate_home_pts_diff()` / `calculate_away_pts_diff()` | same (away sign-flipped) | `_HT_at_home`, `_VT_on_road` |
-| `calculate_norm_pts_diff()` | `norm_pts_diff_avg_L{lag}` | `_HT`, `_VT` |
-| `calculate_norm_home_pts_diff()` / `calculate_norm_away_pts_diff()` | same | `_HT_at_home`, `_VT_on_road` |
-| `_add_season_rolling_avg_total_pts()` | `season_avg_total_pts` (internal) | — |
+| `calculate_margin()` | `margin_avg_L{lag}` | `_HT`, `_VT` |
+| `calculate_home_margin()` / `calculate_away_margin()` | same (away sign-flipped) | `_HT_at_home`, `_VT_on_road` |
+| `calculate_margin(column="margin_scaled")` | `margin_scaled_avg_L{lag}` | `_HT`, `_VT` |
+| `calculate_home_margin(column="margin_scaled")` / `calculate_away_margin(...)` | same | `_HT_at_home`, `_VT_on_road` |
+| `margin_std_by_date()` | `margin_std` (table: `date \| last_date_with_game \| margin_std`) | merged on `gameDateOnlyStr`; in `INTERMEDIATE_COLUMNS` |
 
-**Normalization**: `norm_pts_diff = pts_diff / season_avg_total_pts`, where the divisor is
-the season-to-date mean of combined points per game, `.shift(1)`-ed. This neutralises era
-scoring pace, so a +8 margin in 1998 and a +8 in 2024 are not treated as the same
-achievement. The first game of a season falls back to the *previous* season's mean rather
-than an all-time mean — mixing the 1940s and 2020s would defeat the purpose and peek
-forward.
+**Normalization**: `margin_scaled = margin / margin_std`, where the divisor is
+the league-wide std of final margins over the last 1000 played games through the last
+earlier date with a game, across season boundaries. It is a per-date table
+(`margin_std.csv`: `date | last_date_with_game | margin_std`) joined by game date, so every
+game on a date shares one scale and none sees a result from its own day — which is what
+lets the prediction path reproduce it exactly (and why `daily-cycle` appends yesterday's
+results before predicting). Margins are measured in standard deviations of their era, so a +8 in
+2000 (std ~12.6) and a +8 in 2024 (std ~15.6) are not treated as the same achievement.
 
-**Only the normalized family ships — the two are near-duplicates, at r = 0.998.**
-`season_avg_total_pts` is an expanding within-season mean, so it is near-constant after the
-first weeks of a season; that makes `norm_pts_diff_avg_LX ≈ pts_diff_avg_LX / c_season`, an
+The window used to be season-to-date, with the previous season's std standing in for the
+first 100 games. Against each season's full std that scored worse in games 101–300 (4.1% vs
+3.2% error), and switching estimators at game 100 moved the scale 5.3% on average; the
+continuous window moves it 0.08%. It is a fixed window, not an exponential decay, so the
+prediction path — which keeps only the slate's two prior seasons — reproduces it exactly.
+
+The divisor used to be the season-to-date average of total points. That normalises scoring
+*level*, not margin *spread*: per-season margin std correlates only 0.47 with total points,
+and dividing by it cut the cross-season CV of margin spread just from 7.4% to 6.9%. The same
+`margin_std` scales the LLM's completion target (`src/ml/llm/dataset.py`).
+
+**Only the normalized family ships — the two are near-duplicates, at r = 0.998** (measured
+under the old total-points divisor; the argument carries over unchanged).
+`margin_std` is a trailing 1000-game std, so it is near-constant within a season; that makes `margin_scaled_avg_LX ≈ margin_avg_LX / c_season`, an
 affine transform. The entire information difference is between-season rescaling, which is
-exactly what the feature exists to do. `norm_point_differential` is the training-facing
+exactly what the feature exists to do. `margin_scaled` is the training-facing
 member — see the redundancy map in §3.
 
 > This entry briefly claimed the opposite. On 2026-08-12 a Boruta pass confirmed raw L13,
@@ -146,7 +159,7 @@ member — see the redundancy map in §3.
 > r = 0.998 the two split the SHAP credit and each still beats a shadow. Test accuracy fell
 > 0.66pp with both in. Reverted.
 
-**Leakage**: `.shift(1)` on `pts_diff` per `(teamId, season)`. `.fillna(0.0)` on the result,
+**Leakage**: `.shift(1)` on `margin` per `(teamId, season)`. `.fillna(0.0)` on the result,
 so unlike `record` these columns have **no NaN** — a first-of-season row reads 0.0, the
 correct neutral value for a signed difference.
 
@@ -497,7 +510,7 @@ still comfortably beats a shadow. So both get confirmed, and the artifact reads 
 > metrics, never from the selection artifact.
 
 On 2026-08-12 this audit read a `feature_audit` artifact the wrong way, enabled
-`point_differential` beside `norm_point_differential` (r = 0.998) and `gds` beside its own
+`margin` beside `margin_scaled` (r = 0.998) and `gds` beside its own
 parent `sos_adj_record` (r = 0.946), and test accuracy fell 66.44% → 65.78%. Both were
 reverted. See §7.
 
@@ -507,9 +520,9 @@ member, and features the duplicate had displaced come back:
 
 | feature | with duplicates (40 offered) | decoupled (34 offered) | |
 |---|---|---|---|
-| `norm_pts_diff_avg_L82_delta` | 0.111 confirmed | **0.280** confirmed | credit it was splitting with raw L82 (0.128) returns — 0.111 + 0.128 ≈ 0.24, close to the consolidated value |
-| `norm_pts_diff_avg_L55_delta` | 0.122 | **0.145** | |
-| `norm_pts_diff_avg_L34_delta` | 0.038 | **0.094** | its raw twin scored 0.072 |
+| `margin_scaled_avg_L82_delta` | 0.111 confirmed | **0.280** confirmed | credit it was splitting with raw L82 (0.128) returns — 0.111 + 0.128 ≈ 0.24, close to the consolidated value |
+| `margin_scaled_avg_L55_delta` | 0.122 | **0.145** | |
+| `margin_scaled_avg_L34_delta` | 0.038 | **0.094** | its raw twin scored 0.072 |
 | `sos_adj_record_L41_at_location_delta` | **rejected** | **confirmed** 0.026 | `gds`, built from it, was taking its place |
 | `sos_adj_record_L20_at_location_delta` | tentative 0.022 | **confirmed** 0.030 | same |
 | `games_behind_leader_delta` | 0.033 | **0.051** | uncoupled, and still gains from the noise reduction |
@@ -523,10 +536,10 @@ Every edge below is a place where the ETL computes one group's columns using ano
 `A → B` reads "B is built from A".
 
 ```
-                      pts_diff  (raw column, aggregator.py)
-                       ├──────────────→ point_differential      pts_diff_avg_L*
-                       └──────────────→ norm_point_differential norm_pts_diff_avg_L*
-                                        (÷ season_avg_total_pts)
+                      margin  (raw column, aggregator.py)
+                       ├──────────────→ margin        margin_avg_L*
+                       └──────────────→ margin_scaled margin_scaled_avg_L*
+                                        (÷ margin_std)
 
   record ──┐
            ├──→ sos_adj_record ──→ gds
@@ -550,7 +563,7 @@ Every edge below is a place where the ETL computes one group's columns using ano
 | `record` → `gds` | `_build_cum_win_pct_lookup` — the first fallback for Q |
 | `last_season_record` → `gds`, `sos` | `build_prior_season_strength` — terminal fallback when an opponent has no games yet |
 | `last_season_record` + `sos` → `adjusted_last_season_record` | `last_season_record.py::_apply_sos_to_season_record`, using end-of-season `sos_L82` |
-| `pts_diff` → both point-differential families | `calculate_pts_diff` and `_compute_norm_pts_diff` are siblings off one column |
+| `margin` → both point-differential families | `calculate_margin` and `_compute_scaled_margin` are siblings off one column |
 | rest grid → 4 columns | `rest_days.py::make_rested_days_table_season` |
 | `east_record_*` → conference features | `engineering.py::create_conference_features` |
 
@@ -560,7 +573,7 @@ Pearson r on the deltas, 49,175 rows, seasons ≥ 1980/81, after `dropna()`.
 
 | pair | r | over threshold? | resolution |
 |---|---|---|---|
-| `pts_diff_avg_L*` vs `norm_pts_diff_avg_L*` | **0.998** (0.9967–0.9980, every one of 13 lags) | yes | `norm_point_differential` |
+| `margin_avg_L*` vs `margin_scaled_avg_L*` | **0.998** (0.9967–0.9980, every one of 13 lags) | yes | `margin_scaled` |
 | `last_season_record` vs `adjusted_last_season_record` | **0.9985** (both plain and at-location) | yes | `adjusted_last_season_record` |
 | `record` vs `sos_adj_record` | **0.95** (0.88 at L1 → 0.95 at L34+) | yes, at the lags that ship | `sos_adj_record` |
 | `gds` vs `sos_adj_record` | 0.946 | under 0.95, but **derivation edge** | `sos_adj_record` |
@@ -573,7 +586,7 @@ Pearson r on the deltas, 49,175 rows, seasons ≥ 1980/81, after `dropna()`.
 
 | cluster | ships | disabled in its favour | why this one |
 |---|---|---|---|
-| point differential | **`norm_point_differential`** | `point_differential` | Era-neutral. Training spans 1980/81 to now and scoring pace moved substantially; the raw margin's only extra information *is* the era pace that normalization removes. Also the incumbent. |
+| point differential | **`margin_scaled`** | `margin` | Era-neutral. Training spans 1980/81 to now and scoring pace moved substantially; the raw margin's only extra information *is* the era pace that normalization removes. Also the incumbent. |
 | record / schedule strength | **`sos_adj_record`** | `record`, `sos`, `gds` | The adjustment is the entire point: `record` is its unadjusted input, `sos` its multiplier, `gds` its child. Shipping any of them beside it hands the model a product and its own factors. |
 | last season | **`adjusted_last_season_record`** | `last_season_record` | Same quantity corrected for the schedule that produced it. The adjusted at-location variant is a top-5 feature in every run; the raw pair is rejected. |
 | opponent quality | **`sos_adj_record`** over `gds` | `gds` | Felipe's call. `gds` is the derived member, and `sos_adj_record` must keep being *computed* either way since `gds` cannot be built without it — so retiring the parent would be retiring the child too. |
@@ -634,13 +647,13 @@ As of 2026-08-12, after the revert:
 
 | config | enabled groups | coupled pairs co-enabled |
 |---|---|---|
-| `xgboost.yaml` | norm_point_differential, sos_adj_record, distance, rested_days, back_to_back, adjusted_last_season_record, home_and_road, winning_incentive | **none** |
+| `xgboost.yaml` | margin_scaled, sos_adj_record, distance, rested_days, back_to_back, adjusted_last_season_record, home_and_road, winning_incentive | **none** |
 | `all_models.yaml` | identical to xgboost | **none** |
 | `llm_features.yaml` | the above + streak, home_and_road raw | **none** |
 | `feature_audit.yaml` | everything | **all 7, by design — exempt** |
 
 Two violations existed before this pass and are now fixed:
-`point_differential` + `norm_point_differential` and `sos_adj_record` + `gds`, in all three
+`margin` + `margin_scaled` and `sos_adj_record` + `gds`, in all three
 shippable configs. A third predated the audit entirely: `llm_features.yaml` enabled `record`
 while inheriting `sos_adj_record`. That one mattered *more* than the sklearn cases, not less
 — nothing trains from that config, so there is no Boruta pass to filter a duplicate out, and
@@ -666,9 +679,9 @@ key nothing reads looks like it worked.
 
 | key | read by ETL | read by ML |
 |---|---|---|
-| `record.lags`, `point_differential.lags`, `norm_point_differential.lags`, `distance.lags`, `sos.lags`, `gds.lags`, `gds.location_lags` | yes | yes |
-| `record.location_lags` | yes — and it drives the location tables for **all three** of record / point_differential / norm_point_differential | yes (record only) |
-| `point_differential.location_lags`, `norm_point_differential.location_lags` | **no** | yes |
+| `record.lags`, `margin.lags`, `margin_scaled.lags`, `distance.lags`, `sos.lags`, `gds.lags`, `gds.location_lags` | yes | yes |
+| `record.location_lags` | yes — and it drives the location tables for **all three** of record / margin / margin_scaled | yes (record only) |
+| `margin.location_lags`, `margin_scaled.location_lags` | **no** | yes |
 | `sos_adj_record.location_lags` | yes | yes |
 | `sos_adj_record.lags` | **no** | yes |
 | `last_season_record.location_lags`, `adjusted_last_season_record.location_lags` | no | no — the prefix lambda ignores its argument, so `[]` still yields the `_at_location_delta` column |
@@ -686,8 +699,8 @@ Three consequences:
   `sos_adj_record_L{lag}_HT/_VT` columns come from `record.lags`, so all nine windows are
   emitted regardless. On the ML side the same key *is* read, and leaving it undeclared
   (→ `[]`) is precisely what ships only the at-location variants.
-- **The three location lists must stay equal.** `point_differential.location_lags` and
-  `norm_point_differential.location_lags` are decorative to the ETL but live to
+- **The three location lists must stay equal.** `margin.location_lags` and
+  `margin_scaled.location_lags` are decorative to the ETL but live to
   `resolve_feature_columns`. Diverge them and training asks for a window nobody built;
   the only symptom is the MISSING FEATURE warning in `splits.py`, which is a log line and
   not a failure. Pinned by
@@ -733,23 +746,23 @@ status depends on what it competes against: **shipping** = `outputs/xgboost` (ru
 
 | Column | Group | shipping | audit | Notes |
 |---|---|---|---|---|
-| `norm_pts_diff_avg_L82_delta` | `norm_point_differential` | ✅ **0.280** (#1) | ✅ 0.120 | **lag added by this audit.** Importance more than doubled once its raw twin was removed |
-| `norm_pts_diff_avg_L55_delta` | `norm_point_differential` | ✅ 0.145 (#2) | ✅ 0.114 | |
+| `margin_scaled_avg_L82_delta` | `margin_scaled` | ✅ **0.280** (#1) | ✅ 0.120 | **lag added by this audit.** Importance more than doubled once its raw twin was removed |
+| `margin_scaled_avg_L55_delta` | `margin_scaled` | ✅ 0.145 (#2) | ✅ 0.114 | |
 | `adjusted_last_season_record_at_location_delta` | `adjusted_last_season_record` | ✅ 0.109 (#3) | ✅ 0.094 | top-5 in every run |
-| `norm_pts_diff_avg_L34_delta` | `norm_point_differential` | ✅ 0.094 | ✅ 0.036 | |
+| `margin_scaled_avg_L34_delta` | `margin_scaled` | ✅ 0.094 | ✅ 0.036 | |
 | `back_to_back_delta` | `back_to_back` | ✅ 0.085 | ✅ 0.084 | top-6 in every run. **Sign flipped 2026-08-15** to `VT − HT` — magnitude and rank are unaffected (a sign flip is a monotone transform of one column), but a SHAP direction read from an older run points the wrong way |
 | ~~`games_behind_leader_delta`~~ | `games_behind_leader` | ✅ 0.051 | ✅ 0.029 | **no longer offered as of 2026-08-15** — group disabled. Its Boruta record was the best of the six playoff groups, so this is the one row where the new config overrides a measurement: the group restates one team's record against another's, which `sos_adj_record` carries absolutely. Revisit head-to-head, not with another Boruta pass |
-| `norm_pts_diff_avg_L41_at_location_delta` | `norm_point_differential` | ✅ 0.042 | ✅ 0.040 | |
-| `norm_pts_diff_avg_L13_delta` | `norm_point_differential` | ✅ 0.042 | ✅ 0.020 | |
+| `margin_scaled_avg_L41_at_location_delta` | `margin_scaled` | ✅ 0.042 | ✅ 0.040 | |
+| `margin_scaled_avg_L13_delta` | `margin_scaled` | ✅ 0.042 | ✅ 0.020 | |
 | `sos_adj_record_L20_at_location_delta` | `sos_adj_record` | ✅ 0.030 | ✗ | confirmed → tentative → confirmed as `gds` was enabled then reverted |
 | `sos_adj_record_L41_at_location_delta` | `sos_adj_record` | ✅ 0.026 | ✗ | confirmed → **rejected** → confirmed, same cause |
-| `norm_pts_diff_avg_L8_delta` | `norm_point_differential` | ✅ 0.026 | ~ 0.017 | |
-| `norm_pts_diff_avg_L21_delta` | `norm_point_differential` | ~ 0.023 | ✗ | |
+| `margin_scaled_avg_L8_delta` | `margin_scaled` | ✅ 0.026 | ~ 0.017 | |
+| `margin_scaled_avg_L21_delta` | `margin_scaled` | ~ 0.023 | ✗ | |
 | `distance_L14_delta` | `distance` | ~ 0.021 | ✗ | **sign flipped 2026-08-15** to `VT − HT`, same caveat as `back_to_back_delta` |
-| `norm_pts_diff_avg_L20_at_location_delta` | `norm_point_differential` | ~ 0.020 | ✗ | |
+| `margin_scaled_avg_L20_at_location_delta` | `margin_scaled` | ~ 0.020 | ✗ | |
 | `days_at_home_delta` (= `days_at_home + days_on_road`) | `home_and_road` | ✗ 0.018 | ✗ | raw pair kept instead in `llm_features.yaml` |
 | `adjusted_last_season_record_delta` | `adjusted_last_season_record` | ✗ 0.018 | ✗ | the at-location variant carries the group |
-| `norm_pts_diff_avg_L{1,3,5}_delta`, `..._L{5,10}_at_location_delta` | `norm_point_differential` | ✗ | ✗ | short windows, offered and dropped every run |
+| `margin_scaled_avg_L{1,3,5}_delta`, `..._L{5,10}_at_location_delta` | `margin_scaled` | ✗ | ✗ | short windows, offered and dropped every run |
 | `sos_adj_record_L{5,10}_at_location_delta` | `sos_adj_record` | ✗ | ✗ | |
 | `distance_L{1,3,7}_delta` | `distance` | ✗ | ✗ | |
 | `rested_days_delta` | `rested_days` | ✗ 0.005 | ✗ | rejected in every run; `back_to_back` carries the rest signal |
@@ -767,7 +780,7 @@ These are **not barren**: they are live groups with a documented reason to stay 
 
 | Column family | Group | Why off | Last measured |
 |---|---|---|---|
-| `pts_diff_avg_L*_{HT,VT}`, `..._at_{home,road}` | `point_differential` | r = 0.998 with `norm_point_differential` | ✅ L82 0.129, L34 0.067, L13 0.025 (audit pool) |
+| `margin_avg_L*_{HT,VT}`, `..._at_{home,road}` | `margin` | r = 0.998 with `margin_scaled` | ✅ L82 0.129, L34 0.067, L13 0.025 (audit pool) |
 | `gds_L*_{HT,VT}`, `..._at_{home,road}` | `gds` | computed from `sos_adj_record`; r = 0.946 | ✅ L82 0.083, L55 0.023 (audit pool) |
 | `record_L*` | `record` | input to `sos_adj_record`; r = 0.95 | ✗ all 13, best 0.008 |
 | `sos_L*` | `sos` | input to `sos_adj_record` | ✗ all 18, best 0.015 |
@@ -781,12 +794,12 @@ These are **not barren**: they are live groups with a documented reason to stay 
 |---|---|---|
 | `east_record_adjusted`, `west_record_adjusted`, `east_record_at_east`, `west_record_at_west` | the two conference features | `create_conference_features`, then dropped |
 | `record_L82_HT`, `record_L82_VT` | `record_L82_delta` for `RecordDifferenceBaseline` | `splits.py` builds it onto `X_test_baseline` |
-| `pts_diff_avg_L82_HT`, `pts_diff_avg_L82_VT` | `pts_diff_avg_L82_delta` for `PointDifferentialBaseline` **and** the active `pts_diff_avg_L82_delta` feature | `splits.py`; baseline re-enabled by this audit |
+| `margin_avg_L82_HT`, `margin_avg_L82_VT` | `margin_avg_L82_delta` for `PointDifferentialBaseline` **and** the active `margin_avg_L82_delta` feature | `splits.py`; baseline re-enabled by this audit |
 | `clinched_playoff_berth_{HT,VT}`, `eliminated_from_playoffs_{HT,VT}`, `clinched_final_seed_{HT,VT}` | `winning_incentive`, since 2026-08-18 | `create_winning_incentive_features`, which drops all six after deriving the ordinal. Briefly shipped columns themselves (2026-08-15 to 2026-08-18) |
 | `winning_incentive_label_{HT,VT}` | EDA and plotting only | written beside the numeric pair, listed in `INTERMEDIATE_COLUMNS`; string-valued, so it must never reach a model |
 | `conf_rank_{HT,VT}` | `games_behind_leader`, `games_behind_above`, `games_ahead_of_below`, and the clinch logic | computed inside `compute_playoff_flags`; listed in `INTERMEDIATE_COLUMNS`, deliberately never its own group |
-| `total_wins_*`, `total_losses_*`, `games_played_HT_at_home`, `games_played_VT_on_road`, `pts_diff`, `distance` | divisors / intermediates | listed in `INTERMEDIATE_COLUMNS`; `pts_diff` also feeds every point-differential builder |
-| `season_avg_total_pts` | `norm_pts_diff` denominator | internal to `point_differential.py`, never merged |
+| `total_wins_*`, `total_losses_*`, `games_played_HT_at_home`, `games_played_VT_on_road`, `margin`, `distance` | divisors / intermediates | listed in `INTERMEDIATE_COLUMNS`; `margin` also feeds every point-differential builder |
+| `margin_std` | `margin_scaled` denominator; LLM target scale | `point_differential.py`, persisted per date as `margin_std.csv`, listed in `INTERMEDIATE_COLUMNS` |
 | `is_neutral_court_game` | `neutral_court` fallback when `arenaId` is null | `add_neutral_court`; also metadata for plotting |
 | `winnerteamConference` | East/West win attribution | `make_east_west_record`; also metadata |
 
@@ -834,12 +847,12 @@ two; that was the error §3 now prevents.
 | `sos_L{1..82}_{HT,VT}` | 18 | Same shape: `sos_adj_record` and `gds` consume the in-memory SOS table upstream, never these merged columns. Group was `enabled: false`. | **Measured, left off.** All 18 rejected (best 0.015 at 5/20). `_defaults.yaml` now records that rather than leaving a bare `enabled: false`. |
 | `sos_adj_record_L{1..82}_{HT,VT}` (non-location) | 18 | The plain rolling variants; `_defaults.yaml` declares `location_lags` only. Also feed GDS upstream, in-memory. | **Left off, comment already existed** ("the plain rolling variants lost to the at-location ones"). |
 | `record_L*_{HT,VT}`, `record_L*_at_{home,road}` | 26 | `record` is off everywhere: it is the unadjusted input to `sos_adj_record`, r = 0.95. | **Left as-is, now with the coupling documented.** The ETL must keep building them — `calculate_sos_adjusted_record` intersects `record_lags` with `sos_lags`, so trimming the list breaks the feature that replaced them. **Precursor, not barren.** |
-| `pts_diff_avg_L*_{HT,VT}`, `..._at_{home,road}` | 26 | Group disabled: r = 0.998 with `norm_point_differential`. | **Briefly re-enabled by this audit, then reverted.** Confirmed by Boruta (L82 0.129, L34 0.067) but that was the coupled-pair artifact — see §3. Two columns are genuine precursors: `pts_diff_avg_L82_{HT,VT}` feed `PointDifferentialBaseline`. |
+| `margin_avg_L*_{HT,VT}`, `..._at_{home,road}` | 26 | Group disabled: r = 0.998 with `margin_scaled`. | **Briefly re-enabled by this audit, then reverted.** Confirmed by Boruta (L82 0.129, L34 0.067) but that was the coupled-pair artifact — see §3. Two columns are genuine precursors: `margin_avg_L82_{HT,VT}` feed `PointDifferentialBaseline`. |
 | `gds_*` | 24 | Group `enabled: false`, no comment, **never once through feature selection**. | **Measured, then reverted for coupling.** Confirmed at L82 (0.083–0.097, 5th of 40) and L55, but computed from `sos_adj_record` at r = 0.946, and it displaced its own parent when co-enabled. `_defaults.yaml` now records the measurement, the coupling and the experiment to run if revisited. |
 | `neutral_court` | 1 | Group `enabled: false`, no comment, never measured. | **Measured, left off** with the result recorded: importance exactly 0.00000, 0 hits, both passes. |
 | `last_season_record_*` | 4 | Superseded by the adjusted version, r = 0.9985. | **Measured, left off**, coupling now recorded at the point of disablement. **Precursor** — `_prior_season_lookup` output is the input the adjusted builder corrects. |
 | `streak_{HT,VT}` | 2 | Off for sklearn (measured rejection, 0.007 — not a coupling case), on for the LLM config. | **Left as-is.** The one group that is off for the plain reason of having no signal. |
-| `pts_diff_avg_L82_delta` (derived) | 1 | `splits.py` built it onto `X_test_baseline` every run and `PointDifferentialBaseline` was **commented out** in `experiment.py`, behind a stale `TODO: make this feature available even when it's not passed to train config` — a blocker `splits.py` had already solved. | **Fixed.** Baseline re-enabled, mirroring the record baseline block. |
+| `margin_avg_L82_delta` (derived) | 1 | `splits.py` built it onto `X_test_baseline` every run and `PointDifferentialBaseline` was **commented out** in `experiment.py`, behind a stale `TODO: make this feature available even when it's not passed to train config` — a blocker `splits.py` had already solved. | **Fixed.** Baseline re-enabled, mirroring the record baseline block. |
 
 **Not barren, but flagged:** `momentum_pairs` machinery in `engineering.py` and
 `schema.py` is complete and correct but no config declares a pair. Inert rather than dead —
@@ -920,7 +933,7 @@ duplicated 6 others.** That is Felipe's hypothesis, confirmed.
 
 What survived the revert, and why it is not nothing:
 
-- `norm_pts_diff_avg_L82_delta` — previously excluded by an undocumented lag cap. Now the
+- `margin_scaled_avg_L82_delta` — previously excluded by an undocumented lag cap. Now the
   strongest feature in the model at 0.280, more than double the next.
 - the `playoff_standings` group — 10 columns that had no config knob at all and could not
   reach a model by any path. `games_behind_leader_delta` confirmed at 20/20 hits in four
@@ -930,7 +943,7 @@ What survived the revert, and why it is not nothing:
   be enabled and tested on its own. At the time only `games_behind_leader` shipped; as of
   2026-08-15 it was the three clinch flags instead, as raw HT/VT pairs, and as of
   2026-08-18 those three are one `winning_incentive` ordinal — see §3.
-- `gds` and `point_differential` were reverted, but they are no longer *unmeasured*. Their
+- `gds` and `margin` were reverted, but they are no longer *unmeasured*. Their
   `enabled: false` now carries the correlation, the Boruta result, and the experiment to run
   if anyone revisits them.
 
@@ -946,7 +959,7 @@ stale TODO). Two reference lines now print on every run:
 | model | test accuracy | test ROC AUC |
 |---|---|---|
 | record baseline (`record_L82_delta` threshold) | 65.28% | 65.21% |
-| point differential baseline (`pts_diff_avg_L82_delta` threshold) | 65.45% | 65.43% |
+| point differential baseline (`margin_avg_L82_delta` threshold) | 65.45% | 65.43% |
 | decoupled xgboost | **67.19%** | **72.71%** |
 
 A single-threshold rule on one column is within 1.74pp of the tuned model on accuracy. The
@@ -954,7 +967,7 @@ model earns its keep on **ranking** — 7.3 points of AUC — which is the quant
 selection needs. Keep this table in view whenever an accuracy delta of half a point is being
 treated as signal.
 
-Note both baselines read raw `pts_diff_avg_L82` / `record_L82` columns, from groups that are
+Note both baselines read raw `margin_avg_L82` / `record_L82` columns, from groups that are
 `enabled: false`. That is not a redundancy-rule violation: `splits.py` builds
 `X_test_baseline` from the untouched feature frame *before* `create_delta_features` runs, so
 the baselines are independent of group enablement by construction.
@@ -991,7 +1004,7 @@ import pandas as pd, numpy as np
 df = pd.read_csv("data/processed/regular_season/games_features.csv")
 df = df[df.season >= "1980/81"].dropna()
 d = lambda b: df[f"{b}_HT"] - df[f"{b}_VT"]
-print(np.corrcoef(d("my_new_feature_L34"), d("norm_pts_diff_avg_L34"))[0, 1])
+print(np.corrcoef(d("my_new_feature_L34"), d("margin_scaled_avg_L34"))[0, 1])
 ```
 
 And then: add it to `FEATURE_GROUP_PREFIXES` and `FeaturesMapConfig` as well as the YAML.

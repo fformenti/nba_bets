@@ -1,5 +1,7 @@
 """Visualization utilities for model evaluation."""
 
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,6 +21,15 @@ plt.rcParams["figure.figsize"] = (10, 6)
 # Polymarket is the comparison that matters, and it reads as the market in every
 # figure that carries one.
 COMPARISON_COLORS = ["seagreen", "tomato", "mediumpurple"]
+
+
+def stamp_timestamp(fig: plt.Figure) -> None:
+    """Stamp the figure with its generation time so staleness is visible on the image itself."""
+    fig.text(
+        0.995, 0.005,
+        f"Generated {datetime.now():%Y-%m-%d %H:%M:%S}",
+        ha="right", va="bottom", fontsize=7, color="gray", alpha=0.6,
+    )
 
 
 def plot_residuals(
@@ -68,6 +79,7 @@ def plot_residuals(
 
     plt.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -113,6 +125,7 @@ def plot_predictions(
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -164,6 +177,7 @@ def plot_confusion_matrix(
     ax.set_title(title)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -224,6 +238,7 @@ def plot_feature_importance(
     ax.grid(True, alpha=0.3, axis="x")
 
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -308,6 +323,7 @@ def plot_roc_curve(
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -374,6 +390,7 @@ def plot_prediction_accuracy_by_bin(
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
 
     return fig
 
@@ -494,6 +511,7 @@ def plot_calibration_curve(
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
     return fig
 
 
@@ -557,6 +575,7 @@ def plot_boruta_shap_results(
     ax.legend(handles=legend_elements, loc="lower right", fontsize=10)
 
     plt.tight_layout()
+    stamp_timestamp(fig)
     return fig
 
 
@@ -649,4 +668,5 @@ def plot_shap_summary(
 
     ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
     plt.tight_layout()
+    stamp_timestamp(fig)
     return fig

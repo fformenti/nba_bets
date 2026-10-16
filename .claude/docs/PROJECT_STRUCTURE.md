@@ -28,10 +28,13 @@ configs/
 │   ├── all_models.yaml                 # Overrides: sweep all four sklearn model families
 │   ├── feature_audit.yaml              # Diagnostic: every feature group on, for Boruta-SHAP coverage
 │   ├── llm_features.yaml               # Overrides: LLM feature set (adds win % and streak)
-│   └── xgboost.yaml                    # The deployed model: all games, xgboost
+│   ├── xgboost.yaml                    # The deployed model: all games, xgboost
+│   └── xgboost_margin.yaml             # xgboost regressor on the home margin (not deployable)
 ├── train_llm/
 │   ├── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
 │   └── llama31_8b_qlora_t4.yaml        # Same, but fp16/float16 — T4 has no bf16 tensor cores
+├── llm_prompt/
+│   └── per_team.yaml                   # 'per_team' prompt: which features, team vs delta, games-played thresholds
 └── predict/
     └── predict_classifier.yaml         # The deployed model URI
 ```
@@ -147,15 +150,16 @@ src/
 │   │   └── baseline.py                 # Naive baseline models
 │   │
 │   ├── training/
-│   │   ├── classifier.py               # train_classifier(): one experiment end to end
+│   │   ├── classifier.py               # train_classifier(): one experiment end to end; routes margin targets to regressor.py
 │   │   ├── experiment.py               # train_single_model(): the training body
 │   │   ├── data_prep.py                # Load, validate, prepare
 │   │   ├── model_factory.py            # Build models from config
+│   │   ├── regressor.py                # train_regression_model(): margin targets, MAE + winner accuracy
 │   │   ├── runners.py                  # Baseline and configured-model runners
 │   │   └── weighting.py                # THE sample-weight definition (within-season ramp)
 │   │
 │   ├── llm/                            # The LLM is a second ENCODING of the same experiment
-│   │   ├── serialization.py            # serialize_row(): the ONLY table→text boundary
+│   │   ├── serialization.py            # serialize_row(): the ONLY table→text boundary (incl. per_team format)
 │   │   ├── dataset.py                  # build_llm_dataset() from build_splits()
 │   │   ├── finetune.py                 # QLoRA SFT: preflight, Hub resume, SFTTrainer
 │   │   ├── train.py                    # Run orchestration + tracking

@@ -52,6 +52,7 @@ def train_model_with_config(
     random_state: Optional[int] = None,
     sample_weight: Optional[np.ndarray] = None,
     cv_strategy: str = "timeseries",
+    task_type: str = "classification",
 ) -> tuple[Pipeline, ModelTrainer, Dict[str, Any]]:
     per_model_hp = model_config.get(model_name, {}).get("hyperparameter_tuning", {})
     global_hp = model_config.get("hyperparameter_tuning", {})
@@ -63,7 +64,7 @@ def train_model_with_config(
     model, param_grid = create_model(
         model_name,
         model_config,
-        task_type="classification",
+        task_type=task_type,
         random_state=random_state,
         config_param_grid=config_param_grid,
     )
@@ -79,9 +80,7 @@ def train_model_with_config(
 
     pipeline = Pipeline([("preprocessor", preprocessor), ("model", model)])
 
-    trainer = ModelTrainer(
-        model=pipeline, task_type="classification", random_state=random_state
-    )
+    trainer = ModelTrainer(model=pipeline, task_type=task_type, random_state=random_state)
 
     tuning_performed = False
     if hp_config.get("enabled", False):

@@ -15,15 +15,19 @@ from src.config.paths import (
     TEAMS_HOME_RECORDS_PATH,
     TEAMS_AWAY_RECORDS_PATH,
     TEAMS_RECORDS_PATH,
-    TEAMS_HOME_PTS_DIFF_PATH,
-    TEAMS_AWAY_PTS_DIFF_PATH,
-    TEAMS_PTS_DIFF_PATH,
-    TEAMS_HOME_NORM_PTS_DIFF_PATH,
-    TEAMS_AWAY_NORM_PTS_DIFF_PATH,
-    TEAMS_NORM_PTS_DIFF_PATH,
+    TEAMS_HOME_MARGIN_PATH,
+    TEAMS_AWAY_MARGIN_PATH,
+    TEAMS_MARGIN_PATH,
+    TEAMS_HOME_MARGIN_SCALED_PATH,
+    TEAMS_AWAY_MARGIN_SCALED_PATH,
+    TEAMS_MARGIN_SCALED_PATH,
+    MARGIN_STD_PATH,
     EAST_WEST_RECORDS_PATH,
     EAST_WEST_RECORDS_AT_EAST_PATH,
     EAST_WEST_RECORDS_AT_WEST_PATH,
+    LAST_SEASON_EAST_WEST_RECORDS_PATH,
+    LAST_SEASON_EAST_WEST_RECORDS_AT_EAST_PATH,
+    LAST_SEASON_EAST_WEST_RECORDS_AT_WEST_PATH,
     RESTED_DAYS_PATH,
     TEAMS_DISTANCES_PATH,
     LAST_SEASON_RECORD_PATH,
@@ -33,6 +37,8 @@ from src.config.paths import (
     LAST_SEASON_ADJ_HOME_RECORD_PATH,
     LAST_SEASON_ADJ_AWAY_RECORD_PATH,
     TEAMS_STREAKS_PATH,
+    TEAMS_HOME_STREAKS_PATH,
+    TEAMS_AWAY_STREAKS_PATH,
     TEAMS_SOS_PATH,
     TEAMS_SOS_ADJ_RECORD_PATH,
     TEAMS_SOS_ADJ_HOME_RECORD_PATH,
@@ -49,16 +55,17 @@ from src.etl.features.winning_percentage import (
     calculate_record,
 )
 
-from src.etl.features.east_vs_west import make_east_west_record
+from src.etl.features.east_vs_west import (
+    make_east_west_record,
+    make_last_season_east_west_record,
+)
 
 from src.etl.features.point_differential import (
-    calculate_away_pts_diff,
-    calculate_home_pts_diff,
-    calculate_pts_diff,
-    calculate_norm_home_pts_diff,
-    calculate_norm_away_pts_diff,
-    calculate_norm_pts_diff,
-    _add_season_rolling_avg_total_pts,
+    calculate_away_margin,
+    calculate_home_margin,
+    calculate_margin,
+    margin_std_by_date,
+    _scale_margin,
 )
 from src.etl.features.rest_days import make_rested_days_table
 
@@ -70,8 +77,13 @@ from src.etl.features.last_season_record import (
     create_adjusted_last_season_record,
     create_adjusted_last_season_home_record,
     create_adjusted_last_season_away_record,
+    prev_season,
 )
-from src.etl.features.streaks import calculate_streak
+from src.etl.features.streaks import (
+    calculate_streak,
+    calculate_home_streak,
+    calculate_away_streak,
+)
 from src.etl.features.strength_of_schedule import calculate_strength_of_schedule
 from src.etl.features.sos_adjusted_record import calculate_sos_adjusted_record
 from src.etl.utils.common import save_feature_table
@@ -86,9 +98,9 @@ from src.etl.features.playoff_standings import compute_playoff_flags
 def create_features_tables(
     games: pd.DataFrame,
     record_lags=[],
-    point_differential_lags=[],
+    margin_lags=[],
     location_lags=[],
-    norm_point_differential_lags=[],
+    margin_scaled_lags=[],
     distances_lags=[],
     sos_lags=[],
     sos_adj_alpha: float = 1.0,
@@ -107,8 +119,8 @@ def create_features_tables(
         Games DataFrame with conference information
     record_lags : list
         List of lags to create record features for
-    point_differential_lags : list
-        List of lags to create point differential features for
+    margin_lags : list
+        List of lags to create margin features for
     location_lags : list
         List of lags to create location-specific record features for
     output_dir : Path, optional
@@ -138,19 +150,34 @@ def create_features_tables(
         pd.concat([home_records, away_records], ignore_index=True), record_lags
     )
 
-    # Create pts_diff column needed for point differential calculations
-    games["pts_diff"] = games["homeScore"] - games["awayScore"]
+    # Response columns, set in place: merge_features joins only the columns the
+    # games frame lacks, so a column living here never comes back suffixed
+    # (margin_HT, margin_scaled_VT, ...) — only its _avg_L* windows do.
+    # margin_scaled is margin in units of the season-to-date league margin std.
+    games["margin"] = games["homeScore"] - games["awayScore"]
+    margin_std = margin_std_by_date(games)
+    games["margin_scaled"] = _scale_margin(
+        games["margin"],
+        games["gameDateOnlyStr"].map(margin_std.set_index("date")["margin_std"]),
+    )
 
-    home_pts_diff = calculate_home_pts_diff(games, location_lags)
-    away_pts_diff = calculate_away_pts_diff(games, location_lags)
-    teams_pts_diff = calculate_pts_diff(
-        pd.concat([home_pts_diff, away_pts_diff], ignore_index=True),
-        point_differential_lags,
+    home_margin = calculate_home_margin(games, location_lags)
+    away_margin = calculate_away_margin(games, location_lags)
+    teams_margin = calculate_margin(
+        pd.concat([home_margin, away_margin], ignore_index=True),
+        margin_lags,
     )
 
     east_west_record = make_east_west_record(games)
     east_west_record_at_east = make_east_west_record(games, location="East")
     east_west_record_at_west = make_east_west_record(games, location="West")
+    last_season_east_west_record = make_last_season_east_west_record(games)
+    last_season_east_west_record_at_east = make_last_season_east_west_record(
+        games, location="East"
+    )
+    last_season_east_west_record_at_west = make_last_season_east_west_record(
+        games, location="West"
+    )
     rested_days = make_rested_days_table(games)
     teams_distances = make_teams_distances_table_season(distances_lags, games=games)
 
@@ -159,34 +186,40 @@ def create_features_tables(
     save_feature_table(away_records, table(TEAMS_AWAY_RECORDS_PATH))
     save_feature_table(teams_record, table(TEAMS_RECORDS_PATH))
 
-    save_feature_table(home_pts_diff, table(TEAMS_HOME_PTS_DIFF_PATH))
-    save_feature_table(away_pts_diff, table(TEAMS_AWAY_PTS_DIFF_PATH))
-    save_feature_table(teams_pts_diff, table(TEAMS_PTS_DIFF_PATH))
+    save_feature_table(home_margin, table(TEAMS_HOME_MARGIN_PATH))
+    save_feature_table(away_margin, table(TEAMS_AWAY_MARGIN_PATH))
+    save_feature_table(teams_margin, table(TEAMS_MARGIN_PATH))
 
-    # Normalized point differential (season-to-date avg total pts as denominator)
-    # games already has pts_diff column from above; add rolling season avg
-    games_with_season_avg = _add_season_rolling_avg_total_pts(games)
-
-    home_norm_pts_diff = calculate_norm_home_pts_diff(games_with_season_avg, location_lags)
-    away_norm_pts_diff = calculate_norm_away_pts_diff(games_with_season_avg, location_lags)
-
-    # Combined home+away for all-games rolling avg
-    home_for_norm = games_with_season_avg.rename(columns={"hometeamId": "teamId"})
-    away_for_norm = games_with_season_avg.copy()
-    away_for_norm["pts_diff"] = away_for_norm["pts_diff"] * -1
-    away_for_norm = away_for_norm.rename(columns={"awayteamId": "teamId"})
-    teams_norm_pts_diff = calculate_norm_pts_diff(
-        pd.concat([home_for_norm, away_for_norm], ignore_index=True),
-        norm_point_differential_lags,
+    home_margin_scaled = calculate_home_margin(games, location_lags, column="margin_scaled")
+    away_margin_scaled = calculate_away_margin(games, location_lags, column="margin_scaled")
+    teams_margin_scaled = calculate_margin(
+        pd.concat([home_margin_scaled, away_margin_scaled], ignore_index=True),
+        margin_scaled_lags,
+        column="margin_scaled",
     )
 
-    save_feature_table(home_norm_pts_diff, table(TEAMS_HOME_NORM_PTS_DIFF_PATH))
-    save_feature_table(away_norm_pts_diff, table(TEAMS_AWAY_NORM_PTS_DIFF_PATH))
-    save_feature_table(teams_norm_pts_diff, table(TEAMS_NORM_PTS_DIFF_PATH))
+    save_feature_table(home_margin_scaled, table(TEAMS_HOME_MARGIN_SCALED_PATH))
+    save_feature_table(away_margin_scaled, table(TEAMS_AWAY_MARGIN_SCALED_PATH))
+    save_feature_table(teams_margin_scaled, table(TEAMS_MARGIN_SCALED_PATH))
+
+    # The same scale persisted, one row per date. Not a model feature: the LLM
+    # dataset scales its margin target by it (src/ml/llm/dataset.py).
+    save_feature_table(margin_std, table(MARGIN_STD_PATH))
 
     save_feature_table(east_west_record, table(EAST_WEST_RECORDS_PATH))
     save_feature_table(east_west_record_at_east, table(EAST_WEST_RECORDS_AT_EAST_PATH))
     save_feature_table(east_west_record_at_west, table(EAST_WEST_RECORDS_AT_WEST_PATH))
+    save_feature_table(
+        last_season_east_west_record, table(LAST_SEASON_EAST_WEST_RECORDS_PATH)
+    )
+    save_feature_table(
+        last_season_east_west_record_at_east,
+        table(LAST_SEASON_EAST_WEST_RECORDS_AT_EAST_PATH),
+    )
+    save_feature_table(
+        last_season_east_west_record_at_west,
+        table(LAST_SEASON_EAST_WEST_RECORDS_AT_WEST_PATH),
+    )
     save_feature_table(rested_days, table(RESTED_DAYS_PATH))
     save_feature_table(teams_distances, table(TEAMS_DISTANCES_PATH))
 
@@ -201,6 +234,11 @@ def create_features_tables(
 
     teams_streaks = calculate_streak(games)
     save_feature_table(teams_streaks, table(TEAMS_STREAKS_PATH))
+
+    home_streak = calculate_home_streak(games)
+    away_streak = calculate_away_streak(games)
+    save_feature_table(home_streak, table(TEAMS_HOME_STREAKS_PATH))
+    save_feature_table(away_streak, table(TEAMS_AWAY_STREAKS_PATH))
 
     playoff_standings = compute_playoff_flags(games)
     # game_motivation = calculate_game_motivation(playoff_standings)
@@ -333,13 +371,20 @@ def merge_features(games, features_dir: Optional[Path] = None):
     teams_away_record = pd.read_csv(table(TEAMS_AWAY_RECORDS_PATH))
     teams_records = pd.read_csv(table(TEAMS_RECORDS_PATH))
 
-    home_pts_diff = pd.read_csv(table(TEAMS_HOME_PTS_DIFF_PATH))
-    away_pts_diff = pd.read_csv(table(TEAMS_AWAY_PTS_DIFF_PATH))
-    teams_pts_diff = pd.read_csv(table(TEAMS_PTS_DIFF_PATH))
+    home_margin = pd.read_csv(table(TEAMS_HOME_MARGIN_PATH))
+    away_margin = pd.read_csv(table(TEAMS_AWAY_MARGIN_PATH))
+    teams_margin = pd.read_csv(table(TEAMS_MARGIN_PATH))
 
     east_west_record = pd.read_csv(table(EAST_WEST_RECORDS_PATH))
     east_west_record_at_east = pd.read_csv(table(EAST_WEST_RECORDS_AT_EAST_PATH))
     east_west_record_at_west = pd.read_csv(table(EAST_WEST_RECORDS_AT_WEST_PATH))
+    last_season_east_west_record = pd.read_csv(table(LAST_SEASON_EAST_WEST_RECORDS_PATH))
+    last_season_east_west_record_at_east = pd.read_csv(
+        table(LAST_SEASON_EAST_WEST_RECORDS_AT_EAST_PATH)
+    )
+    last_season_east_west_record_at_west = pd.read_csv(
+        table(LAST_SEASON_EAST_WEST_RECORDS_AT_WEST_PATH)
+    )
     rested_days = pd.read_csv(table(RESTED_DAYS_PATH))
     teams_distances = pd.read_csv(table(TEAMS_DISTANCES_PATH))
     last_season_record = pd.read_csv(table(LAST_SEASON_RECORD_PATH))
@@ -358,30 +403,41 @@ def merge_features(games, features_dir: Optional[Path] = None):
         games, teams_away_record, "awayteamId", "VT_on_road"
     )
 
-    # Point differential
-    games = join_games_and_teams_feature(games, teams_pts_diff, "hometeamId", "HT")
-    games = join_games_and_teams_feature(games, teams_pts_diff, "awayteamId", "VT")
+    # Margin
+    games = join_games_and_teams_feature(games, teams_margin, "hometeamId", "HT")
+    games = join_games_and_teams_feature(games, teams_margin, "awayteamId", "VT")
     games = join_games_and_teams_feature(
-        games, home_pts_diff, "hometeamId", "HT_at_home"
+        games, home_margin, "hometeamId", "HT_at_home"
     )
     games = join_games_and_teams_feature(
-        games, away_pts_diff, "awayteamId", "VT_on_road"
+        games, away_margin, "awayteamId", "VT_on_road"
     )
 
-    # Normalized point differential
-    if table(TEAMS_NORM_PTS_DIFF_PATH).exists():
-        teams_norm_pts_diff = pd.read_csv(table(TEAMS_NORM_PTS_DIFF_PATH))
-        games = join_games_and_teams_feature(games, teams_norm_pts_diff, "hometeamId", "HT")
-        games = join_games_and_teams_feature(games, teams_norm_pts_diff, "awayteamId", "VT")
-    if table(TEAMS_HOME_NORM_PTS_DIFF_PATH).exists():
-        home_norm_pts_diff = pd.read_csv(table(TEAMS_HOME_NORM_PTS_DIFF_PATH))
+    # Scaled margin
+    if table(TEAMS_MARGIN_SCALED_PATH).exists():
+        teams_margin_scaled = pd.read_csv(table(TEAMS_MARGIN_SCALED_PATH))
+        games = join_games_and_teams_feature(games, teams_margin_scaled, "hometeamId", "HT")
+        games = join_games_and_teams_feature(games, teams_margin_scaled, "awayteamId", "VT")
+    if table(TEAMS_HOME_MARGIN_SCALED_PATH).exists():
+        home_margin_scaled = pd.read_csv(table(TEAMS_HOME_MARGIN_SCALED_PATH))
         games = join_games_and_teams_feature(
-            games, home_norm_pts_diff, "hometeamId", "HT_at_home"
+            games, home_margin_scaled, "hometeamId", "HT_at_home"
         )
-    if table(TEAMS_AWAY_NORM_PTS_DIFF_PATH).exists():
-        away_norm_pts_diff = pd.read_csv(table(TEAMS_AWAY_NORM_PTS_DIFF_PATH))
+    if table(TEAMS_AWAY_MARGIN_SCALED_PATH).exists():
+        away_margin_scaled = pd.read_csv(table(TEAMS_AWAY_MARGIN_SCALED_PATH))
         games = join_games_and_teams_feature(
-            games, away_norm_pts_diff, "awayteamId", "VT_on_road"
+            games, away_margin_scaled, "awayteamId", "VT_on_road"
+        )
+
+    if table(MARGIN_STD_PATH).exists():
+        # One row per date. Only the scale itself comes across:
+        # last_date_with_game is a date string, not a feature.
+        margin_std = pd.read_csv(table(MARGIN_STD_PATH))[["date", "margin_std"]]
+        games = games.merge(
+            margin_std.rename(columns={"date": "gameDateOnlyStr"}),
+            how="left",
+            on="gameDateOnlyStr",
+            validate="m:1",
         )
 
     # East vs West. Each table is one row per (season, date), so the join needs
@@ -400,6 +456,25 @@ def merge_features(games, features_dir: Optional[Path] = None):
             on=["season", "gameDateOnlyStr"],
             validate="m:1",
         )
+
+    # Last season's final conference-matchup record, attached to the season
+    # that follows it. Each table is one row per season, so the join key is a
+    # season alone — mapped through prev_season rather than gameDateOnlyStr,
+    # since this is a season-level lookup, not a date-level one (the opposite
+    # of the east/west merge just above).
+    games["prev_season"] = games["season"].map(prev_season)
+    for last_season_east_west_table in (
+        last_season_east_west_record,
+        last_season_east_west_record_at_east,
+        last_season_east_west_record_at_west,
+    ):
+        games = games.merge(
+            last_season_east_west_table.rename(columns={"season": "prev_season"}),
+            how="left",
+            on="prev_season",
+            validate="m:1",
+        )
+    games = games.drop(columns=["prev_season"])
 
     # Rested days
     games = get_rested_days(games, rested_days, is_hometeam=True)
@@ -490,6 +565,17 @@ def merge_features(games, features_dir: Optional[Path] = None):
 
     games = join_games_and_teams_feature(games, teams_streaks, "hometeamId", "HT")
     games = join_games_and_teams_feature(games, teams_streaks, "awayteamId", "VT")
+
+    if table(TEAMS_HOME_STREAKS_PATH).exists():
+        home_streak = pd.read_csv(table(TEAMS_HOME_STREAKS_PATH))
+        games = join_games_and_teams_feature(
+            games, home_streak, "hometeamId", "HT_at_home"
+        )
+    if table(TEAMS_AWAY_STREAKS_PATH).exists():
+        away_streak = pd.read_csv(table(TEAMS_AWAY_STREAKS_PATH))
+        games = join_games_and_teams_feature(
+            games, away_streak, "awayteamId", "VT_on_road"
+        )
 
     # Strength of Schedule
     if table(TEAMS_SOS_PATH).exists():
@@ -680,9 +766,9 @@ def create_features_tables_from_config(
     create_features_tables(
         games,
         features_config.record_lags,
-        features_config.point_differential_lags,
+        features_config.margin_lags,
         features_config.location_lags,
-        features_config.norm_point_differential_lags,
+        features_config.margin_scaled_lags,
         features_config.distances_lags,
         features_config.sos_lags,
         sos_adj_alpha=features_config.sos_adj_alpha,

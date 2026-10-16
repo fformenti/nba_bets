@@ -13,6 +13,7 @@ from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig
 from src.ml.tracking.mlflow_tracker import MLflowTracker
 from src.ml.training.experiment import generate_run_name, train_single_model
+from src.ml.training.regressor import train_regression_model
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -55,6 +56,9 @@ def _log_feature_configs(
 def train_classifier(config_path: Optional[Path] = None, promote: bool = False):
     """Train every model in the config and register the best with MLflow.
 
+    ``data.target_column`` picks the task: ``win_bool`` trains classifiers,
+    ``margin`` / ``margin_scaled`` train regressors (src/ml/training/regressor.py).
+
     Parameters
     ----------
     promote : bool, default False
@@ -75,6 +79,14 @@ def train_classifier(config_path: Optional[Path] = None, promote: bool = False):
         )
     config_path = resolved
     config = load_experiment_config(config_path)
+    regression = config.data.task_type == "regression"
+    if regression and promote:
+        # predict-upcoming serves win probabilities (predict_proba); a margin
+        # regressor has none, so deploying one would break the daily cycle.
+        raise ValueError(
+            f"Refusing --promote: {config.data.target_column!r} trains a regressor, "
+            "and the prediction pipeline only serves classifiers."
+        )
 
     run_name = generate_run_name(config_path=config_path, include_timestamp=True)
 
@@ -85,18 +97,17 @@ def train_classifier(config_path: Optional[Path] = None, promote: bool = False):
     ) as tracker:
         tracker.log_config(config.model_dump())
         _log_feature_configs(config, config_path, tracker)
-        result = train_single_model(
-            config=config,
-            config_path=config_path,
-            tracker=tracker,
-        )
+        train = train_regression_model if regression else train_single_model
+        result = train(config=config, config_path=config_path, tracker=tracker)
 
     if result:
         best_model = result.get("best_model_name", "N/A")
+        # A regressor's comparable figure is the share of winners its margin calls.
+        accuracy_key = "test_winner_accuracy" if regression else "test_accuracy"
         best_acc = (
             result.get("best_model_data", {})
             .get("test_metrics", {})
-            .get("test_accuracy", 0)
+            .get(accuracy_key, 0)
         )
         logger.info(f"{best_model} - Accuracy: {best_acc:.4f}")
 

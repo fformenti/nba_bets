@@ -7,7 +7,7 @@ When to read: detecting leakage or reviewing a new feature/config for correctnes
 | Risk | Examples | Rule |
 |------|----------|------|
 | **Target leakage** | `win_bool`, `winner`, `homeScore`, `awayScore` | Always in `originally_enriched_columns` or `metadata_columns` |
-| **Score proxies** | `pts_diff`, any post-game aggregate | Always excluded via `originally_enriched_columns` |
+| **Score proxies** | `margin`, any post-game aggregate | Always excluded via `originally_enriched_columns` |
 | **Temporal leakage** | Any feature computed using future game data | Use only `_L{lag}` lagged features |
 | **Conference identity** | `hometeamConference`, `awayteamConference` raw columns | Drop after feature construction |
 | **Split leakage** | Fitting scaler/imputer on full dataset before split | Preprocessor always fit on train split only, transform val/test |
@@ -44,7 +44,7 @@ games["record_L7"] = (
 | Module | Column shifted | Method |
 |--------|---------------|--------|
 | `winning_percentage.py` | `win_bool` → `win_bool_l1` | `.shift(1)` before cumsum/rolling |
-| `point_differential.py` | `pts_diff` → `pts_diff_L1` | `.shift(1)` before rolling mean |
+| `point_differential.py` | `margin` → `margin_L1` | `.shift(1)` before rolling mean |
 | `east_vs_west.py` | cumulative sums | `.shift(1)` on grouped cumsum |
 | `rest_days.py` | `rest` indicator | `.shift(1)` on rest flag |
 | `distances.py` | N/A — distance is a pre-game fact | No shift needed (location is known before the game) |
@@ -72,7 +72,7 @@ games["record_L7"] = (
 When asked to detect or verify leakage:
 
 1. **Config audit**: Scan `originally_enriched_columns` and `metadata_columns` — confirm all post-game signals are listed
-2. **Feature name scan**: Check for post-game signals (raw scores, `win_bool`, `pts_diff` without `_L{lag}` suffix)
+2. **Feature name scan**: Check for post-game signals (raw scores, `win_bool`, `margin` without `_L{lag}` suffix)
 3. **Preprocessor timing**: Verify preprocessor is fit only on train split (not before `temporal_split()`)
 4. **Split integrity**: Confirm `temporal_split()` is used and date ordering is correct (`train_max_date < test_min_date`)
 5. **Conference columns**: Confirm raw conference columns are dropped after conference feature construction

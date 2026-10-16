@@ -30,22 +30,38 @@ RAW_CONFERENCE_COLUMNS = [
     "west_record_adjusted",
     "east_record_at_east",
     "west_record_at_west",
+    "games_played_east_vs_west",
+    "last_season_east_record_adjusted",
+    "last_season_west_record_adjusted",
+    "last_season_east_record_at_east",
+    "last_season_west_record_at_west",
 ]
 
 
-def _frame() -> pd.DataFrame:
-    """Four games: two cross-conference (both directions) and two intra."""
-    return pd.DataFrame(
-        {
-            "hometeamConference": ["East", "West", "East", "West"],
-            "awayteamConference": ["West", "East", "East", "West"],
-            "east_record_adjusted": [0.55, 0.55, 0.55, 0.55],
-            "west_record_adjusted": [0.45, 0.45, 0.45, 0.45],
-            "east_record_at_east": [0.60, 0.60, 0.60, 0.60],
-            "west_record_at_west": [0.52, 0.52, 0.52, 0.52],
-            "record_L10_delta": [0.1, -0.2, 0.3, 0.0],
-        }
-    )
+def _frame(**overrides) -> pd.DataFrame:
+    """Four games: two cross-conference (both directions) and two intra.
+
+    ``games_played_east_vs_west`` defaults well above the default
+    ``saturation_games`` (20) and ``last_season_*`` default to NaN, so the
+    blend ramp lands at full weight on the current-season columns and every
+    pre-existing assertion below keeps holding unchanged.
+    """
+    base = {
+        "hometeamConference": ["East", "West", "East", "West"],
+        "awayteamConference": ["West", "East", "East", "West"],
+        "east_record_adjusted": [0.55, 0.55, 0.55, 0.55],
+        "west_record_adjusted": [0.45, 0.45, 0.45, 0.45],
+        "east_record_at_east": [0.60, 0.60, 0.60, 0.60],
+        "west_record_at_west": [0.52, 0.52, 0.52, 0.52],
+        "games_played_east_vs_west": [999, 999, 999, 999],
+        "last_season_east_record_adjusted": [float("nan")] * 4,
+        "last_season_west_record_adjusted": [float("nan")] * 4,
+        "last_season_east_record_at_east": [float("nan")] * 4,
+        "last_season_west_record_at_west": [float("nan")] * 4,
+        "record_L10_delta": [0.1, -0.2, 0.3, 0.0],
+    }
+    base.update(overrides)
+    return pd.DataFrame(base)
 
 
 def _declared_conference_columns() -> list[str]:
@@ -115,3 +131,53 @@ def test_home_court_advantage_is_zero_for_intra_conference_games():
     intra = frame["hometeamConference"] == frame["awayteamConference"]
 
     assert (out.loc[intra, "conference_home_court_advantage_pct"] == 0.0).all()
+
+
+def test_blend_uses_last_season_fully_at_zero_games_played():
+    """0 interconference games played this season -> ramp weight is 0."""
+    frame = _frame(
+        games_played_east_vs_west=[0, 0, 0, 0],
+        last_season_east_record_adjusted=[0.70, 0.70, 0.70, 0.70],
+        last_season_west_record_adjusted=[0.30, 0.30, 0.30, 0.30],
+        last_season_east_record_at_east=[0.80, 0.80, 0.80, 0.80],
+        last_season_west_record_at_west=[0.20, 0.20, 0.20, 0.20],
+    )
+    out = create_conference_features(frame, saturation_games=20)
+
+    # Row 0: East hosts West. diff = +1 * (0.70 - 0.30) = 0.40.
+    assert out.loc[0, "conference_diff_home_advantage_pct"] == pytest.approx(0.40)
+    # Row 0: home court uses last season's east_record_at_east, centered.
+    assert out.loc[0, "conference_home_court_advantage_pct"] == pytest.approx(0.30)
+    # Row 1: West hosts East. home court uses last season's west_record_at_west.
+    assert out.loc[1, "conference_home_court_advantage_pct"] == pytest.approx(-0.30)
+
+
+def test_blend_ramps_linearly_between_last_and_current_season():
+    """Midway through the ramp, the blend is the weighted average of both."""
+    frame = _frame(
+        games_played_east_vs_west=[10, 10, 10, 10],  # half of saturation_games=20
+        last_season_east_record_adjusted=[0.70, 0.70, 0.70, 0.70],
+        last_season_west_record_adjusted=[0.30, 0.30, 0.30, 0.30],
+    )
+    out = create_conference_features(frame, saturation_games=20)
+
+    # weight = 0.5 -> east_eff = 0.5*0.55 + 0.5*0.70 = 0.625, west_eff = 0.5*0.45 + 0.5*0.30 = 0.375
+    # Row 0: East hosts West. diff = +1 * (0.625 - 0.375) = 0.25.
+    assert out.loc[0, "conference_diff_home_advantage_pct"] == pytest.approx(0.25)
+
+
+def test_blend_falls_back_to_current_season_when_last_season_missing():
+    """First season in the dataset: no prior season to blend with.
+
+    Even with a thin current-season sample, NaN last-season inputs must not
+    propagate into the feature — the row falls back to the current-season
+    value outright.
+    """
+    frame = _frame(games_played_east_vs_west=[1, 1, 1, 1])
+    out = create_conference_features(frame, saturation_games=20)
+
+    assert not out["conference_diff_home_advantage_pct"].isna().any()
+    assert not out["conference_home_court_advantage_pct"].isna().any()
+    # Same as the full-weight case: last_season_* is NaN, so the raw
+    # current-season values pass through unblended.
+    assert out.loc[0, "conference_diff_home_advantage_pct"] == pytest.approx(0.10)

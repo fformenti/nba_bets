@@ -315,18 +315,25 @@ def run_prediction_pipeline(
         # season left every adjusted_last_season_record_* column NaN for every
         # game — a feature the models had selected during training, silently
         # imputed away at inference by allow_missing_features.
+        #
+        # The season before that comes too: margin_std is a trailing window of
+        # MARGIN_STD_WINDOW games across seasons (point_differential.py), and
+        # one prior season can hold fewer (1998/99 had 725). Two always cover it,
+        # so the slate sees the same scale training did.
         upcoming_seasons = upcoming_games["season"].dropna().unique().tolist()
         if upcoming_seasons:
             required_seasons = set(upcoming_seasons) | {
-                prev_season(season) for season in upcoming_seasons
+                earlier
+                for season in upcoming_seasons
+                for earlier in (prev_season(season), prev_season(prev_season(season)))
             }
             historical_features = historical_features[
                 historical_features["season"].isin(required_seasons)
             ].copy()
             logger.info(
                 f"Filtered historical features to seasons: {sorted(required_seasons)} "
-                f"(slate: {sorted(upcoming_seasons)}, plus the prior season for "
-                f"last-season features)"
+                f"(slate: {sorted(upcoming_seasons)}, plus two prior seasons for "
+                f"last-season features and the margin_std window)"
             )
 
         # Build the feature tables once. They depend on the slate and the
@@ -369,11 +376,9 @@ def run_prediction_pipeline(
             logger.warning("No games left after feature engineering; nothing to predict")
             return
 
-        target_column = model_experiment_config.data.target_column
         X = prepare_features_for_model(
             df=upcoming_with_features,
             experiment_config=model_experiment_config,
-            target_column=target_column,
         )
 
         logger.info(f"Loading model from MLflow: {model_uri}")

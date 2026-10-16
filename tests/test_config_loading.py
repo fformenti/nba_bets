@@ -2,8 +2,12 @@
 
 import pytest
 import yaml
+from pydantic import ValidationError
+
+from src.config.constants import RESPONSE_VARIABLES
 
 from src.config.paths import CONFIGS_TRAIN_DIR, PROJECT_ROOT
+from src.ml.config.schema import DataConfig
 from src.ml.config.loader import (
     load_experiment_config,
     load_features_config,
@@ -20,6 +24,8 @@ ALL_MODELS = CONFIGS_TRAIN_DIR / "all_models.yaml"
 # An ExperimentConfig too, but it deliberately diverges: it enables `streak` and
 # keeps home_and_road raw.
 LLM_FEATURES = CONFIGS_TRAIN_DIR / "llm_features.yaml"
+# xgboost's features and splits, regressing the home margin instead.
+XGBOOST_MARGIN = CONFIGS_TRAIN_DIR / "xgboost_margin.yaml"
 # Diagnostic only. Enables every group at once — including both members of every
 # coupled pair — so it is exempt from test_no_coupled_pairs_co_enabled.
 FEATURE_AUDIT = CONFIGS_TRAIN_DIR / "feature_audit.yaml"
@@ -27,7 +33,7 @@ FEATURE_AUDIT = CONFIGS_TRAIN_DIR / "feature_audit.yaml"
 # The two that must resolve to an identical feature set.
 SKLEARN_TRAIN_CONFIGS = [XGBOOST, ALL_MODELS]
 # Every runnable train config, for assertions that hold regardless of feature set.
-ALL_TRAIN_CONFIGS = SKLEARN_TRAIN_CONFIGS + [LLM_FEATURES]
+ALL_TRAIN_CONFIGS = SKLEARN_TRAIN_CONFIGS + [LLM_FEATURES, XGBOOST_MARGIN]
 
 # ── The redundancy map, as an executable constraint ────────────────────────
 #
@@ -46,10 +52,10 @@ ALL_TRAIN_CONFIGS = SKLEARN_TRAIN_CONFIGS + [LLM_FEATURES]
 # .claude/skills/data-analyst/references/feature-catalog.md.
 COUPLED_GROUPS = [
     (
-        "point_differential",
-        "norm_point_differential",
-        "siblings from one pts_diff column; norm divides by a near-constant "
-        "within-season mean, so r = 0.998 at every lag",
+        "margin",
+        "margin_scaled",
+        "siblings from one margin column; the scaled version divides by a "
+        "near-constant within-season mean, so r = 0.998 at every lag",
     ),
     (
         "last_season_record",
@@ -123,11 +129,12 @@ class TestFeaturesConfig:
         fe = load_features_config(FEATURES_YAML)
         assert fe.record_lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
         assert fe.sos_adj_alpha == 1.0
+        assert fe.conference_record_saturation_games == 20
 
     def test_features_yaml_has_all_lag_types(self):
         fe = load_features_config(FEATURES_YAML)
         assert len(fe.record_lags) > 0
-        assert len(fe.point_differential_lags) > 0
+        assert len(fe.margin_lags) > 0
         assert len(fe.location_lags) > 0
         assert len(fe.distances_lags) > 0
         assert len(fe.sos_lags) > 0
@@ -147,7 +154,7 @@ class TestTrainConfigLoading:
         """The flat *_lags properties are views onto the resolved feature groups."""
         fe = load_experiment_config(config_path).feature_engineering
         assert fe.record_lags == fe.features.record.lags
-        assert fe.point_differential_lags == fe.features.point_differential.lags
+        assert fe.margin_lags == fe.features.margin.lags
         assert fe.location_lags == fe.features.record.location_lags
         assert fe.distances_lags == fe.features.distance.lags
         assert fe.sos_lags == fe.features.sos.lags
@@ -163,12 +170,12 @@ class TestTrainConfigLoading:
         # keys were removed. _defaults.yaml is the only place training
         # enablement is decided, and it turns `record` off.
         assert fe.features.record.enabled is False
-        assert fe.features.norm_point_differential.enabled is True
+        assert fe.features.margin_scaled.enabled is True
         # The model takes every window the ETL builds, L82 included — confirmed
         # at 20/20 hits, and previously excluded by an undocumented L55 cap.
-        assert fe.features.norm_point_differential.lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
+        assert fe.features.margin_scaled.lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
         # Its raw twin stays off: r = 0.998 against the above at every lag.
-        assert fe.features.point_differential.enabled is False
+        assert fe.features.margin.enabled is False
 
     @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
     def test_opt_in_groups_disabled_by_default(self, config_path):
@@ -193,6 +200,16 @@ class TestTrainConfigLoading:
         config = load_experiment_config(config_path)
         assert config.feature_engineering.sos_adj_alpha == features.sos_adj_alpha
         assert config.feature_engineering.features.sos.delta is False
+
+    @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
+    def test_conference_record_saturation_games_from_features_yaml(self, config_path):
+        """Merges the same way sos_adj_alpha does: a flat scalar from features.yaml."""
+        features = load_features_config(FEATURES_YAML)
+        config = load_experiment_config(config_path)
+        assert (
+            config.feature_engineering.conference_record_saturation_games
+            == features.conference_record_saturation_games
+        )
 
     @pytest.mark.parametrize("config_path", ALL_TRAIN_CONFIGS, ids=lambda p: p.stem)
     def test_include_tentative_inherited_from_defaults(self, config_path):
@@ -234,7 +251,7 @@ class TestTrainConfigLoading:
 
         aggregator.py takes a single `location_lags`, and schema.py reads it off
         `record` alone — that one list drives calculate_home_record,
-        calculate_home_pts_diff and calculate_norm_home_pts_diff alike. But
+        calculate_home_margin (for margin and margin_scaled) alike. But
         resolve_feature_columns reads each group's *own* location_lags to name
         the `_at_location_delta` columns it asks for.
 
@@ -245,11 +262,11 @@ class TestTrainConfigLoading:
         """
         features = load_experiment_config(XGBOOST).feature_engineering.features
         assert (
-            features.point_differential.location_lags
+            features.margin.location_lags
             == features.record.location_lags
         )
         assert (
-            features.norm_point_differential.location_lags
+            features.margin_scaled.location_lags
             == features.record.location_lags
         )
 
@@ -276,7 +293,7 @@ class TestTrainConfigLoading:
         """
         config = load_experiment_config(XGBOOST)
         features = config.feature_engineering.features
-        assert features.norm_point_differential.lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
+        assert features.margin_scaled.lags == [1, 3, 5, 8, 13, 21, 34, 55, 82]
         assert features.sos_adj_record.lags == []
         assert features.sos_adj_record.location_lags == [5, 10, 20, 41]
         assert features.record.enabled is False
@@ -295,14 +312,14 @@ class TestTrainConfigLoading:
         across three columns, and once collapsed the quantity is signed, so
         HT - VT says which team has more reason to play its starters.
 
-        `gds` and `point_differential` stay off for a different reason: each sits
+        `gds` and `margin` stay off for a different reason: each sits
         next to a feature it is derived from or near-duplicates. Re-enabling one
         is a modelling decision that needs a head-to-head against the group it
         duplicates — not another Boruta run. See COUPLED_GROUPS.
         """
         features = load_experiment_config(XGBOOST).feature_engineering.features
         assert features.gds.enabled is False
-        assert features.point_differential.enabled is False
+        assert features.margin.enabled is False
 
         assert features.games_behind_leader.enabled is False
         assert features.games_behind_above.enabled is False
@@ -383,7 +400,7 @@ class TestTrainConfigLoading:
         assert llm.streak.enabled is True and xgb.streak.enabled is False
         assert llm.home_and_road.delta is False and xgb.home_and_road.delta is True
         # Everything else tracks the shared base.
-        assert llm.norm_point_differential.lags == xgb.norm_point_differential.lags
+        assert llm.margin_scaled.lags == xgb.margin_scaled.lags
         assert llm.sos_adj_record.lags == xgb.sos_adj_record.lags
         assert llm.distance.model_dump() == xgb.distance.model_dump()
 
@@ -396,3 +413,14 @@ class TestTrainConfigLoading:
         assert "feature_engineering" in dumped
         assert "model" in dumped
         assert "mlflow" in dumped
+
+
+class TestTargetColumn:
+    @pytest.mark.parametrize("target", RESPONSE_VARIABLES)
+    def test_accepts_every_response_variable(self, target):
+        assert DataConfig(target_column=target).target_column == target
+
+    @pytest.mark.parametrize("target", ["winner", "record_L82_delta", "margin_avg_L8"])
+    def test_rejects_anything_else(self, target):
+        with pytest.raises(ValidationError, match="RESPONSE_VARIABLES|must be one of"):
+            DataConfig(target_column=target)

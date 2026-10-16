@@ -38,7 +38,7 @@ The model factory auto-prefixes with `"model__"`. Custom grids from config are a
 ## Feature name propagation
 
 1. `ColumnTransformer.set_output(transform="pandas")` preserves DataFrame output
-2. ColumnTransformer prepends sub-pipeline names: `"numerical__pts_diff_avg_L7_delta"`, `"boolean__is_back_to_back"`
+2. ColumnTransformer prepends sub-pipeline names: `"numerical__margin_avg_L7_delta"`, `"boolean__is_back_to_back"`
 3. `clean_feature_names()` in `model_factory.py` strips these prefixes: `name.split("__", 1)[1]`
 
 ## `set_output(transform="pandas")` implications

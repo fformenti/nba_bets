@@ -14,11 +14,11 @@
 # edit that changes the build and one that changes nothing:
 #
 #   record.location_lags drives the home/road tables for ALL THREE of record,
-#   point_differential and norm_point_differential — aggregator.py passes one
-#   `location_lags` argument (schema.py::location_lags reads `record` only) to
-#   calculate_home_record, calculate_home_pts_diff and
-#   calculate_norm_home_pts_diff alike. So `point_differential.location_lags`
-#   and `norm_point_differential.location_lags` are read by nothing in the ETL.
+#   margin and margin_scaled — aggregator.py passes one `location_lags`
+#   argument (schema.py::location_lags reads `record` only) to
+#   calculate_home_record and calculate_home_margin (once per margin
+#   column) alike. So `margin.location_lags` and
+#   `margin_scaled.location_lags` are read by nothing in the ETL.
 #   They are NOT dead, though: the ML resolver reads each group's own key to
 #   name the `_at_location_delta` columns. Keep all three lists equal or
 #   training asks for columns the ETL never built. Pinned by
@@ -56,22 +56,28 @@
 # Groups with no lags at all (rested_days, back_to_back, streak, home_and_road,
 # neutral_court, games_behind_leader, games_behind_above, games_ahead_of_below,
 # winning_incentive) have nothing to say to the ETL and are declared only in
-# _defaults.yaml.
+# _defaults.yaml. streak (like rest_days) still gets an unconditional
+# home/road split table (streak_HT_at_home/VT_on_road) — it just has no lag
+# list to configure, so there is still nothing for this file to say about it.
 
 feature_engineering:
   sos_adj_alpha: 1.0
   gds_beta: 0.10
+  # Below this many current-season interconference games played, the
+  # conference-matchup features ramp from last season's final record toward
+  # this season's; at/above it they use this season's record outright.
+  conference_record_saturation_games: 20
 
   features:
     record:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
 
-    point_differential:
+    margin:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
 
-    norm_point_differential:
+    margin_scaled:
       lags: [1, 3, 5, 8, 13, 21, 34, 55, 82]
       location_lags: [5, 10, 20, 41]
 

@@ -78,7 +78,7 @@ if train_max_date >= test_min_date:
 ### Features Computed from Target
 Red flags in feature names:
 - Any feature containing `win` without a `_L{lag}` suffix
-- Raw `pts_diff` without a lag window
+- Raw `margin` without a lag window
 - `homeScore`, `awayScore` appearing in the feature matrix
 - `winner` column not in `metadata_columns`
 

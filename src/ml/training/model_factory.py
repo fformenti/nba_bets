@@ -1,10 +1,15 @@
 from typing import Any, Dict, Optional
 
 from sklearn.base import BaseEstimator
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import (
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from xgboost import XGBClassifier, XGBRegressor
+from lightgbm import LGBMClassifier, LGBMRegressor
 
 from src.utils.logging_config import get_logger
 
@@ -29,18 +34,26 @@ def create_model(
     random_state: Optional[int] = None,
     config_param_grid: Optional[Dict[str, list]] = None,
 ) -> tuple[BaseEstimator, Dict[str, Any]]:
+    # Regression swaps in each family's regressor and drops the class-balancing
+    # knobs (class_weight, scale_pos_weight), which have no meaning there.
+    regression = task_type == "regression"
+    # Passed only to classifiers.
+    class_balance: Dict[str, Any] = {}
+
     if model_name == "random_forest":
         rf_config = model_config.get("random_forest", {})
-        model = RandomForestClassifier(
+        if not regression:
+            class_balance = {"class_weight": rf_config.get("class_weight", "balanced")}
+        model = (RandomForestRegressor if regression else RandomForestClassifier)(
             n_estimators=rf_config.get("n_estimators", 100),
             max_depth=rf_config.get("max_depth", 10),
             min_samples_split=rf_config.get("min_samples_split", 20),
             min_samples_leaf=rf_config.get("min_samples_leaf", 15),
             max_features=rf_config.get("max_features", "sqrt"),
             max_samples=rf_config.get("max_samples", 0.7),
-            class_weight=rf_config.get("class_weight", "balanced"),
             random_state=random_state,
             n_jobs=-1,
+            **class_balance,
         )
         param_grid = {
             "model__n_estimators": [100, 200, 300, 500],
@@ -52,7 +65,7 @@ def create_model(
         }
     elif model_name == "gradient_boosting":
         gb_config = model_config.get("gradient_boosting", {})
-        model = GradientBoostingClassifier(
+        model = (GradientBoostingRegressor if regression else GradientBoostingClassifier)(
             n_estimators=gb_config.get("n_estimators", 100),
             learning_rate=gb_config.get("learning_rate", 0.1),
             max_depth=gb_config.get("max_depth", 5),
@@ -72,7 +85,9 @@ def create_model(
         }
     elif model_name == "xgboost":
         xgb_config = model_config.get("xgboost", {})
-        model = XGBClassifier(
+        if not regression:
+            class_balance = {"scale_pos_weight": xgb_config.get("scale_pos_weight", 1)}
+        model = (XGBRegressor if regression else XGBClassifier)(
             n_estimators=xgb_config.get("n_estimators", 300),
             learning_rate=xgb_config.get("learning_rate", 0.05),
             max_depth=xgb_config.get("max_depth", 5),
@@ -80,10 +95,10 @@ def create_model(
             colsample_bytree=xgb_config.get("colsample_bytree", 0.8),
             reg_alpha=xgb_config.get("reg_alpha", 0.1),
             reg_lambda=xgb_config.get("reg_lambda", 1.0),
-            scale_pos_weight=xgb_config.get("scale_pos_weight", 1),
             tree_method="hist",
             random_state=random_state,
             n_jobs=-1,
+            **class_balance,
         )
         param_grid = {
             "model__n_estimators": [100, 200, 300, 500],
@@ -96,7 +111,9 @@ def create_model(
         }
     elif model_name == "lgbm":
         lgbm_config = model_config.get("lgbm", {})
-        model = LGBMClassifier(
+        if not regression:
+            class_balance = {"class_weight": lgbm_config.get("class_weight", "balanced")}
+        model = (LGBMRegressor if regression else LGBMClassifier)(
             n_estimators=lgbm_config.get("n_estimators", 300),
             learning_rate=lgbm_config.get("learning_rate", 0.05),
             max_depth=lgbm_config.get("max_depth", 6),
@@ -106,10 +123,10 @@ def create_model(
             colsample_bytree=lgbm_config.get("colsample_bytree", 0.8),
             reg_alpha=lgbm_config.get("reg_alpha", 0.1),
             reg_lambda=lgbm_config.get("reg_lambda", 1.0),
-            class_weight=lgbm_config.get("class_weight", "balanced"),
             verbose=lgbm_config.get("verbose", -1),
             random_state=random_state,
             n_jobs=-1,
+            **class_balance,
         )
         param_grid = {
             "model__n_estimators": [100, 200, 300, 500],
@@ -124,7 +141,7 @@ def create_model(
         }
     elif model_name == "neural_network":
         nn_config = model_config.get("neural_network", {})
-        model = MLPClassifier(
+        model = (MLPRegressor if regression else MLPClassifier)(
             hidden_layer_sizes=tuple(nn_config.get("hidden_layer_sizes", [64, 32])),
             activation=nn_config.get("activation", "relu"),
             solver=nn_config.get("solver", "adam"),
@@ -159,5 +176,5 @@ def create_model(
         }
         # logger.info(f"Using config-defined param grid: {param_grid}")
 
-    logger.info(f"Created {model_name} model")
+    logger.info(f"Created {model_name} {'regressor' if regression else 'classifier'}")
     return model, param_grid

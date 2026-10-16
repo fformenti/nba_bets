@@ -27,7 +27,7 @@ feature_engineering:
   distances_lags: [1, 3, 7, 14]
   metadata_columns: [...]       # columns kept for bookkeeping, excluded from features
   originally_enriched_columns:  # raw enriched cols that are sources for lag features (excluded)
-    - "win_bool", "pts_diff", "total_wins_HT", ...
+    - "win_bool", "margin", "total_wins_HT", ...
   exclude_columns: []           # any additional columns to drop from feature matrix
 
 preprocessing:

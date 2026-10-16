@@ -46,12 +46,20 @@ data:
   # for a strict like-for-like comparison against the sklearn models.
   source_experiment_config: "configs/train/llm_features.yaml"
 
-  # labeled | json | markdown.
-  # All three follow whatever feature columns the config produces, so new
-  # features reach the prompt automatically. labeled additionally renders
-  # human-readable names, which a base (non-instruct) model has more to work
-  # with.
-  serialization_format: "labeled"
+  # labeled | json | markdown | per_team.
+  # The first three follow whatever feature columns the config produces, so new
+  # features reach the prompt automatically; labeled additionally renders
+  # human-readable names. per_team renders the fixed layout of
+  # src/ml/llm/prompt_template_per_team.md, with features, team/delta and the
+  # games-played thresholds chosen by prompt_config.
+  serialization_format: "per_team"
+  prompt_config: "configs/llm_prompt/per_team.yaml"
+
+  # Era scaling of the target. The completion is margin * 13.0 / s, where s is
+  # the league's season-to-date margin std at tip-off (~13 over 1996/97-2020/21,
+  # ~15.7 in the test seasons). Evaluation multiplies s/13.0 back in, so MAE is
+  # reported in real points. null = raw points.
+  target_reference_std: 13.0
 
 quantization:
   # "4bit" | "8bit" | "none". The original notebook set 4bit then silently

@@ -61,7 +61,7 @@ df['is_outlier'] = iso.fit_predict(df[numerical_cols].fillna(0))
 | `days_on_road` | 1-10 | 11-20 | > 30 (COVID cap applied in code) |
 | `distance_L1` | 0-5000 | 5000-8000 | > 10000 |
 | `record_L*` | 0.0-1.0 | N/A | < 0 or > 1 |
-| `pts_diff_avg_L*` | -20 to +20 | -25 to -20 or +20 to +25 | abs > 30 |
+| `margin_avg_L*` | -20 to +20 | -25 to -20 or +20 to +25 | abs > 30 |
 | `games_played` | 0-82 | N/A | > 82 or < 0 |
 
 ### Known Legitimate Outliers

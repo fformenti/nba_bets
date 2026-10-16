@@ -23,6 +23,7 @@ from src.config.paths import (
 )
 from src.etl.utils.common import (
     CANONICAL_INGESTED_COLUMNS,
+    add_game_time,
     assert_unique_game_ids,
     atomic_write_csv,
     coerce_numeric_columns,
@@ -243,6 +244,7 @@ def add_game_results_to_historical(
     # Combine and align to canonical schema — filter out empty frames to avoid FutureWarning
     frames = [df for df in [historical_df, upcoming_df] if not df.empty]
     combined_df = pd.concat(frames, ignore_index=True)
+    combined_df = add_game_time(combined_df)
     combined_df = combined_df.reindex(columns=CANONICAL_INGESTED_COLUMNS)
     # Sort by gameDate and gameId for consistency
     combined_df = combined_df.sort_values(

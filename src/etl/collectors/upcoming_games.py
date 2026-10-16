@@ -31,7 +31,7 @@ from src.config.paths import (
 )
 from src.etl.reference.teams_history import load_teams_history_table
 from src.etl.transformation.add_conference import add_conference
-from src.etl.utils.common import get_nba_season, add_neutral_court_game_flag
+from src.etl.utils.common import add_game_time, get_nba_season, add_neutral_court_game_flag
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -308,11 +308,13 @@ def get_upcoming_games(
 
     upcoming_games = upcoming_games.drop(columns=["gameDate"], errors="ignore")
     upcoming_games = upcoming_games.rename(columns={"gameDateTimeEstLocal": "gameDate"})
+    upcoming_games = add_game_time(upcoming_games)
     upcoming_games = upcoming_games[
         [
             "gameId",
             "gameDate",
             "gameDateOnlyStr",
+            "gameTime",
             "arenaCity",
             "arenaName",
             "hometeamId",

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.config.constants import RESPONSE_VARIABLES
 from src.ml.config.schema import (
     ExperimentConfig,
     FeatureGroupConfig,
@@ -58,7 +59,9 @@ def feature_table(tmp_path):
             "gameDateOnlyStr": dates.strftime("%Y-%m-%d"),
             "season": [s for s in SEASONS for _ in range(GAMES_PER_SEASON)],
             "winner": rng.integers(0, 2, N_GAMES),
-            "pts_diff": rng.integers(-25, 25, N_GAMES),
+            "win_bool": rng.integers(0, 2, N_GAMES),
+            "margin": rng.integers(-25, 25, N_GAMES),
+            "margin_scaled": rng.normal(0, 1, N_GAMES),
             "hometeamId": rng.integers(1, 6, N_GAMES),
             "awayteamId": rng.integers(6, 11, N_GAMES),
             "hometeamName": "Home",
@@ -72,12 +75,21 @@ def feature_table(tmp_path):
             "west_record_adjusted": 0.45,
             "east_record_at_east": 0.60,
             "west_record_at_west": 0.52,
+            # Well above saturation_games (20), so the ramp sits at full weight
+            # on the current-season columns above regardless of what
+            # last_season_* holds; real (non-NaN) values here since
+            # prepare_data's drop_na=True would otherwise drop every row.
+            "games_played_east_vs_west": 999,
+            "last_season_east_record_adjusted": 0.55,
+            "last_season_west_record_adjusted": 0.45,
+            "last_season_east_record_at_east": 0.60,
+            "last_season_west_record_at_west": 0.52,
             "games_played_HT": rng.integers(20, 60, N_GAMES),
             "games_played_VT": rng.integers(20, 60, N_GAMES),
             "record_L82_HT": rng.random(N_GAMES),
             "record_L82_VT": rng.random(N_GAMES),
-            "pts_diff_avg_L82_HT": rng.normal(0, 5, N_GAMES),
-            "pts_diff_avg_L82_VT": rng.normal(0, 5, N_GAMES),
+            "margin_avg_L82_HT": rng.normal(0, 5, N_GAMES),
+            "margin_avg_L82_VT": rng.normal(0, 5, N_GAMES),
         }
     )
 
@@ -91,7 +103,7 @@ def feature_table(tmp_path):
 def experiment_config(feature_table):
     path, _ = feature_table
     return ExperimentConfig(
-        data={"path": str(path), "target_column": "winner", "date_column": "gameDate"},
+        data={"path": str(path), "target_column": "win_bool", "date_column": "gameDate"},
         filters={
             "minimum_games_train": 0,
             "minimum_games_test": 0,
@@ -111,7 +123,7 @@ def experiment_config(feature_table):
                 "games_played_HT",
                 "games_played_VT",
             ],
-            "intermediate_columns": ["pts_diff"],
+            "intermediate_columns": [],
         },
         splitting={
             "test_start_season": TEST_START_SEASON,
@@ -134,6 +146,19 @@ def test_game_ids_match_per_split(experiment_config, llm_config):
         llm_ids = {int(g) for g in dataset[name]["game_id"]}
         ml_ids = set(splits.game_ids(name).astype(int))
         assert llm_ids == ml_ids, f"{name} split diverged"
+
+
+@pytest.mark.parametrize("target", RESPONSE_VARIABLES)
+def test_no_response_variable_reaches_the_features(experiment_config, target):
+    """Whichever outcome is the target, the other two restate it."""
+    config = experiment_config.model_copy(
+        update={"data": experiment_config.data.model_copy(update={"target_column": target})}
+    )
+    splits = build_splits(config)
+
+    assert splits.y_train.name == target
+    for X in (splits.X_train, splits.X_val, splits.X_test):
+        assert not set(RESPONSE_VARIABLES) & set(X.columns)
 
 
 def test_splits_are_pairwise_disjoint(experiment_config, llm_config):
@@ -159,7 +184,7 @@ def test_completion_is_the_signed_point_differential(
 ):
     """The completion must be the real margin for that game, sign included."""
     _, source = feature_table
-    expected = source.set_index("gameId")["pts_diff"].to_dict()
+    expected = source.set_index("gameId")["margin"].to_dict()
 
     dataset = build_llm_dataset(llm_config, experiment_config)
     for game_id, completion in zip(
@@ -171,13 +196,13 @@ def test_completion_is_the_signed_point_differential(
 def test_prompts_do_not_contain_the_completion(experiment_config, llm_config):
     """Serialization is the leak boundary; assert it holds on real split output.
 
-    Matches whole markdown cells rather than substrings: ``pts_diff_avg_L82_HT``
-    is a legitimate feature that contains the leaking name ``pts_diff``.
+    Matches whole markdown cells rather than substrings: ``margin_avg_L82_HT``
+    is a legitimate feature that contains the leaking name ``margin``.
     """
     dataset = build_llm_dataset(llm_config, experiment_config)
 
     for row in dataset["test"]:
         prompt_body = row["prompt"].rsplit("point differential of", 1)[0]
-        assert "| pts_diff |" not in prompt_body
+        assert "| margin |" not in prompt_body
         assert "| winner |" not in prompt_body
         assert "| homeScore |" not in prompt_body

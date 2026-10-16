@@ -5,14 +5,14 @@
 # It answers exactly one question: HAS BORUTA-SHAP EVER SEEN THIS FEATURE, and
 # does it beat a shadow? It cannot answer "should both members of this pair be
 # enabled?" — and reading it that way on 2026-08-12 is what put
-# point_differential beside norm_point_differential (r = 0.998) and gds beside
+# margin beside margin_scaled (r = 0.998) and gds beside
 # its own parent sos_adj_record (r = 0.946) in the shipping config, at a cost of
 # 0.66pp test accuracy. Two features at r ≈ 1 split the SHAP credit and both
 # clear significance; that is an artifact of the method, not a finding.
 #
 # The coupled pairs live inside this pool, all of them co-enabled here on
 # purpose:
-#   point_differential  ↔ norm_point_differential   r = 0.998
+#   margin              ↔ margin_scaled              r = 0.998
 #   last_season_record  ↔ adjusted_last_season_record r = 0.9985
 #   record, sos         → sos_adj_record            r = 0.95
 #   sos_adj_record      → gds                       r = 0.946
@@ -46,13 +46,13 @@ feature_engineering:
   features:
     record:
       enabled: true
-    point_differential:
-      # Lag lists must match norm_point_differential's, or the comparison is
+    margin:
+      # Lag lists must match margin_scaled's, or the comparison is
       # rigged: the first audit pass gave raw an L82 window that normalized did
       # not have, and raw L82 duly came out the strongest feature in the pool.
       # Matching them showed the two were tied — because they are the same
       # column in different units. _defaults.yaml now carries the full list on
-      # norm_point_differential, so this inherits it and needs no override.
+      # margin_scaled, so this inherits it and needs no override.
       enabled: true
     sos:
       enabled: true

@@ -17,6 +17,7 @@ from src.config.paths import (
 )
 from src.etl.utils.common import (
     CANONICAL_INGESTED_COLUMNS,
+    add_game_time,
     assert_unique_game_ids,
     atomic_write_csv,
     coerce_numeric_columns,
@@ -129,6 +130,9 @@ def merge_into_history(parsed_games: DataFrame, history: DataFrame) -> DataFrame
         frames = [df for df in [parsed_games, kept] if not df.empty]
         combined = pd.concat(frames, ignore_index=True)
 
+    # Re-derived over the whole table so history written before the column
+    # existed is backfilled rather than reindexed to NaN.
+    combined = add_game_time(combined)
     combined = combined.reindex(columns=CANONICAL_INGESTED_COLUMNS)
     combined = combined.sort_values(
         ["gameDate", "gameId"], na_position="last"

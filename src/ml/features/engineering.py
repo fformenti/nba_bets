@@ -21,8 +21,8 @@ AWAY_ON_ROAD_SUFFIX = f"{AWAY_SUFFIX}_on_road"
 # prefix_fn takes lags and returns list of column base names.
 FEATURE_GROUP_PREFIXES = {
     "record": lambda lags: [f"record_L{lag}" for lag in lags],
-    "point_differential": lambda lags: [f"pts_diff_avg_L{lag}" for lag in lags],
-    "norm_point_differential": lambda lags: [f"norm_pts_diff_avg_L{lag}" for lag in lags],
+    "margin": lambda lags: [f"margin_avg_L{lag}" for lag in lags],
+    "margin_scaled": lambda lags: [f"margin_scaled_avg_L{lag}" for lag in lags],
     "sos": lambda lags: [f"sos_L{lag}" for lag in lags],
     "sos_adj_record": lambda lags: [f"sos_adj_record_L{lag}" for lag in lags],
     "gds": lambda lags: [f"gds_L{lag}" for lag in lags],
@@ -57,8 +57,8 @@ INVERTED_DELTA_GROUPS = {"distance", "back_to_back"}
 # Groups that have HT_at_home / VT_on_road location variants
 LOCATION_VARIANT_GROUPS = {
     "record",
-    "point_differential",
-    "norm_point_differential",
+    "margin",
+    "margin_scaled",
     "last_season_record",
     "adjusted_last_season_record",
     "sos_adj_record",
@@ -300,7 +300,7 @@ def create_momentum_features(
     Replace correlated lag-delta pairs with a single momentum feature.
 
     For each [short_lag, long_lag] pair, computes:
-        pts_diff_momentum_L{short}_L{long}_delta = pts_diff_avg_L{short}_delta - pts_diff_avg_L{long}_delta
+        margin_momentum_L{short}_L{long}_delta = margin_avg_L{short}_delta - margin_avg_L{long}_delta
 
     Both source delta columns are dropped.
 
@@ -343,10 +343,17 @@ _CONFERENCE_INTERMEDIATES = [
     "west_record_adjusted",
     "east_record_at_east",
     "west_record_at_west",
+    "games_played_east_vs_west",
+    "last_season_east_record_adjusted",
+    "last_season_west_record_adjusted",
+    "last_season_east_record_at_east",
+    "last_season_west_record_at_west",
 ]
 
 
-def create_conference_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_conference_features(
+    df: pd.DataFrame, saturation_games: int = 20
+) -> pd.DataFrame:
     """Both conference features, defined for every game.
 
     Each measures a conference-vs-conference advantage — a quantity that exists
@@ -379,6 +386,17 @@ def create_conference_features(df: pd.DataFrame) -> pd.DataFrame:
     "the East holds home court at .550" on an all-East game, handing every East
     home team one value and every West home team another.
 
+    Early in a season the current-season inputs (``east_record_adjusted`` etc.)
+    are built on a thin interconference sample. Each is blended with last
+    season's final record (``last_season_east_record_adjusted`` etc., from
+    ``src/etl/features/east_vs_west.py::make_last_season_east_west_record``),
+    ramping linearly from last season's value at 0 interconference games played
+    to this season's value alone at ``saturation_games`` — the same style of
+    ramp as the within-season sample weight in
+    ``src/ml/training/weighting.py``, applied to a feature value instead of a
+    training weight. A game in the dataset's first season has no prior season
+    to blend with, so it uses the current-season value outright.
+
     Note the intermediates are dropped on the way out — see
     ``_CONFERENCE_INTERMEDIATES``.
     """
@@ -386,19 +404,30 @@ def create_conference_features(df: pd.DataFrame) -> pd.DataFrame:
 
     is_cross_conference = df["hometeamConference"] != df["awayteamConference"]
 
+    ramp_weight = (df["games_played_east_vs_west"] / saturation_games).clip(0.0, 1.0)
+
+    def _blend(current_col: str, last_season_col: str) -> pd.Series:
+        blended = ramp_weight * df[current_col] + (1 - ramp_weight) * df[last_season_col]
+        return blended.where(df[last_season_col].notna(), df[current_col])
+
+    east_record_adjusted = _blend("east_record_adjusted", "last_season_east_record_adjusted")
+    west_record_adjusted = _blend("west_record_adjusted", "last_season_west_record_adjusted")
+    east_record_at_east = _blend("east_record_at_east", "last_season_east_record_at_east")
+    west_record_at_west = _blend("west_record_at_west", "last_season_west_record_at_west")
+
     # East=1, West=0 → +1 East hosts West, -1 West hosts East, 0 same conference.
     conference_diff = df["hometeamConference"].map({"East": 1, "West": 0}) - df[
         "awayteamConference"
     ].map({"East": 1, "West": 0})
 
     df["conference_diff_home_advantage_pct"] = conference_diff * (
-        df["east_record_adjusted"] - df["west_record_adjusted"]
+        east_record_adjusted - west_record_adjusted
     )
 
     home_conference_home_record = np.where(
         df["hometeamConference"] == "East",
-        df["east_record_at_east"],
-        df["west_record_at_west"],
+        east_record_at_east,
+        west_record_at_west,
     )
     df["conference_home_court_advantage_pct"] = np.where(
         is_cross_conference, home_conference_home_record - 0.5, 0.0

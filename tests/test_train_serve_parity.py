@@ -24,10 +24,12 @@ import pandas as pd
 import pytest
 
 from src.config.paths import DEFAULT_FEATURES_CONFIG_PATH
+from src.etl.utils.common import add_game_time
 from src.etl.features.aggregator import (
     create_features_tables_from_config,
     merge_features,
 )
+from src.etl.features.point_differential import _scale_margin, margin_std_by_date
 from src.ml.config.loader import load_features_config
 from src.ml.prediction.features import build_prediction_feature_base, fix_upcoming_games_cols
 from src.ml.prediction.io import load_upcoming_games
@@ -116,8 +118,11 @@ def _build_games() -> pd.DataFrame:
 
     games = pd.DataFrame(rows)
     games["gameDateOnlyStr"] = games["gameDate"].dt.strftime("%Y-%m-%d")
+    games = add_game_time(games)
     games["win_bool"] = (games["hometeamId"] == games["winner"]).astype(int)
-    games["pts_diff"] = games["homeScore"] - games["awayScore"]
+    games["margin"] = games["homeScore"] - games["awayScore"]
+    scale = margin_std_by_date(games).set_index("date")["margin_std"]
+    games["margin_scaled"] = _scale_margin(games["margin"], games["gameDateOnlyStr"].map(scale))
     games["winnerteamConference"] = np.where(
         games["winner"] == games["hometeamId"],
         games["hometeamConference"],
@@ -239,7 +244,7 @@ def league(tmp_path, monkeypatch):
 
 # Placeholders legitimately differ on these: they describe the played game.
 EXPECTED_TO_DIFFER = {
-    "homeScore", "awayScore", "winner", "win_bool", "pts_diff", "overtimes",
+    "homeScore", "awayScore", "winner", "win_bool", "margin", "margin_scaled", "overtimes",
     "attendance", "arenaId", "gameType", "gameLabel", "gameSubLabel",
     "postponed", "winnerteamConference", "seriesGameNumber", "gameDate",
 }
@@ -330,3 +335,4 @@ def test_away_teams_are_not_all_teleporting(league):
         "every away team in the slate travelled zero miles — the slate is not "
         "being enriched with locations before the distance table is built"
     )
+

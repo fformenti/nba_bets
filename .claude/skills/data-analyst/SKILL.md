@@ -103,7 +103,7 @@ print(f"Date range: {df['gameDateOnlyStr'].min()} to {df['gameDateOnlyStr'].max(
 - Per-season game counts: `df.groupby('season').size()` — flag seasons with unusual counts
 
 ### Distributions
-- Histograms for continuous features (record, pts_diff_avg, distances)
+- Histograms for continuous features (record, margin_avg, distances)
 - Value counts for categorical/ordinal features (conferences, seasons)
 - Target variable distribution: `df['win_bool'].value_counts(normalize=True)` — check balance
 
@@ -196,7 +196,7 @@ Follow this step-by-step guide:
 
 | Pattern | Join keys | When to use |
 |---------|-----------|-------------|
-| `join_games_and_teams_feature()` | `gameId`, `season`, `teamId` → `hometeamId`/`awayteamId` | Per-team, per-game features (records, pts_diff, distances) |
+| `join_games_and_teams_feature()` | `gameId`, `season`, `teamId` → `hometeamId`/`awayteamId` | Per-team, per-game features (records, margin, distances) |
 | Direct merge on `gameDateOnlyStr` | `gameDateOnlyStr` | League-wide daily features (east_vs_west) |
 | Merge on `season` + `teamId` | `season`, `teamId` → `hometeamId`/`awayteamId` | Per-team, per-season features (last_season_record) |
 | `get_rested_days()` | `gameDateOnlyStr` + `teamId` | Rest days (special handler with home/away suffix logic) |

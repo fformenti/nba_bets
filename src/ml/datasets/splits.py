@@ -25,6 +25,7 @@ from typing import Optional, cast
 import pandas as pd
 
 from src.config.paths import REGULAR_SEASON_GAMES_FEATURES_PATH
+from src.config.constants import RESPONSE_VARIABLES
 from src.ml.config.schema import ExperimentConfig
 from src.ml.datasets.splitters import season_split, temporal_split
 from src.ml.features.engineering import (
@@ -173,13 +174,13 @@ def build_splits(config: ExperimentConfig) -> Splits:
     X_test_baseline["record_L82_delta"] = (
         X_test_baseline["record_L82_HT"] - X_test_baseline["record_L82_VT"]
     )
-    X_test_baseline["pts_diff_avg_L82_delta"] = (
-        X_test_baseline["pts_diff_avg_L82_HT"] - X_test_baseline["pts_diff_avg_L82_VT"]
+    X_test_baseline["margin_avg_L82_delta"] = (
+        X_test_baseline["margin_avg_L82_HT"] - X_test_baseline["margin_avg_L82_VT"]
     )
 
     df = create_winning_incentive_features(df)
     df = create_delta_features(df, feat_eng_config.features)
-    df = create_conference_features(df)
+    df = create_conference_features(df, feat_eng_config.conference_record_saturation_games)
 
     if feat_eng_config.selection_mode == "inclusion":
         feature_columns = resolve_feature_columns(
@@ -205,7 +206,8 @@ def build_splits(config: ExperimentConfig) -> Splits:
             )
         X = df[available]
     else:
-        exclude_cols = metadata_columns + intermediate_columns + [target_column]
+        # Every response variable, not just the target: the others restate it.
+        exclude_cols = metadata_columns + intermediate_columns + RESPONSE_VARIABLES
         cols_to_drop = [col for col in exclude_cols if col in df.columns]
         X = df.drop(columns=cols_to_drop)
 

@@ -1,0 +1,37 @@
+# xgboost as a regressor on the final home margin (home - away, in points).
+#
+# Same features, splits and weighting as xgboost.yaml; only the target differs.
+# Training is selected by data.target_column (src/ml/training/regressor.py), and
+# the run reports MAE plus winner accuracy — the share of games whose predicted
+# margin has the right sign — which is what to compare against the classifier.
+#
+# Not deployable: predict-upcoming serves win probabilities, so `PROMOTE=1`
+# refuses a regression run.
+
+_include:
+  - "../features.yaml"
+  - "_defaults.yaml"
+
+description: "All games, xgboost regressor on the home margin"
+tags:
+  variation: "xgboost_margin"
+
+data:
+  target_column: "margin"
+
+# Boruta-SHAP ranks features with a classifier; it cannot rank for a margin.
+feature_selection:
+  enabled: false
+
+model:
+  train_models:
+    - xgboost
+  xgboost:
+    hyperparameter_tuning:
+      scoring: "neg_mean_absolute_error"
+
+paths:
+  outputs: "outputs/xgboost_margin"
+
+mlflow:
+  experiment_name: "nba_bets_xgboost_margin"
