@@ -127,7 +127,7 @@ def build_split_dataset(
             "game_id": [int(g) for g in metadata["gameId"]],
             "prompt": prompts,
             "completion": completions,
-            "margin": [float(v) for v in target],
+            "margin": [int(round(v)) for v in target],
             "margin_scale": [float(v) for v in scale],
         }
     )
@@ -184,6 +184,41 @@ def build_llm_dataset(
     total = sum(len(d) for d in dataset.values())
     logger.info(f"LLM dataset built: {total} rows across {len(dataset)} splits")
     return dataset
+
+
+def load_hf_split(
+    config: LLMTrainingConfig,
+    split: str,
+    *,
+    max_samples: Optional[int] = None,
+    shuffle_seed: Optional[int] = None,
+):
+    """Load one split of the LLM's HF dataset, capped to ``max_samples``.
+
+    With ``shuffle_seed`` set, the cap takes a seeded random sample rather
+    than the first N rows: splits are date-sorted, so the first N would all
+    come from one month.
+    """
+    from datasets import load_dataset
+    from src.ml.llm.finetune import get_hf_token
+
+    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
+    if split not in dataset:
+        raise KeyError(
+            f"Split '{split}' not in {config.data.dataset_name}. "
+            f"Available: {sorted(dataset.keys())}"
+        )
+    data = dataset[split]
+    if max_samples:
+        n = min(max_samples, len(data))
+        data = (
+            data.shuffle(seed=shuffle_seed).select(range(n))
+            if shuffle_seed is not None
+            else data.select(range(n))
+        )
+        logger.info(f"Sampled {n} rows from split '{split}' (max_samples).")
+    logger.info(f"Loaded {len(data)} rows from split '{split}'.")
+    return data
 
 
 def push_to_hub(dataset: "DatasetDict", dataset_name: str, private: bool = True) -> None:

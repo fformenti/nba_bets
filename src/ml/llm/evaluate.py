@@ -11,29 +11,17 @@ from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH, LLM_EVAL_OUTPUTS_DIR
 from src.ml.config.loader import load_llm_training_config
 from src.ml.config.schema import LLMTrainingConfig
 from src.ml.tracking.mlflow_tracker import MLflowTracker
+from src.ml.llm.dataset import load_hf_split
 from src.ml.llm.finetune import (
     build_base_model,
     build_hub_model_id,
     build_tokenizer,
-    get_hf_token,
 )
 from src.ml.llm.testers import BatchedClassificationTester
 
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-
-def load_eval_dataset(config: LLMTrainingConfig, split: str):
-    from datasets import load_dataset
-
-    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
-    if split not in dataset:
-        raise KeyError(
-            f"Split '{split}' not in {config.data.dataset_name}. "
-            f"Available: {sorted(dataset.keys())}"
-        )
-    return dataset[split]
 
 
 def _load_adapter_model(config: LLMTrainingConfig, hub_model_id: str, revision=None):
@@ -115,7 +103,7 @@ def run_evaluation(
 
     logger.info(f"Evaluating {hub_model_id} on split '{split}' (n={size})")
 
-    data = load_eval_dataset(config, split)
+    data = load_hf_split(config, split)
     predict_batch = build_batch_predictor(config, hub_model_id, revision=revision)
 
     set_seed(config.evaluation.seed)

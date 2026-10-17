@@ -306,34 +306,23 @@ def build_sft_config(
 
 def load_train_dataset(config: LLMTrainingConfig):
     """Load the training split, honouring ``data.max_train_samples``."""
-    from datasets import load_dataset
+    from src.ml.llm.dataset import load_hf_split
 
-    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
-    train = dataset[config.data.train_split]
-    if config.data.max_train_samples:
-        n = min(config.data.max_train_samples, len(train))
-        train = train.select(range(n))
-        logger.info(f"Capped training set to {n} rows (max_train_samples).")
-    logger.info(f"Training rows: {len(train)}")
-    return train
+    return load_hf_split(
+        config, config.data.train_split, max_samples=config.data.max_train_samples
+    )
 
 
 def load_eval_dataset(config: LLMTrainingConfig):
-    """Load the in-training evaluation split, honouring ``data.max_eval_samples``.
+    """Load the in-training evaluation split, honouring ``data.max_eval_samples``."""
+    from src.ml.llm.dataset import load_hf_split
 
-    The cap takes a seeded random sample rather than the first N rows: the
-    split is date-sorted, and the first N would all come from one month.
-    """
-    from datasets import load_dataset
-
-    dataset = load_dataset(config.data.dataset_name, token=get_hf_token())
-    evaluation = dataset[config.data.eval_split]
-    if config.data.max_eval_samples:
-        n = min(config.data.max_eval_samples, len(evaluation))
-        evaluation = evaluation.shuffle(seed=config.training.seed).select(range(n))
-        logger.info(f"Sampled {n} eval rows (max_eval_samples).")
-    logger.info(f"Eval rows ({config.data.eval_split}): {len(evaluation)}")
-    return evaluation
+    return load_hf_split(
+        config,
+        config.data.eval_split,
+        max_samples=config.data.max_eval_samples,
+        shuffle_seed=config.training.seed,
+    )
 
 
 def first_completion_token_hits(logits, labels):

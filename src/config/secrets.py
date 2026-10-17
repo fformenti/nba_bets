@@ -39,6 +39,16 @@ OPENAI_ENV_VAR = "OPENAI_API_KEY"
 SERPER_ENV_VAR = "SERPER_API_KEY"
 
 
+def load_env_file(secrets_file: str = SECRETS_FILE) -> None:
+    """Explicitly load the secrets file, for kernels direnv never reaches
+    (VS Code's Jupyter extension, a notebook server started before `cd`).
+
+    Safe to call from a shell that already has the real vars exported —
+    override=False means an existing process env value always wins.
+    """
+    load_dotenv(os.path.expanduser(secrets_file), override=False)
+
+
 def _colab_secret(name: str) -> str | None:
     """Colab's Secrets panel doesn't populate os.environ; ask it directly."""
     try:

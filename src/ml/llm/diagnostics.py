@@ -172,10 +172,11 @@ def inspect_adapter(
     """
     from tqdm.auto import tqdm
 
-    from src.ml.llm.evaluate import _load_adapter_model, load_eval_dataset
+    from src.ml.llm.dataset import load_hf_split
+    from src.ml.llm.evaluate import _load_adapter_model
     from src.ml.llm.finetune import build_hub_model_id
 
-    data = load_eval_dataset(config, split)
+    data = load_hf_split(config, split)
     size = min(size, len(data))
     tokenizer, model = _load_adapter_model(
         config, build_hub_model_id(config, run_name), revision=revision

@@ -12,6 +12,7 @@
 # Typed by hand: team → conference history, Polymarket ticker map.
 !/data/raw/historical/handmade/
 
+explanations/
 scratchpad
 notebooks
 sandbox
