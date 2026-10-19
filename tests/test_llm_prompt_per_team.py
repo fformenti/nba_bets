@@ -44,6 +44,7 @@ def make_raw(games=(30, 30), venue_games=(15, 15), confs=("East", "West")) -> pd
         "west_record_adjusted": 0.45,
         "east_record_at_east": 0.65,
         "west_record_at_west": 0.60,
+        "home_adv_L1000": 0.55,
         # Outcome columns: present in the raw table, must never reach the prompt.
         "homeScore": 999,
         "awayScore": 111,

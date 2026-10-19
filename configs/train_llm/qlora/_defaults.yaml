@@ -1,0 +1,41 @@
+# Shared by every QLoRA experiment, regardless of base model. Hardware- or
+# precision-specific knobs (compute_dtype, bf16/fp16, save/eval cadence, eval
+# batch sizes) are left out here because they vary per GPU — each experiment
+# file under qlora/<model>/ sets those itself.
+
+quantization:
+  # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
+  # overwrote it with 8bit, so 8bit reproduces what actually ran.
+  mode: "8bit"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.1
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  bias: "none"
+
+training:
+  epochs: 2
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  optimizer: "paged_adamw_32bit"
+  weight_decay: 0.001
+  max_grad_norm: 0.3
+  gradient_checkpointing: true
+  logging_steps: 50
+  save_total_limit: 10
+  # Score eval_split during training (loss, mean_token_accuracy and
+  # first_token_accuracy, logged with an eval/ prefix). "no" skips it.
+  eval_strategy: "steps"
+  seed: 42
+  # Loss over the completion only — the signed point differential — instead of
+  # over the whole sequence. The prompt is ~440 tokens and the answer is 2, so
+  # this is the difference between the sign carrying ~1/440 of the gradient and
+  # carrying half of it.
+  train_on_completion_only: true

@@ -166,7 +166,7 @@ cap. Run it as-is before committing to a multi-hour job:
 ```bash
 cd /workspace/nba_bets
 uv run python -m src.cli.train_llm \
-  --config configs/train_llm/llama31_8b_qlora.yaml \
+  --config configs/train_llm/qlora/llama31_8b/baseline.yaml \
   --run-name smoke-test \
   --max-train-samples 100
 ```
@@ -191,7 +191,7 @@ whole path — auth, gated model, dataset, GPU, Hub push — works. Delete the r
 
 ### 5.1 Adjust the config
 
-Edit `configs/train_llm/llama31_8b_qlora.yaml`:
+Edit `configs/train_llm/qlora/llama31_8b/baseline.yaml`:
 
 ```yaml
 data:
@@ -254,7 +254,7 @@ To deliberately start over into the same repo name:
 
 ```bash
 uv run python -m src.cli.train_llm \
-  --config configs/train_llm/llama31_8b_qlora.yaml \
+  --config configs/train_llm/qlora/llama31_8b/baseline.yaml \
   --run-name nba-bets-2026-07-30 \
   --resume never
 ```
@@ -315,7 +315,7 @@ cd /workspace && git clone <repo> && cd nba_bets && git checkout feature/train_L
 uv sync --extra gpu
 
 # smoke test
-uv run python -m src.cli.train_llm --config configs/train_llm/llama31_8b_qlora.yaml \
+uv run python -m src.cli.train_llm --config configs/train_llm/qlora/llama31_8b/baseline.yaml \
   --run-name smoke-test --max-train-samples 100
 
 # real run (max_train_samples: null in the config first)

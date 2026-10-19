@@ -47,7 +47,7 @@ def run_llm_training(
         raise FileNotFoundError(
             f"LLM training config not found: {resolved}. "
             "Pass config_path= or --config with a valid YAML "
-            "(e.g. configs/train_llm/llama31_8b_qlora.yaml)."
+            "(e.g. configs/train_llm/qlora/llama31_8b/baseline.yaml)."
         )
     config = load_llm_training_config(resolved)
 
@@ -70,6 +70,9 @@ def run_llm_training(
         run_name=resolved_run_name,
         tracking_uri=mlflow_config.tracking_uri,
     ) as tracker:
+        # The merged config no longer shows which experiment file produced it
+        # once _include has flattened it, so tag the source path explicitly.
+        tracker.set_tags({"config_path": str(resolved)})
         tracker.log_config(config.model_dump())
         return _train_and_report(config, resolved_run_name, resume, tracker)
 

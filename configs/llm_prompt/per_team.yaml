@@ -25,6 +25,7 @@ thresholds:
 #   delta -> one "Home−Away" row
 # Delete a line to drop the feature. Display order is fixed in code.
 # playoffs and conference_matchup are team-only (no meaningful difference).
+# home_adv is team-only too — it's a single league-wide line, nothing to split.
 features:
   streak: team
   venue_streak: team
@@ -40,3 +41,4 @@ features:
   venue_pt_diff: team
   travel: team
   conference_matchup: team
+  home_adv: team  # global line, not team/delta — see conference_matchup comment above

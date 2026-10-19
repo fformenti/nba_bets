@@ -151,6 +151,9 @@ class FeaturesMapConfig(BaseModel):
     neutral_court: FeatureGroupConfig = Field(
         default_factory=lambda: FeatureGroupConfig(delta=False, enabled=False)
     )
+    home_adv: FeatureGroupConfig = Field(
+        default_factory=lambda: FeatureGroupConfig(delta=False, enabled=True)
+    )
 
 
 class FeatureEngineeringConfig(BaseModel):

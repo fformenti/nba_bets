@@ -1,0 +1,6 @@
+base_model: "meta-llama/Meta-Llama-3.1-8B"
+
+data:
+  # Llama 3.1 context window. Training fails if any record exceeds it; the
+  # truncation cap itself is measured from the dataset at launch.
+  context_length: 131072

@@ -30,8 +30,8 @@ DEFAULT_FEATURES_CONFIG_PATH = CONFIGS_DIR / "features.yaml"
 # each has its own loader. configs/train/llm_features.yaml is an ExperimentConfig
 # despite the name — it defines the columns the LLM dataset is built from.
 CONFIGS_TRAIN_LLM_DIR = CONFIGS_DIR / "train_llm"
-# Aligns with Makefile LLM_CONFIG ?= llama31_8b_qlora / make train-llm
-DEFAULT_TRAIN_LLM_CONFIG_PATH = CONFIGS_TRAIN_LLM_DIR / "llama31_8b_qlora.yaml"
+# Aligns with Makefile LLM_CONFIG ?= qlora/llama31_8b/baseline / make train-llm
+DEFAULT_TRAIN_LLM_CONFIG_PATH = CONFIGS_TRAIN_LLM_DIR / "qlora" / "llama31_8b" / "baseline.yaml"
 # Aligns with Makefile PREDICTION_CONFIG ?= predict_classifier / make predict-upcoming
 CONFIGS_PREDICT_DIR = CONFIGS_DIR / "predict"
 DEFAULT_PREDICT_CONFIG_PATH = CONFIGS_PREDICT_DIR / "predict_classifier.yaml"
@@ -165,6 +165,7 @@ TEAMS_HOME_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_home_margin
 TEAMS_AWAY_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_away_margin_scaled.csv"
 TEAMS_MARGIN_SCALED_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_margin_scaled.csv"
 MARGIN_STD_PATH = REGULAR_SEASON_FEATURES_DIR / "margin_std.csv"
+HOME_ADV_PATH = REGULAR_SEASON_FEATURES_DIR / "home_adv.csv"
 TEAMS_GDS_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds.csv"
 TEAMS_GDS_HOME_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_home.csv"
 TEAMS_GDS_AWAY_PATH = REGULAR_SEASON_FEATURES_DIR / "teams_gds_away.csv"

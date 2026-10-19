@@ -30,9 +30,15 @@ configs/
 │   ├── llm_features.yaml               # Overrides: LLM feature set (adds win % and streak)
 │   ├── xgboost.yaml                    # The deployed model: all games, xgboost
 │   └── xgboost_margin.yaml             # xgboost regressor on the home margin (not deployable)
-├── train_llm/
-│   ├── llama31_8b_qlora.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
-│   └── llama31_8b_qlora_t4.yaml        # Same, but fp16/float16 — T4 has no bf16 tensor cores
+├── train_llm/                          # LLM fine-tuning: <type>/<base model>/<experiment>.yaml
+│   ├── _defaults.yaml                  # Shared across every type and model: hub, data, tracking, paths
+│   ├── _base_models/
+│   │   └── llama31_8b.yaml             # Model-specific: HF repo id, context_length
+│   └── qlora/
+│       ├── _defaults.yaml              # Shared across QLoRA runs: quantization, LoRA block, training recipe
+│       └── llama31_8b/
+│           ├── baseline.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
+│           └── baseline_t4.yaml        # Same, but fp16/float16 — T4 has no bf16 tensor cores
 ├── llm_prompt/
 │   └── per_team.yaml                   # 'per_team' prompt: which features, team vs delta, games-played thresholds
 └── predict/

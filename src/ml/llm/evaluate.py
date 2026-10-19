@@ -132,7 +132,7 @@ def run_tracked_evaluation(
         raise FileNotFoundError(
             f"LLM training config not found: {resolved}. "
             "Pass config_path= or --config with a valid YAML "
-            "(e.g. configs/train_llm/llama31_8b_qlora.yaml)."
+            "(e.g. configs/train_llm/qlora/llama31_8b/baseline.yaml)."
         )
     config = load_llm_training_config(resolved)
 

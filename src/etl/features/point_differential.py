@@ -161,6 +161,65 @@ def margin_std_by_date(games: pd.DataFrame) -> pd.DataFrame:
     return table[["date", "last_date_with_game", "margin_std"]]
 
 
+# ── League home-court advantage ─────────────────────────────────────────────
+
+# Same window as MARGIN_STD_WINDOW, and for the same reason: a trailing count
+# of played games large enough to be stable but fitting inside the two prior
+# seasons that src/ml/prediction/pipeline.py always loads alongside a slate.
+HOME_ADV_WINDOW = 1000
+
+
+def home_adv_by_date(games: pd.DataFrame) -> pd.DataFrame:
+    """
+    League-wide home-court win rate, one row per game date:
+    ``date | last_date_with_game | home_adv_L1000``.
+
+    ``home_adv_L1000`` is the fraction of home teams that won over the last
+    ``HOME_ADV_WINDOW`` played games through the end of
+    ``last_date_with_game`` — the latest date strictly before ``date`` with a
+    played game. Same shape and the same ``merge_asof(allow_exact_matches=
+    False)`` leakage guard as ``margin_std_by_date``, just a mean rather than
+    a std: every game only ever sees games through an earlier date, never its
+    own day's results.
+    """
+    played = has_result(games)
+    sequence = (
+        pd.DataFrame(
+            {
+                "date": games["gameDateOnlyStr"].to_numpy(),
+                "gameId": games["gameId"].to_numpy(),
+                "home_win": (games["winner"] == games["hometeamId"]).to_numpy(
+                    dtype=float
+                ),
+            }
+        )[played.to_numpy()]
+        # gameId only decides which games of the oldest day leave the window.
+        .sort_values(["date", "gameId"])
+    )
+    w = sequence["home_win"].to_numpy()
+    p1 = np.concatenate([[0.0], np.cumsum(w)])
+
+    # Window = played games (c - W, c], c counting every game through the date.
+    c = sequence.groupby("date").size().cumsum()
+    lo = np.maximum(c.to_numpy() - HOME_ADV_WINDOW, 0)
+    n = c.to_numpy() - lo
+    s1 = p1[c.to_numpy()] - p1[lo]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rate = np.where(n > 0, s1 / n, np.nan)
+    through_date = pd.DataFrame(
+        {"last_date_with_game": c.index, "home_adv_L1000": rate}
+    )
+
+    dates = pd.DataFrame({"date": np.sort(games["gameDateOnlyStr"].dropna().unique())})
+    table = pd.merge_asof(
+        dates.assign(_on=pd.to_datetime(dates["date"])),
+        through_date.assign(_on=pd.to_datetime(through_date["last_date_with_game"])),
+        on="_on",
+        allow_exact_matches=False,
+    )
+    return table[["date", "last_date_with_game", "home_adv_L1000"]]
+
+
 def _scale_margin(margin: pd.Series, margin_std: pd.Series) -> pd.Series:
     """
     ``margin_scaled``: margin in standard deviations of recent league margins

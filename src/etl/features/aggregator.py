@@ -22,6 +22,7 @@ from src.config.paths import (
     TEAMS_AWAY_MARGIN_SCALED_PATH,
     TEAMS_MARGIN_SCALED_PATH,
     MARGIN_STD_PATH,
+    HOME_ADV_PATH,
     EAST_WEST_RECORDS_PATH,
     EAST_WEST_RECORDS_AT_EAST_PATH,
     EAST_WEST_RECORDS_AT_WEST_PATH,
@@ -65,6 +66,7 @@ from src.etl.features.point_differential import (
     calculate_home_margin,
     calculate_margin,
     margin_std_by_date,
+    home_adv_by_date,
     _scale_margin,
 )
 from src.etl.features.rest_days import make_rested_days_table
@@ -156,6 +158,7 @@ def create_features_tables(
     # margin_scaled is margin in units of the season-to-date league margin std.
     games["margin"] = games["homeScore"] - games["awayScore"]
     margin_std = margin_std_by_date(games)
+    home_adv = home_adv_by_date(games)
     games["margin_scaled"] = _scale_margin(
         games["margin"],
         games["gameDateOnlyStr"].map(margin_std.set_index("date")["margin_std"]),
@@ -205,6 +208,10 @@ def create_features_tables(
     # The same scale persisted, one row per date. Not a model feature: the LLM
     # dataset scales its margin target by it (src/ml/llm/dataset.py).
     save_feature_table(margin_std, table(MARGIN_STD_PATH))
+
+    # Unlike margin_std, this one IS a model feature: merge_features joins it
+    # onto games directly as home_adv_L1000.
+    save_feature_table(home_adv, table(HOME_ADV_PATH))
 
     save_feature_table(east_west_record, table(EAST_WEST_RECORDS_PATH))
     save_feature_table(east_west_record_at_east, table(EAST_WEST_RECORDS_AT_EAST_PATH))
@@ -435,6 +442,17 @@ def merge_features(games, features_dir: Optional[Path] = None):
         margin_std = pd.read_csv(table(MARGIN_STD_PATH))[["date", "margin_std"]]
         games = games.merge(
             margin_std.rename(columns={"date": "gameDateOnlyStr"}),
+            how="left",
+            on="gameDateOnlyStr",
+            validate="m:1",
+        )
+
+    if table(HOME_ADV_PATH).exists():
+        # One row per date, same join as margin_std — but home_adv_L1000 is a
+        # real feature column, not an intermediate scale.
+        home_adv = pd.read_csv(table(HOME_ADV_PATH))[["date", "home_adv_L1000"]]
+        games = games.merge(
+            home_adv.rename(columns={"date": "gameDateOnlyStr"}),
             how="left",
             on="gameDateOnlyStr",
             validate="m:1",

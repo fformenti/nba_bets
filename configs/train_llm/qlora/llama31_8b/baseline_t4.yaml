@@ -1,0 +1,29 @@
+description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts (T4 variant)"
+
+# Same as baseline.yaml except compute/training dtype. Colab's T4 is Turing
+# (sm_75) and has no bf16 tensor cores, so bitsandbytes' int8 matmul kernel has
+# to downcast bf16 activations to fp16 on every quantized layer - spamming
+# "inputs will be cast from torch.bfloat16 to float16" warnings. float16/fp16
+# here matches what the hardware actually computes in.
+
+_include:
+  - "../../_defaults.yaml"
+  - "../_defaults.yaml"
+  - "../../_base_models/llama31_8b.yaml"
+
+quantization:
+  compute_dtype: "float16"
+
+training:
+  bf16: false
+  fp16: true
+  save_steps: 500
+  eval_steps: 500
+  per_device_eval_batch_size: 1
+
+evaluation:
+  max_new_tokens: 8
+  batch_size: 16
+
+paths:
+  output_dir: "outputs/llm/qlora/llama31_8b"

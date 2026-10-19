@@ -174,6 +174,16 @@ class TestResolveFeatureColumns:
         assert "days_at_home_delta" in cols
         assert "days_at_home" not in cols
 
+    def test_home_adv_enabled(self):
+        cfg = _all_disabled(home_adv=FeatureGroupConfig(enabled=True, delta=False))
+        cols = _without_conference(cfg)
+        assert "home_adv_L1000" in cols
+
+    def test_home_adv_disabled(self):
+        cfg = _all_disabled(home_adv=FeatureGroupConfig(enabled=False, delta=False))
+        cols = _without_conference(cfg)
+        assert "home_adv_L1000" not in cols
+
 
 # ── create_delta_features resilience ────────────────────────────────────────
 

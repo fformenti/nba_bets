@@ -139,6 +139,7 @@ _STEM_LABELS = {
     "adjusted_last_season_record": "adjusted last-season win percentage",
     "days_at_home": "consecutive days at home",
     "days_on_road": "consecutive days on the road",
+    "home_adv": "league-wide home-court win rate",
     "conference_diff_home_advantage_pct": "cross-conference home advantage",
     "conference_home_court_advantage_pct": "home conference's edge on its own floor",
     "winning_incentive": (
@@ -167,6 +168,7 @@ _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "adjusted_last_season_record",
             "conference_diff_home_advantage_pct",
             "conference_home_court_advantage_pct",
+            "home_adv",
         ),
     ),
     (
@@ -371,10 +373,14 @@ PER_TEAM_TABLES = {
 # The conference line is its own sentence, not a table row.
 CONFERENCE_MATCHUP = "conference_matchup"
 
-# A difference of these means nothing, so they only render as team values.
-_TEAM_ONLY = {"playoffs", CONFERENCE_MATCHUP}
+# League-wide home-court win rate — also its own sentence: one value for the
+# whole league on this date, nothing to split by team.
+HOME_ADV = "home_adv"
 
-PER_TEAM_FEATURES = (*PER_TEAM_SCALARS, *PER_TEAM_TABLES, CONFERENCE_MATCHUP)
+# A difference of these means nothing, so they only render as team values.
+_TEAM_ONLY = {"playoffs", CONFERENCE_MATCHUP, HOME_ADV}
+
+PER_TEAM_FEATURES = (*PER_TEAM_SCALARS, *PER_TEAM_TABLES, CONFERENCE_MATCHUP, HOME_ADV)
 
 
 def load_prompt_config(path) -> dict:
@@ -507,6 +513,11 @@ def _conference_line(raw: pd.Series) -> Optional[str]:
     )
 
 
+def _home_adv_line(raw: pd.Series) -> str:
+    pct = _format_cell(raw["home_adv_L1000"], "pct")
+    return f"League-wide home win rate (last 1000 games): {pct}%"
+
+
 def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
     """The whole prompt, header to ``PER_TEAM_SUFFIX``."""
     hidden = hidden_features(raw, prompt_config["thresholds"])
@@ -518,6 +529,8 @@ def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
         line = _conference_line(raw)
         if line is not None:
             blocks.append(line)
+    if HOME_ADV in shown:
+        blocks.append(_home_adv_line(raw))
     blocks.append(PER_TEAM_SUFFIX)
     return "\n\n".join(blocks)
 

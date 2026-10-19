@@ -1,0 +1,25 @@
+description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts"
+
+_include:
+  - "../../_defaults.yaml"
+  - "../_defaults.yaml"
+  - "../../_base_models/llama31_8b.yaml"
+
+quantization:
+  compute_dtype: "bfloat16"
+
+training:
+  bf16: true
+  fp16: false
+  # Lower than the notebook's 2000 so an interrupted run loses less work.
+  save_steps: 200
+  # Same cadence as save_steps, so every checkpoint pushed has an eval score.
+  eval_steps: 200
+  per_device_eval_batch_size: 8
+
+evaluation:
+  max_new_tokens: 5
+  batch_size: 32
+
+paths:
+  output_dir: "outputs/llm/qlora/llama31_8b"

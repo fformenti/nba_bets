@@ -305,6 +305,11 @@ feature_engineering:
       # definable. engineering.py special-cases it either way.
       delta: false
       enabled: false
+    home_adv:
+      # League-wide scalar — the trailing-1000-game home-court win rate, same
+      # for every game on a date. No HT/VT split, so no delta is definable.
+      delta: false
+      enabled: true
 
 feature_selection:
   enabled: true

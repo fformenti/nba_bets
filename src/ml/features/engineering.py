@@ -282,6 +282,10 @@ def create_delta_features(
     if not features_config.neutral_court.enabled:
         columns_to_drop.append("neutral_court")
 
+    # home_adv: league-wide scalar — no HT/VT split, no delta
+    if not features_config.home_adv.enabled:
+        columns_to_drop.append("home_adv_L1000")
+
     # Drop columns
     cols_to_drop = [c for c in columns_to_drop if c in df.columns]
     if cols_to_drop:
@@ -501,6 +505,10 @@ def resolve_feature_columns(
     # neutral_court: game-level scalar — no HT/VT split, no delta
     if features_config.neutral_court.enabled:
         columns.append("neutral_court")
+
+    # home_adv: league-wide scalar — no HT/VT split, no delta
+    if features_config.home_adv.enabled:
+        columns.append("home_adv_L1000")
 
     # Conference features (created dynamically by create_conference_features)
     columns.extend(CONFERENCE_FEATURES)

@@ -12,7 +12,7 @@
 
 TRAIN_CONFIG      ?= all_models
 PREDICTION_CONFIG ?= predict_classifier
-LLM_CONFIG        ?= llama31_8b_qlora
+LLM_CONFIG        ?= qlora/llama31_8b/baseline
 LLM_RUN           ?=
 # Where finished-game outcomes come from: nba_api | placeholder.
 # See src/etl/collectors/results/ — 'placeholder' reads hand-dropped files.

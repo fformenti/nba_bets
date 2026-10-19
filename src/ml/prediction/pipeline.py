@@ -316,10 +316,11 @@ def run_prediction_pipeline(
         # game — a feature the models had selected during training, silently
         # imputed away at inference by allow_missing_features.
         #
-        # The season before that comes too: margin_std is a trailing window of
-        # MARGIN_STD_WINDOW games across seasons (point_differential.py), and
-        # one prior season can hold fewer (1998/99 had 725). Two always cover it,
-        # so the slate sees the same scale training did.
+        # The season before that comes too: margin_std and home_adv_L1000 are
+        # both trailing windows of MARGIN_STD_WINDOW/HOME_ADV_WINDOW games
+        # across seasons (point_differential.py), and one prior season can
+        # hold fewer (1998/99 had 725). Two always cover it, so the slate sees
+        # the same scale/rate training did.
         upcoming_seasons = upcoming_games["season"].dropna().unique().tolist()
         if upcoming_seasons:
             required_seasons = set(upcoming_seasons) | {
@@ -333,7 +334,7 @@ def run_prediction_pipeline(
             logger.info(
                 f"Filtered historical features to seasons: {sorted(required_seasons)} "
                 f"(slate: {sorted(upcoming_seasons)}, plus two prior seasons for "
-                f"last-season features and the margin_std window)"
+                f"last-season features and the margin_std/home_adv_L1000 windows)"
             )
 
         # Build the feature tables once. They depend on the slate and the

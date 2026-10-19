@@ -1,10 +1,13 @@
-description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts"
+# Shared across every experiment type and base model under configs/train_llm/.
+# Model-specific settings (base_model id, context_length) live in
+# _base_models/<model>.yaml; experiment-type-specific settings (quantization
+# recipe, LoRA block, training hyperparameters) live in
+# <type>/_defaults.yaml. An experiment file _includes both layers on top of
+# this one, in that order, then overrides anything unique to that run.
 
 # null -> a timestamped name is generated at launch and printed in the log.
 # Pin it (or pass --run-name) to resume an interrupted run.
 run_name: null
-
-base_model: "meta-llama/Meta-Llama-3.1-8B"
 
 hub:
   user: "fformenti"
@@ -20,9 +23,6 @@ data:
   # Evaluation only. Training deliberately names no text field — see
   # LLMDataConfig.prompt_field and build_sft_config().
   prompt_field: "prompt"
-  # Llama 3.1 context window. Training fails if any record exceeds it; the
-  # truncation cap itself is measured from the dataset at launch.
-  context_length: 131072
   # null = train on the full split. The train split is date-sorted and the cap
   # takes the first N rows, so a small value here means the oldest N games, not
   # a sample. Use --max-train-samples for smoke tests instead.
@@ -55,57 +55,10 @@ data:
   # reported in real points. null = raw points.
   target_reference_std: 13.0
 
-quantization:
-  # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
-  # overwrote it with 8bit, so 8bit reproduces what actually ran.
-  mode: "8bit"
-  compute_dtype: "bfloat16"
-  bnb_4bit_quant_type: "nf4"
-  bnb_4bit_use_double_quant: true
-
-lora:
-  r: 32
-  alpha: 64
-  dropout: 0.1
-  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
-  bias: "none"
-
-training:
-  epochs: 2
-  per_device_train_batch_size: 2
-  gradient_accumulation_steps: 4
-  learning_rate: 1.0e-4
-  lr_scheduler_type: "cosine"
-  warmup_ratio: 0.03
-  optimizer: "paged_adamw_32bit"
-  weight_decay: 0.001
-  max_grad_norm: 0.3
-  bf16: true
-  fp16: false
-  gradient_checkpointing: true
-  logging_steps: 50
-  # Lower than the notebook's 2000 so an interrupted run loses less work.
-  save_steps: 200
-  save_total_limit: 10
-  # Score eval_split during training (loss, mean_token_accuracy and
-  # first_token_accuracy, logged with an eval/ prefix). "no" skips it.
-  eval_strategy: "steps"
-  # Same cadence as save_steps, so every checkpoint pushed has an eval score.
-  eval_steps: 200
-  per_device_eval_batch_size: 8
-  seed: 42
-  # Loss over the completion only — the signed point differential — instead of
-  # over the whole sequence. The prompt is ~440 tokens and the answer is 2, so
-  # this is the difference between the sign carrying ~1/440 of the gradient and
-  # carrying half of it.
-  train_on_completion_only: true
-
 evaluation:
   split: "test"
   size: 200
-  max_new_tokens: 5
   seed: 42
-  batch_size: 32
 
 tracking:
   wandb:
