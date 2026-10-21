@@ -6,7 +6,7 @@ config-driven so a run can be relaunched on any GPU box and, crucially,
 dropped connection.
 """
 
-import re
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -22,7 +22,11 @@ from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_CHECKPOINT_RE = re.compile(r"^checkpoint-(\d+)/")
+# hub_strategy="checkpoint" pushes the newest full checkpoint - adapter,
+# optimizer, scheduler, RNG and trainer state - under this folder, overwriting
+# it on every save. "every_save" pushes only the adapter to the repo root, which
+# is nothing a run can resume from.
+RESUME_DIR = "last-checkpoint"
 
 
 def get_hf_token() -> str:
@@ -51,11 +55,11 @@ def build_hub_model_id(config: LLMTrainingConfig, run_name: str) -> str:
 
 
 def find_resumable_checkpoint(hub_model_id: str, output_dir: Path, token: str) -> Optional[Path]:
-    """Download the newest ``checkpoint-N`` from the Hub repo, if any.
+    """Download the Hub repo's ``last-checkpoint/`` folder, if it has one.
 
     Returns the local checkpoint directory to hand to
     ``SFTTrainer.train(resume_from_checkpoint=...)``, or ``None`` when the repo
-    does not exist or holds no checkpoints.
+    does not exist or holds no resumable checkpoint.
     """
     from huggingface_hub import HfApi, snapshot_download
     from huggingface_hub.errors import RepositoryNotFoundError
@@ -67,24 +71,22 @@ def find_resumable_checkpoint(hub_model_id: str, output_dir: Path, token: str) -
         logger.info(f"No existing Hub repo {hub_model_id} - starting a fresh run.")
         return None
 
-    steps = {int(match.group(1)) for f in files if (match := _CHECKPOINT_RE.match(f))}
-    if not steps:
+    if not any(f.startswith(f"{RESUME_DIR}/") for f in files):
         logger.info(
-            f"Hub repo {hub_model_id} exists but has no checkpoint-* directories "
+            f"Hub repo {hub_model_id} exists but has no {RESUME_DIR}/ folder "
             "- starting a fresh run."
         )
         return None
 
-    latest = max(steps)
-    logger.info(f"Found checkpoint-{latest} in {hub_model_id}; downloading to resume.")
+    logger.info(f"Found {RESUME_DIR}/ in {hub_model_id}; downloading to resume.")
     output_dir.mkdir(parents=True, exist_ok=True)
     snapshot_download(
         repo_id=hub_model_id,
         token=token,
         local_dir=str(output_dir),
-        allow_patterns=[f"checkpoint-{latest}/*"],
+        allow_patterns=[f"{RESUME_DIR}/*"],
     )
-    return output_dir / f"checkpoint-{latest}"
+    return output_dir / RESUME_DIR
 
 
 def preflight(config: LLMTrainingConfig) -> None:
@@ -122,6 +124,17 @@ def preflight(config: LLMTrainingConfig) -> None:
     logger.info(f"Dataset {config.data.dataset_name} is reachable.")
 
 
+def _drop_int8_cast_notice(record: logging.LogRecord) -> bool:
+    """Drop bitsandbytes' per-matmul "inputs will be cast ... to float16" notice.
+
+    LLM.int8's matmul only runs in fp16, so with bf16 compute every quantized
+    layer casts its input on every call and logs it each time. The cast is
+    expected and harmless (test_run2 did the same); see
+    project_knowledge/llm_training/quantization_8bit.md.
+    """
+    return not str(record.msg).startswith("MatMul8bitLt: inputs will be cast")
+
+
 def build_quant_config(config: LLMTrainingConfig):
     """Build the bitsandbytes config, or ``None`` for full-precision loading."""
     import torch
@@ -139,6 +152,9 @@ def build_quant_config(config: LLMTrainingConfig):
             bnb_4bit_compute_dtype=compute_dtype,
             bnb_4bit_quant_type=quant.bnb_4bit_quant_type,
         )
+    # Only this one notice: bitsandbytes' other warnings still show. Adding the
+    # same filter again is a no-op.
+    logging.getLogger("bitsandbytes.autograd._functions").addFilter(_drop_int8_cast_notice)
     return BitsAndBytesConfig(
         load_in_8bit=True,
         bnb_8bit_compute_dtype=compute_dtype,
@@ -195,11 +211,12 @@ def _report_to(config: LLMTrainingConfig) -> list[str]:
 
 
 def sequence_lengths(prompts, completions, tokenizer) -> list[int]:
-    """Token count of each prompt+completion, as trl tokenizes it for training.
+    """Upper bound on each record's token count as trl trains it.
 
-    trl 0.22 tokenizes the two fields separately: the prompt with special tokens
-    (BOS), the completion without, then appends EOS. Tokenizing the
-    concatenated string can merge tokens across the boundary and undercount.
+    trl tokenizes ``prompt + completion + EOS`` as one string (BOS included).
+    Counting the prompt (with BOS), the completion and EOS separately can only
+    add tokens, where the joint string merges across the boundary, so the result
+    is a safe ``max_length``: it never truncates a record.
     """
     prompt_ids = tokenizer(list(prompts))["input_ids"]
     completion_ids = tokenizer(list(completions), add_special_tokens=False)["input_ids"]
@@ -278,6 +295,7 @@ def build_sft_config(
         max_steps=-1,
         bf16=training.bf16,
         fp16=training.fp16,
+        tf32=training.tf32 or None,
         seed=training.seed,
         logging_steps=training.logging_steps,
         # transformers defaults this from its own logger level, so anything that
@@ -287,6 +305,8 @@ def build_sft_config(
         save_strategy="steps",
         save_steps=training.save_steps,
         save_total_limit=training.save_total_limit,
+        load_best_model_at_end=training.load_best_model_at_end,
+        metric_for_best_model=training.metric_for_best_model,
         report_to=_report_to(config),
         # No dataset_text_field on purpose. trl dispatches on column names, and
         # checks for a text field *before* prompt/completion: naming one here
@@ -298,18 +318,28 @@ def build_sft_config(
         # Measured from the dataset (resolve_max_length), so nothing is truncated.
         max_length=max_length,
         push_to_hub=config.hub.push_checkpoints,
-        hub_strategy="every_save",
+        # Also pushes the full checkpoint to last-checkpoint/, which is what
+        # find_resumable_checkpoint downloads after a dropped connection.
+        hub_strategy="checkpoint",
         hub_model_id=build_hub_model_id(config, run_name),
         hub_private_repo=config.hub.private,
     )
 
 
 def load_train_dataset(config: LLMTrainingConfig):
-    """Load the training split, honouring ``data.max_train_samples``."""
+    """Load the training split, honouring ``data.max_train_samples``.
+
+    ``data.train_sample_strategy: random`` makes the cap a seeded sample across
+    all seasons instead of the oldest N games.
+    """
     from src.ml.llm.dataset import load_hf_split
 
+    random = config.data.train_sample_strategy == "random"
     return load_hf_split(
-        config, config.data.train_split, max_samples=config.data.max_train_samples
+        config,
+        config.data.train_split,
+        max_samples=config.data.max_train_samples,
+        shuffle_seed=config.training.seed if random else None,
     )
 
 
@@ -325,29 +355,25 @@ def load_eval_dataset(config: LLMTrainingConfig):
     )
 
 
-def first_completion_token_hits(logits, labels):
+def first_completion_token_hits(is_top1, label_mask):
     """Count rows whose first completion token is predicted correctly.
 
-    ``labels`` is the collator's output: prompt and padding positions are
-    ``-100``, so with completion-only loss the first unmasked label is the
-    first completion token - the sign of the point differential. Logits at
-    position ``i`` predict the token at ``i + 1``, hence the one-step shift.
+    trl's fused LM head never builds the full logits: its forward returns, per
+    position, whether the next-token label was the top-1 prediction
+    (``is_top1``) and whether that label is scored at all (``label_mask``),
+    both already shifted by one. With completion-only loss the first scored
+    position is the first completion token - the sign of the point differential.
 
     Returns ``(correct, total)`` as 0-d tensors. Rows whose completion was
-    truncated away by ``max_length`` have no unmasked label and are excluded.
+    truncated away by ``max_length`` have no scored label and are excluded.
     """
     import torch
 
-    shift_labels = labels[:, 1:]
-    mask = shift_labels != -100
-    has_completion = mask.any(dim=1)
+    has_completion = label_mask.any(dim=1)
     # argmax over a 0/1 mask returns the first 1; rows without one are dropped below.
-    first = mask.int().argmax(dim=1)
-    rows = torch.arange(labels.size(0), device=labels.device)
-
-    target = shift_labels[rows, first]
-    predicted = logits[rows, first].argmax(dim=-1)
-    correct = ((predicted == target) & has_completion).sum()
+    first = label_mask.int().argmax(dim=1)
+    rows = torch.arange(label_mask.size(0), device=label_mask.device)
+    correct = (is_top1[rows, first].bool() & has_completion).sum()
     return correct, has_completion.sum()
 
 
@@ -362,31 +388,38 @@ def build_trainer_class():
 
     Built inside a function because trl is a GPU-only extra and every module
     under ``src/`` must import without it.
+
+    trl computes the loss from its fused LM head, whose output carries the
+    per-token ``is_top1``/``label_mask`` this needs, but ``compute_loss`` keeps
+    that output to itself. Asking for it with ``return_outputs=True`` makes trl
+    rebuild full logits with a second forward pass on every step, so a forward
+    hook catches the fused output on its way out instead.
     """
     import torch
     from trl import SFTTrainer
 
     class FirstTokenAccuracySFTTrainer(SFTTrainer):
         def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-            loss, outputs = super().compute_loss(
-                model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
-            )
-            # Without completion-only loss the first unmasked label is a prompt
-            # token; liger returns no logits.
-            if (
-                "labels" in inputs
-                and self.args.completion_only_loss
-                and not self.args.use_liger_kernel
-            ):
+            captured = []
+            handle = model.register_forward_hook(lambda _module, _args, out: captured.append(out))
+            try:
+                result = super().compute_loss(
+                    model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch
+                )
+            finally:
+                handle.remove()
+
+            fused = next((o for o in reversed(captured) if getattr(o, "is_top1", None) is not None), None)
+            # Without completion-only loss the first scored label is a prompt token.
+            if fused is not None and self.args.completion_only_loss:
                 with torch.no_grad():
-                    logits = outputs.logits[:, self.num_virtual_tokens :, :]
-                    correct, total = first_completion_token_hits(logits, inputs["labels"])
-                    correct = self.accelerator.gather_for_metrics(correct).sum()
-                    total = self.accelerator.gather_for_metrics(total).sum()
+                    correct, total = first_completion_token_hits(fused.is_top1, fused.label_mask)
+                correct = self.accelerator.gather_for_metrics(correct).sum()
+                total = self.accelerator.gather_for_metrics(total).sum()
                 if total > 0:
                     mode = "train" if self.model.training else "eval"
                     self._metrics[mode]["first_token_accuracy"].append((correct / total).item())
-            return (loss, outputs) if return_outputs else loss
+            return result
 
     return FirstTokenAccuracySFTTrainer
 
@@ -439,15 +472,32 @@ def run_training(
     evaluation = load_eval_dataset(config) if config.training.eval_strategy != "no" else None
     base_model = build_base_model(config, tokenizer)
 
+    callbacks = []
+    if config.training.early_stopping_patience is not None:
+        from transformers import EarlyStoppingCallback
+
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=config.training.early_stopping_patience)
+        )
+
     trainer = build_trainer_class()(
         model=base_model,
         train_dataset=train,
         eval_dataset=evaluation,
         peft_config=build_lora_config(config),
         args=build_sft_config(config, run_name, output_dir, max_length),
+        callbacks=callbacks,
     )
 
     result = trainer.train(resume_from_checkpoint=str(checkpoint) if checkpoint else None)
+    memory = peak_gpu_memory()
+    # Through the trainer's callbacks, so W&B and MLflow both record it.
+    trainer.log(memory)
+    logger.info(
+        f"Peak GPU memory: {memory['peak_gpu_allocated_gb']:.1f} GB allocated, "
+        f"{memory['peak_gpu_reserved_gb']:.1f} GB reserved"
+    )
+    train_metrics = {**result.metrics, **memory}
 
     trainer.model.push_to_hub(hub_model_id, private=config.hub.private)
     logger.info(f"Pushed final adapter to the hub: {hub_model_id}")
@@ -456,5 +506,19 @@ def run_training(
         "run_name": run_name,
         "hub_model_id": hub_model_id,
         "resumed_from": str(checkpoint) if checkpoint else None,
-        "train_metrics": dict(result.metrics),
+        "train_metrics": train_metrics,
+    }
+
+
+def peak_gpu_memory() -> dict[str, float]:
+    """Peak GPU memory since the process started, in GB.
+
+    ``allocated`` is what tensors held; ``reserved`` adds the caching
+    allocator's slack and is the one that hits the card's limit first.
+    """
+    import torch
+
+    return {
+        "peak_gpu_allocated_gb": torch.cuda.max_memory_allocated() / 1e9,
+        "peak_gpu_reserved_gb": torch.cuda.max_memory_reserved() / 1e9,
     }

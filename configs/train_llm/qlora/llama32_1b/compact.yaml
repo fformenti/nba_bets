@@ -1,0 +1,16 @@
+description: "Llama-3.2-1B v2, compact prompt layout (experiment E11)"
+
+# v2.yaml with one change: the prompt drops alignment whitespace and the
+# constant definitions header (configs/llm_prompt/per_team_compact.yaml). It
+# trains on its own Hub dataset, built from this file:
+#   make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact ARGS=--push
+
+_include:
+  - "v2.yaml"
+
+data:
+  dataset_name: "fformenti/nba-bets-compact"
+  prompt_config: "configs/llm_prompt/per_team_compact.yaml"
+
+paths:
+  output_dir: "outputs/llm/qlora/llama32_1b_compact"

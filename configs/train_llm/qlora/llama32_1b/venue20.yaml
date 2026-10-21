@@ -1,0 +1,16 @@
+description: "Llama-3.2-1B v2, last-season venue win% kept to 20 venue games (experiment E12)"
+
+# v2.yaml with one change: "Adj Last-season venue win%" stays in the prompt
+# until both teams have 20 venue games (configs/llm_prompt/per_team_venue20.yaml).
+# It trains on its own Hub dataset, built from this file:
+#   make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/venue20 ARGS=--push
+
+_include:
+  - "v2.yaml"
+
+data:
+  dataset_name: "fformenti/nba-bets-venue20"
+  prompt_config: "configs/llm_prompt/per_team_venue20.yaml"
+
+paths:
+  output_dir: "outputs/llm/qlora/llama32_1b_venue20"

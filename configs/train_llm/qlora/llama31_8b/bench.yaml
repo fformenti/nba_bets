@@ -1,0 +1,20 @@
+description: "E3 speed benchmark: Llama-3.1-8B v2 (4-bit, gradient checkpointing, 8x4) for 50 steps"
+
+# The reference point of the E3 speed benchmark. Each bench_*.yaml includes
+# this file and changes one thing. Only throughput matters here
+# (train_samples_per_second, peak_gpu_reserved_gb), so evaluation is off and
+# no checkpoint is pushed; the final adapter still lands in the run's Hub repo.
+
+_include:
+  - "v2.yaml"
+
+data:
+  # 50 optimizer steps at an effective batch of 32. The oldest 1,600 games -
+  # every variant trains on the same rows.
+  max_train_samples: 1600
+
+training:
+  eval_strategy: "no"
+
+hub:
+  push_checkpoints: false

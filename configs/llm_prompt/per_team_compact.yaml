@@ -1,0 +1,10 @@
+# per_team.yaml with the alignment whitespace and the constant definitions
+# header removed (experiment E11). In test_run2's data 35% of prompt tokens were
+# whitespace and 70 more were a header identical in every row; this cuts the
+# average Llama-3 prompt from 425 to 282 tokens (-34%). Everything else is
+# unchanged, so a difference against per_team.yaml measures the layout alone.
+
+_include:
+  - "per_team.yaml"
+
+layout: "compact"

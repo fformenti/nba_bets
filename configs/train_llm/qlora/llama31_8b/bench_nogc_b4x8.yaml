@@ -1,0 +1,11 @@
+description: "E3 speed benchmark: bench_nogc.yaml at per-device batch 4 x 8 accumulation"
+
+# ~12 GB of activations on the ~5.5 GB 4-bit base: may not fit in the L4's
+# 22 GB. An OOM here is a result, not a bug. Same effective batch of 32.
+
+_include:
+  - "bench_nogc.yaml"
+
+training:
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8

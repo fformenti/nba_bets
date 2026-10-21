@@ -64,7 +64,12 @@ tracking:
   wandb:
     enabled: true
     project: "nba-bets"
-    watch: "gradients"
+    # Gradient histograms for 256 LoRA matrices every logging step, never read;
+    # train/grad_norm already shows stability.
+    watch: "false"
+    # "checkpoint" would upload every checkpoint as a W&B artifact. The Hub
+    # already keeps them.
+    log_model: "false"
   mlflow:
     enabled: true
     experiment_name: "nba_bets_llm"

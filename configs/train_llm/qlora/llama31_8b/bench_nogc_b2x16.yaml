@@ -1,0 +1,12 @@
+description: "E3 speed benchmark: bench_nogc.yaml at per-device batch 2 x 16 accumulation"
+
+# bench_nogc ran out of memory at 8 rows per micro-batch: without checkpointing
+# the 8B keeps ~2.9 GB of activations per row. 2 rows need ~6 GB on top of the
+# ~5.5 GB 4-bit base. Same effective batch of 32.
+
+_include:
+  - "bench_nogc.yaml"
+
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 16

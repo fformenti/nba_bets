@@ -15,6 +15,21 @@ def test_default_llm_config_loads():
     assert config.tracking.mlflow.enabled is True
 
 
+def test_8bit_load_silences_only_the_fp16_cast_notice(caplog):
+    import logging
+
+    from src.ml.llm.finetune import build_quant_config
+
+    build_quant_config(load_llm_training_config(DEFAULT_TRAIN_LLM_CONFIG_PATH))
+    bnb = logging.getLogger("bitsandbytes.autograd._functions")
+    with caplog.at_level(logging.WARNING, logger=bnb.name):
+        bnb.warning("MatMul8bitLt: inputs will be cast from %s to float16 during quantization", "torch.bfloat16")
+        bnb.warning("some other bitsandbytes warning")
+
+    passed = [r.getMessage() for r in caplog.records if r.name == bnb.name]
+    assert passed == ["some other bitsandbytes warning"]
+
+
 def test_run_name_resolution_prefers_cli_then_config():
     from src.ml.llm.finetune import build_hub_model_id, resolve_run_name
 
@@ -29,33 +44,6 @@ def test_run_name_resolution_prefers_cli_then_config():
     # Falls back to a generated, project-prefixed timestamp.
     config.run_name = None
     assert resolve_run_name(config, None).startswith("nba-bets-")
-
-
-def test_first_completion_token_hits_scores_only_the_first_completion_token():
-    import torch
-
-    from src.ml.llm.finetune import first_completion_token_hits
-
-    vocab = 5
-    # Row 0: prompt [9, 9], completion [1, 2]. Row 1: completion [3, 4].
-    # Row 2: completion truncated away - everything masked.
-    labels = torch.tensor(
-        [
-            [-100, -100, 1, 2],
-            [-100, -100, 3, 4],
-            [-100, -100, -100, -100],
-        ]
-    )
-    logits = torch.zeros(3, 4, vocab)
-    # Position 1 predicts the token at position 2 - the first completion token.
-    logits[0, 1, 1] = 1.0  # right
-    logits[1, 1, 0] = 1.0  # wrong (target is 3)
-    logits[1, 2, 4] = 1.0  # right on the *second* token - must not count
-
-    correct, total = first_completion_token_hits(logits, labels)
-
-    assert correct.item() == 1
-    assert total.item() == 2
 
 
 def test_classifier_scores_by_sign_agreement():
@@ -174,3 +162,32 @@ def test_diagnostics_summary_separates_bias_from_no_signal():
     assert summary["accuracy_greedy"] == 0.5
     assert summary["auc_p_home"] == 1.0
     assert summary["accuracy_at_median_threshold"] == 1.0
+
+
+def test_first_completion_token_hits_scores_only_the_first_completion_token():
+    # trl's fused LM head returns no logits, only per-position is_top1 /
+    # label_mask, both already shifted by one. Row 0: completion of two
+    # tokens, sign right. Row 1: sign wrong. Row 2: completion truncated away.
+    import torch
+
+    from src.ml.llm.finetune import first_completion_token_hits
+
+    label_mask = torch.tensor(
+        [
+            [False, True, True],
+            [False, True, True],
+            [False, False, False],
+        ]
+    )
+    is_top1 = torch.tensor(
+        [
+            [False, True, False],  # sign right
+            [True, False, True],  # sign wrong; a prompt hit and the 2nd token must not count
+            [True, True, True],  # no completion - excluded
+        ]
+    )
+
+    correct, total = first_completion_token_hits(is_top1, label_mask)
+
+    assert correct.item() == 1
+    assert total.item() == 2

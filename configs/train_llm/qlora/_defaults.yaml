@@ -1,41 +1,61 @@
 # Shared by every QLoRA experiment, regardless of base model. Hardware- or
-# precision-specific knobs (compute_dtype, bf16/fp16, save/eval cadence, eval
-# batch sizes) are left out here because they vary per GPU — each experiment
-# file under qlora/<model>/ sets those itself.
+# precision-specific knobs (compute_dtype, bf16/fp16, eval batch sizes) are left
+# out here because they vary per GPU — each experiment file under
+# qlora/<model>/ sets those itself.
+#
+# These are the values chosen after the first full run (test_run2, see
+# qlora/llama31_8b/baseline.yaml, which pins that run's settings explicitly).
+# That run converged within one epoch: eval loss was flat from step ~2,600 of
+# 5,812, and the second epoch only widened the train/eval gap.
 
 quantization:
-  # "4bit" | "8bit" | "none". The original notebook set 4bit then silently
-  # overwrote it with 8bit, so 8bit reproduces what actually ran.
-  mode: "8bit"
+  # Real QLoRA. 8bit (LLM.int8) was slower per step and used more memory than
+  # 4bit; "none" (bf16 weights, ~16 GB for an 8B) is the other candidate on a
+  # 24 GB card — benchmark before switching.
+  mode: "4bit"
   bnb_4bit_quant_type: "nf4"
   bnb_4bit_use_double_quant: true
 
 lora:
-  r: 32
-  alpha: 64
-  dropout: 0.1
+  # r=32 tied XGBoost on the same features, so capacity was not the limit.
+  r: 16
+  alpha: 32
+  dropout: 0.05
   target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
   bias: "none"
 
 training:
-  epochs: 2
-  per_device_train_batch_size: 2
+  epochs: 1
+  # Effective batch 32. The target is close to a coin flip per game, so a
+  # larger batch averages away gradient noise; 2 x 4 clipped 78% of steps.
+  per_device_train_batch_size: 8
   gradient_accumulation_steps: 4
-  learning_rate: 1.0e-4
+  # Raised with the batch: 4x fewer, cleaner updates.
+  learning_rate: 2.0e-4
   lr_scheduler_type: "cosine"
-  warmup_ratio: 0.03
-  optimizer: "paged_adamw_32bit"
+  warmup_ratio: 0.05
+  optimizer: "adamw_torch_fused"
   weight_decay: 0.001
-  max_grad_norm: 0.3
+  # 0.3 clipped most steps at effective batch 8, which hides the real learning
+  # rate. 1.0 is the HF default.
+  max_grad_norm: 1.0
   gradient_checkpointing: true
-  logging_steps: 50
-  save_total_limit: 10
+  logging_steps: 10
+  # ~727 steps per epoch on the full train split -> ~7 evaluations.
+  save_steps: 100
+  eval_steps: 100
+  save_total_limit: 3
   # Score eval_split during training (loss, mean_token_accuracy and
   # first_token_accuracy, logged with an eval/ prefix). "no" skips it.
   eval_strategy: "steps"
   seed: 42
   # Loss over the completion only — the signed point differential — instead of
-  # over the whole sequence. The prompt is ~440 tokens and the answer is 2, so
-  # this is the difference between the sign carrying ~1/440 of the gradient and
+  # over the whole sequence. The prompt is ~426 tokens and the answer is 2, so
+  # this is the difference between the sign carrying ~1/426 of the gradient and
   # carrying half of it.
   train_on_completion_only: true
+
+data:
+  # A seeded random sample across all three validation seasons. The first 800
+  # rows, used for test_run2, were all 2021/22.
+  max_eval_samples: 1000

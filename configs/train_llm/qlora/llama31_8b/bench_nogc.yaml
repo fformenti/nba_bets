@@ -1,0 +1,11 @@
+description: "E3 speed benchmark: bench.yaml without gradient checkpointing"
+
+# Checkpointing recomputes each layer's forward during backward (~30% more
+# compute) to avoid storing activations. Off trades that time for memory.
+# Built on 4-bit; if bench_bf16 wins step 1, include that file instead.
+
+_include:
+  - "bench.yaml"
+
+training:
+  gradient_checkpointing: false

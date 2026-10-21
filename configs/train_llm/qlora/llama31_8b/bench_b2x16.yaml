@@ -1,0 +1,11 @@
+description: "E3 speed benchmark: bench.yaml with per-device batch 2 x 16 accumulation (same effective 32)"
+
+# Smaller micro-batches use less activation memory but keep the GPU less busy
+# per step. Built on 4-bit; if bench_bf16 wins step 1, include that file instead.
+
+_include:
+  - "bench.yaml"
+
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 16

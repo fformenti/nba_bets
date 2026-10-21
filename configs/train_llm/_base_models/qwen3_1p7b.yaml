@@ -1,0 +1,6 @@
+base_model: "Qwen/Qwen3-1.7B-Base"
+
+data:
+  # Qwen3 base context window. Training fails if any record exceeds it.
+  # Qwen tokenizes numbers digit by digit: "+15" is "+", "1", "5".
+  context_length: 32768

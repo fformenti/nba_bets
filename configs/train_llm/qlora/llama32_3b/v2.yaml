@@ -1,0 +1,25 @@
+description: "QLoRA SFT of Llama-3.2-3B on nba-bets point-differential prompts (v2 settings)"
+
+# Everything comes from ../_defaults.yaml; this file only sets what depends on
+# the GPU (an L4 here) and where outputs go.
+
+_include:
+  - "../../_defaults.yaml"
+  - "../_defaults.yaml"
+  - "../../_base_models/llama32_3b.yaml"
+
+quantization:
+  compute_dtype: "bfloat16"
+
+training:
+  bf16: true
+  fp16: false
+  tf32: true
+  per_device_eval_batch_size: 16
+
+evaluation:
+  max_new_tokens: 5
+  batch_size: 32
+
+paths:
+  output_dir: "outputs/llm/qlora/llama32_3b"

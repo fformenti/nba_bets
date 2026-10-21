@@ -443,6 +443,13 @@ class LLMDataConfig(BaseModel):
     max_train_samples: Optional[int] = Field(
         default=None, description="Cap training rows; useful for smoke tests."
     )
+    train_sample_strategy: Literal["first", "random"] = Field(
+        default="first",
+        description="How max_train_samples picks its rows. The train split is "
+        "date-sorted, so 'first' means the oldest N games — fine for a smoke "
+        "test, wrong for a learning curve. 'random' takes a sample seeded by "
+        "training.seed, spread over every season.",
+    )
     max_eval_samples: Optional[int] = Field(
         default=None,
         description="Cap the in-training evaluation set to a seeded random "
@@ -541,6 +548,45 @@ class LLMTrainerConfig(BaseModel):
         "Requires the prompt-completion dataset schema built by "
         "src/ml/llm/dataset.py; trl rejects it for language-modeling datasets.",
     )
+    tf32: bool = Field(
+        default=False,
+        description="Allow TF32 for the matmuls still in fp32. Ampere-or-newer "
+        "only (L4, A100, H100); a T4 rejects it.",
+    )
+    load_best_model_at_end: bool = Field(
+        default=False,
+        description="Finish on the checkpoint with the best metric_for_best_model "
+        "instead of the last one. Needs save_steps to be a multiple of eval_steps.",
+    )
+    metric_for_best_model: Optional[str] = Field(
+        default=None,
+        description="Eval metric that ranks checkpoints, e.g. 'eval_loss'. "
+        "Lower-is-better is inferred for names ending in 'loss'.",
+    )
+    early_stopping_patience: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Stop after this many evaluations without improvement in "
+        "metric_for_best_model. None trains for the full schedule — what a "
+        "fixed-budget experiment wants, so runs stay comparable.",
+    )
+
+    @model_validator(mode="after")
+    def _best_model_needs_aligned_evals(self):
+        if self.early_stopping_patience is not None and not self.load_best_model_at_end:
+            raise ValueError("early_stopping_patience requires load_best_model_at_end: true.")
+        if self.load_best_model_at_end:
+            if self.eval_strategy == "no" or not self.metric_for_best_model:
+                raise ValueError(
+                    "load_best_model_at_end needs eval_strategy != 'no' and a "
+                    "metric_for_best_model."
+                )
+            if self.save_steps % self.eval_steps:
+                raise ValueError(
+                    f"save_steps ({self.save_steps}) must be a multiple of eval_steps "
+                    f"({self.eval_steps}) for load_best_model_at_end."
+                )
+        return self
 
 
 class LLMEvaluationConfig(BaseModel):
@@ -560,6 +606,12 @@ class WandbConfig(BaseModel):
     enabled: bool = True
     project: str = "nba-bets"
     watch: str = "gradients"
+    log_model: str = Field(
+        default="false",
+        description="WANDB_LOG_MODEL. 'checkpoint' uploads every checkpoint as a "
+        "W&B artifact — 13.8 GB for one 2-epoch run, past the free tier. The Hub "
+        "already holds them, so the default is off.",
+    )
 
 
 class LLMMLflowConfig(BaseModel):

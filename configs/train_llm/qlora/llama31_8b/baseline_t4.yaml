@@ -6,10 +6,10 @@ description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts (
 # "inputs will be cast from torch.bfloat16 to float16" warnings. float16/fp16
 # here matches what the hardware actually computes in.
 
+# Includes baseline.yaml itself, so it keeps test_run2's settings rather than
+# the newer ../_defaults.yaml.
 _include:
-  - "../../_defaults.yaml"
-  - "../_defaults.yaml"
-  - "../../_base_models/llama31_8b.yaml"
+  - "baseline.yaml"
 
 quantization:
   compute_dtype: "float16"

@@ -29,13 +29,15 @@ dependencies = [
     "tqdm>=4.66.0",
 ]
 
-# GPU-only fine-tuning stack. Kept out of the core dependencies because
-# bitsandbytes has no macOS wheel and would break `uv sync` on a laptop.
-# On the training box: uv sync --extra gpu
+# Fine-tuning stack, needed to train and only useful on a CUDA box. It also
+# installs on an Apple-silicon laptop (bitsandbytes ships a macOS arm64 wheel),
+# which lets the trl tests run locally: uv sync --extra gpu
 [project.optional-dependencies]
 gpu = [
-    "peft>=0.14",
-    "trl>=0.13",
+    # trl 1.x's fused LM head returns per-token is_top1/label_mask instead of
+    # logits; src/ml/llm/finetune.py reads those and supports nothing older.
+    "peft>=0.21",
+    "trl>=1.16,<2",
     "accelerate>=1.0",
     "bitsandbytes>=0.45",
     "wandb>=0.19",

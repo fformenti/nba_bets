@@ -1,0 +1,25 @@
+description: "Resume drill (experiment E2): 60 steps of Qwen3-1.7B, checkpointing every 10"
+
+# Proves the resume path end to end before any long run depends on it: start
+# it, stop the cell after step ~30, re-run the identical cell. Training must
+# continue from the Hub's last-checkpoint/ (log: "Found last-checkpoint/ ...")
+# and the W&B charts must carry on from step 30 in the same run.
+#
+# Qwen3 because it is ungated: the drill tests checkpoint plumbing, not the
+# model, and Meta approves each Llama repo separately.
+
+_include:
+  - "v2.yaml"
+
+data:
+  # 60 optimizer steps at effective batch 32.
+  max_train_samples: 1920
+  max_eval_samples: 200
+
+training:
+  save_steps: 10
+  eval_steps: 10
+  logging_steps: 5
+
+paths:
+  output_dir: "outputs/llm/qlora/qwen3_1p7b_resume_drill"

@@ -1,21 +1,44 @@
 description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts"
 
+# The settings of the first full run, test_run2 (W&B xnwuv6o3, adapter at
+# fformenti/test_run2): 64.2% val / 66.9% test sign accuracy, 9.7 h on a Colab
+# L4. Every value that later moved in ../_defaults.yaml is pinned here, so this
+# file keeps reproducing that run. New experiments start from v2.yaml.
+
 _include:
   - "../../_defaults.yaml"
   - "../_defaults.yaml"
   - "../../_base_models/llama31_8b.yaml"
 
 quantization:
+  mode: "8bit"
   compute_dtype: "bfloat16"
 
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.1
+
 training:
+  epochs: 2
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-4
+  warmup_ratio: 0.03
+  optimizer: "paged_adamw_32bit"
+  max_grad_norm: 0.3
+  logging_steps: 50
   bf16: true
   fp16: false
-  # Lower than the notebook's 2000 so an interrupted run loses less work.
   save_steps: 200
-  # Same cadence as save_steps, so every checkpoint pushed has an eval score.
   eval_steps: 200
+  save_total_limit: 10
   per_device_eval_batch_size: 8
+
+data:
+  # test_run2 took the first 800 validation rows in the notebook; null scores
+  # the whole split, which is the closest the config can express.
+  max_eval_samples: null
 
 evaluation:
   max_new_tokens: 5

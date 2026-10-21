@@ -1,0 +1,5 @@
+base_model: "meta-llama/Llama-3.2-1B"
+
+data:
+  # Llama 3.2 context window. Training fails if any record exceeds it.
+  context_length: 131072

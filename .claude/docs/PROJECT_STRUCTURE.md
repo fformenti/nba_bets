@@ -33,14 +33,33 @@ configs/
 ├── train_llm/                          # LLM fine-tuning: <type>/<base model>/<experiment>.yaml
 │   ├── _defaults.yaml                  # Shared across every type and model: hub, data, tracking, paths
 │   ├── _base_models/
-│   │   └── llama31_8b.yaml             # Model-specific: HF repo id, context_length
+│   │   ├── llama31_8b.yaml             # Model-specific: HF repo id, context_length
+│   │   ├── llama32_1b.yaml             # Llama-3.2-1B (same tokenizer as 3.1)
+│   │   ├── llama32_3b.yaml             # Llama-3.2-3B
+│   │   ├── qwen3_1p7b.yaml             # Qwen3-1.7B-Base (digit-level number tokens)
+│   │   └── qwen3_4b.yaml               # Qwen3-4B-Base
 │   └── qlora/
-│       ├── _defaults.yaml              # Shared across QLoRA runs: quantization, LoRA block, training recipe
-│       └── llama31_8b/
-│           ├── baseline.yaml           # QLoRA SFT; names the experiment whose splits it mirrors
-│           └── baseline_t4.yaml        # Same, but fp16/float16 — T4 has no bf16 tensor cores
+│       ├── _defaults.yaml              # Shared across QLoRA runs: the current recipe (4-bit, 1 epoch, eff. batch 32)
+│       ├── llama31_8b/
+│       │   ├── baseline.yaml           # Pins test_run2's settings (8-bit, 2 epochs) so it stays reproducible
+│       │   ├── baseline_t4.yaml        # baseline.yaml in fp16/float16 — T4 has no bf16 tensor cores
+│       │   ├── bench.yaml              # E3 speed benchmark: v2 for 50 steps, no eval, no checkpoint pushes
+│       │   ├── bench_{8bit,bf16,nogc,b2x16}.yaml  # bench.yaml with one change each (precision, grad checkpointing, micro-batch)
+│       │   ├── bench_nogc_{b2x16,b4x8}.yaml  # no grad checkpointing at smaller micro-batches (8×4 ran out of memory)
+│       │   └── v2.yaml                 # Current recipe on an L4
+│       ├── llama32_1b/
+│       │   ├── v2.yaml                 # Current recipe on an L4
+│       │   ├── compact.yaml            # v2 + compact prompt layout, own Hub dataset
+│       │   └── venue20.yaml            # v2 + last-season venue line to 20 venue games, own Hub dataset
+│       ├── llama32_3b/v2.yaml          # Current recipe on an L4
+│       ├── qwen3_1p7b/
+│       │   ├── v2.yaml                 # Current recipe on an L4
+│       │   └── resume_drill.yaml       # 60 steps, checkpoint every 10: proves resume works (ungated model)
+│       └── qwen3_4b/v2.yaml            # Current recipe on an L4
 ├── llm_prompt/
-│   └── per_team.yaml                   # 'per_team' prompt: which features, team vs delta, games-played thresholds
+│   ├── per_team.yaml                   # 'per_team' prompt: which features, team vs delta, games-played thresholds
+│   ├── per_team_compact.yaml           # per_team + layout: compact (no alignment whitespace, one-line header)
+│   └── per_team_venue20.yaml           # per_team + last-season venue win% until 20 venue games
 └── predict/
     └── predict_classifier.yaml         # The deployed model URI
 ```
@@ -169,7 +188,7 @@ src/
 │   │   ├── dataset.py                  # build_llm_dataset() from build_splits()
 │   │   ├── finetune.py                 # QLoRA SFT: preflight, Hub resume, SFTTrainer
 │   │   ├── train.py                    # Run orchestration + tracking
-│   │   ├── diagnostics.py              # Raw outputs + first-token sign probabilities
+│   │   ├── diagnostics.py              # Raw outputs, sign probabilities, expected margin, calibration, Platt
 │   │   ├── evaluate.py                 # Score an adapter as a sign classifier
 │   │   └── testers.py                  # RegressionTester / ClassificationTester
 │   │

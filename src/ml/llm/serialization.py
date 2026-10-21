@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Literal, Optional
 
 import pandas as pd
@@ -315,6 +316,13 @@ PER_TEAM_HEADER = (
 )
 PER_TEAM_SUFFIX = "Home margin ="
 
+# layout: compact. The definitions above are identical in every row, so after a
+# few steps they teach nothing, and the aligned columns are a third of the
+# tokens (all whitespace). Compact keeps one instruction line and
+# single-space-separated cells.
+PER_TEAM_HEADER_COMPACT = "Predict the final NBA score margin (home − away) from pre-game stats."
+PER_TEAM_LAYOUTS = ("aligned", "compact")
+
 # Single-value features: key -> (label, home column, away column, value kind).
 # Display order is the order here.
 PER_TEAM_SCALARS = {
@@ -384,10 +392,13 @@ PER_TEAM_FEATURES = (*PER_TEAM_SCALARS, *PER_TEAM_TABLES, CONFERENCE_MATCHUP, HO
 
 
 def load_prompt_config(path) -> dict:
-    """Read and check a prompt config (configs/llm_prompt/*.yaml)."""
-    from src.ml.config.loader import load_yaml_config
+    """Read and check a prompt config (configs/llm_prompt/*.yaml).
 
-    config = load_yaml_config(path)
+    Supports ``_include``, so a variant can name only what it changes.
+    """
+    from src.ml.config.loader import _resolve_includes, load_yaml_config
+
+    config = _resolve_includes(load_yaml_config(path), Path(path).resolve().parent)
     for key, mode in config.get("features", {}).items():
         if key not in PER_TEAM_FEATURES:
             raise ValueError(
@@ -401,6 +412,11 @@ def load_prompt_config(path) -> dict:
     for name in ("last_season_min_games", "last_season_venue_min_games", "playoffs_min_games"):
         if name not in config.get("thresholds", {}):
             raise ValueError(f"Prompt config {path} is missing thresholds.{name}.")
+    if config.get("layout", "aligned") not in PER_TEAM_LAYOUTS:
+        raise ValueError(
+            f"Prompt config {path}: layout must be one of {PER_TEAM_LAYOUTS}, "
+            f"got '{config['layout']}'."
+        )
     return config
 
 
@@ -452,8 +468,13 @@ def _format_cell(value, kind: str, signed: bool = False) -> str:
     return str(number)
 
 
-def _grid(rows: list[list[str]]) -> list[str]:
-    """First column left-aligned, the rest right-aligned, two spaces apart."""
+def _grid(rows: list[list[str]], compact: bool = False) -> list[str]:
+    """First column left-aligned, the rest right-aligned, two spaces apart.
+
+    ``compact`` drops the alignment: cells separated by a single space.
+    """
+    if compact:
+        return [" ".join(row) for row in rows]
     widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
     return [
         (row[0].ljust(widths[0]) + "".join(f"  {c.rjust(w)}" for c, w in zip(row[1:], widths[1:], strict=True))).rstrip()
@@ -461,7 +482,7 @@ def _grid(rows: list[list[str]]) -> list[str]:
     ]
 
 
-def _scalar_blocks(raw: pd.Series, shown: dict[str, str]) -> list[str]:
+def _scalar_blocks(raw: pd.Series, shown: dict[str, str], compact: bool = False) -> list[str]:
     team_rows, delta_rows = [], []
     for key, (label, home_col, away_col, kind) in PER_TEAM_SCALARS.items():
         if key not in shown:
@@ -475,13 +496,13 @@ def _scalar_blocks(raw: pd.Series, shown: dict[str, str]) -> list[str]:
 
     blocks = []
     if team_rows:
-        blocks.append("\n".join(_grid([["Team", "Home", "Away"], *team_rows])))
+        blocks.append("\n".join(_grid([["Team", "Home", "Away"], *team_rows], compact)))
     if delta_rows:
-        blocks.append("\n".join(_grid([["Team", "Home−Away"], *delta_rows])))
+        blocks.append("\n".join(_grid([["Team", "Home−Away"], *delta_rows], compact)))
     return blocks
 
 
-def _lag_table(raw: pd.Series, key: str, mode: str) -> str:
+def _lag_table(raw: pd.Series, key: str, mode: str, compact: bool = False) -> str:
     label, home_col, away_col, lags, head, kind, counter = PER_TEAM_TABLES[key]
     if counter is not None:
         # The more-played team decides, so neither team loses a window it needs.
@@ -498,7 +519,7 @@ def _lag_table(raw: pd.Series, key: str, mode: str) -> str:
         rows.append(
             ["Home−Away", *(_format_cell(h - a, kind, signed=True) for h, a in zip(home, away, strict=True))]
         )
-    return "\n".join(_grid(rows))
+    return "\n".join(_grid(rows, compact))
 
 
 def _conference_line(raw: pd.Series) -> Optional[str]:
@@ -522,9 +543,13 @@ def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
     """The whole prompt, header to ``PER_TEAM_SUFFIX``."""
     hidden = hidden_features(raw, prompt_config["thresholds"])
     shown = {k: m for k, m in prompt_config.get("features", {}).items() if k not in hidden}
+    compact = prompt_config.get("layout", "aligned") == "compact"
 
-    blocks = [PER_TEAM_HEADER, *_scalar_blocks(raw, shown)]
-    blocks.extend(_lag_table(raw, key, shown[key]) for key in PER_TEAM_TABLES if key in shown)
+    header = PER_TEAM_HEADER_COMPACT if compact else PER_TEAM_HEADER
+    blocks = [header, *_scalar_blocks(raw, shown, compact)]
+    blocks.extend(
+        _lag_table(raw, key, shown[key], compact) for key in PER_TEAM_TABLES if key in shown
+    )
     if CONFERENCE_MATCHUP in shown:
         line = _conference_line(raw)
         if line is not None:

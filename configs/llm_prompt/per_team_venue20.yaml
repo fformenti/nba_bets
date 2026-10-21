@@ -1,0 +1,13 @@
+# per_team.yaml with "Adj Last-season venue win%" kept until both teams have 20
+# venue games (experiment E12), shown alongside the current-season venue tables.
+#
+# At 7 it almost never rendered: the splits drop games before 15 games played
+# (configs/train/_defaults.yaml filters.minimum_games_*), by which point a team
+# has ~7 home games, so the line reached 0.8% of rows. At 20 it covers roughly
+# the first half of each season, while this season's venue sample is small.
+
+_include:
+  - "per_team.yaml"
+
+thresholds:
+  last_season_venue_min_games: 20

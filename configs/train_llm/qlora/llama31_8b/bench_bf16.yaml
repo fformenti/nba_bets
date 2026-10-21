@@ -1,0 +1,11 @@
+description: "E3 speed benchmark: bench.yaml with unquantized bf16 weights (~16 GB for an 8B)"
+
+# Plain LoRA rather than QLoRA: no dequantization on every matmul, at the
+# cost of 4x the weight memory. Whether the rest fits in 24 GB is part of the
+# question.
+
+_include:
+  - "bench.yaml"
+
+quantization:
+  mode: "none"

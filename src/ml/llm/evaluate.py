@@ -24,13 +24,17 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _load_adapter_model(config: LLMTrainingConfig, hub_model_id: str, revision=None):
-    """Load the tokenizer and the base model with the fine-tuned adapter applied."""
-    from peft import PeftModel
+def _load_adapter_model(config: LLMTrainingConfig, hub_model_id: Optional[str], revision=None):
+    """Load the tokenizer and the base model with the fine-tuned adapter applied.
 
+    ``hub_model_id=None`` returns the untuned base model, for baselines.
+    """
     tokenizer = build_tokenizer(config)
-    base_model = build_base_model(config, tokenizer)
-    model = PeftModel.from_pretrained(base_model, hub_model_id, revision=revision)
+    model = build_base_model(config, tokenizer)
+    if hub_model_id is not None:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, hub_model_id, revision=revision)
     model.eval()
     return tokenizer, model
 

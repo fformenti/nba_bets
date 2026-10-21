@@ -26,14 +26,20 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _configure_wandb_env(config) -> None:
-    """Point the HF wandb integration at the right project."""
+def _configure_wandb_env(config, run_name: str) -> None:
+    """Point the HF wandb integration at the right project and run.
+
+    The W&B run id is the run name, and resume is allowed, so relaunching an
+    interrupted run appends to the same charts instead of starting a new run.
+    """
     wandb_config = config.tracking.wandb
     if not wandb_config.enabled:
         return
     os.environ["WANDB_PROJECT"] = wandb_config.project
-    os.environ["WANDB_LOG_MODEL"] = "checkpoint"
+    os.environ["WANDB_LOG_MODEL"] = wandb_config.log_model
     os.environ["WANDB_WATCH"] = wandb_config.watch
+    os.environ["WANDB_RUN_ID"] = run_name
+    os.environ["WANDB_RESUME"] = "allow"
 
 
 def run_llm_training(
@@ -56,7 +62,7 @@ def run_llm_training(
 
     resolved_run_name = resolve_run_name(config, run_name)
     preflight(config)
-    _configure_wandb_env(config)
+    _configure_wandb_env(config, resolved_run_name)
 
     mlflow_config = config.tracking.mlflow
     if not mlflow_config.enabled:

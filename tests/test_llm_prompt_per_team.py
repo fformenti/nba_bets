@@ -172,3 +172,35 @@ def test_bad_config_is_rejected(tmp_path, features, match):
     path.write_text(yaml.safe_dump({"thresholds": THRESHOLDS, "features": features}))
     with pytest.raises(ValueError, match=match):
         load_prompt_config(path)
+
+
+def test_variant_configs_change_only_what_they_name():
+    base = load_prompt_config("configs/llm_prompt/per_team.yaml")
+    compact = load_prompt_config("configs/llm_prompt/per_team_compact.yaml")
+    venue20 = load_prompt_config("configs/llm_prompt/per_team_venue20.yaml")
+
+    assert compact == {**base, "layout": "compact"}
+    assert venue20["features"] == base["features"]
+    assert venue20["thresholds"] == {**base["thresholds"], "last_season_venue_min_games": 20}
+
+
+def test_compact_layout_keeps_every_value_with_fewer_characters():
+    raw = make_raw()
+    aligned = render(raw, make_config())
+    compact = render(raw, {**make_config(), "layout": "compact"})
+
+    assert len(compact) < len(aligned)
+    assert "  " not in compact
+    assert compact.endswith(PER_TEAM_SUFFIX)
+    # Same cells, same order: only the whitespace between them and the header differ.
+    body = aligned.split("\n\n", 1)[1]
+    assert compact.split("\n\n", 1)[1].split() == body.split()
+
+
+def test_unknown_layout_is_rejected(tmp_path):
+    import yaml
+
+    path = tmp_path / "prompt.yaml"
+    path.write_text(yaml.safe_dump({"thresholds": THRESHOLDS, "features": {}, "layout": "wide"}))
+    with pytest.raises(ValueError, match="layout"):
+        load_prompt_config(path)

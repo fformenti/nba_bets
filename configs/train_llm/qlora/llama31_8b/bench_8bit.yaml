@@ -1,0 +1,7 @@
+description: "E3 speed benchmark: bench.yaml with 8-bit (LLM.int8) weights, as test_run2"
+
+_include:
+  - "bench.yaml"
+
+quantization:
+  mode: "8bit"
