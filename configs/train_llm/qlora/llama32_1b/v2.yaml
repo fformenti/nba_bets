@@ -15,6 +15,10 @@ training:
   bf16: true
   fp16: false
   tf32: true
+  # No gradient checkpointing: ~25% faster on the 8B in E3. Activations scale
+  # with layers x hidden size, a quarter of the 8B's (~0.7 GB per row), so the
+  # default 8 x 4 should peak around 8 GB. Not measured yet - E4 will show it.
+  gradient_checkpointing: false
   per_device_eval_batch_size: 16
 
 evaluation:

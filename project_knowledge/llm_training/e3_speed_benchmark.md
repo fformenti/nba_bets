@@ -22,8 +22,8 @@ Configs: `configs/train_llm/qlora/llama31_8b/bench*.yaml`.*
 | `e3-8bit` | LLM.int8 | 19.4 | 1.64 | 18.6 GB |
 | `e3-b2x16` | micro-batch 2×16 | 18.3 | 1.74 | 6.6 GB |
 | `e3-nogc` | gradient checkpointing off | — | — | OOM (22 GB) |
-| `e3-nogc-b2x16` | gc off, 2×16 | *pending* | | |
-| `e3-nogc-b4x8` | gc off, 4×8 | *pending* | | |
+| `e3-nogc-b2x16` | gc off, 2×16 | **13.8** | 2.30 | 12.3 GB |
+| `e3-nogc-b4x8` | gc off, 4×8 | **13.4** | 2.37 | 18.6 GB |
 
 ## What it means
 - **Precision and micro-batch size don't change speed** on an L4: all within about 6%. The card
@@ -41,7 +41,13 @@ Configs: `configs/train_llm/qlora/llama31_8b/bench*.yaml`.*
   - At 2 rows that's about 6 GB on the 5.5 GB 4-bit base, which fits.
   - At 4 rows it's about 12 GB, which is borderline.
   - bf16's 16 GB base leaves no room, so only 4-bit can turn checkpointing off.
-- **Epoch time** (727 steps on the full train split): 8B ≈ **3.7 h** at the current settings.
+  - **Measured:** 2 rows peaked at 12.3 GB and 4 rows at 18.6 GB. That's about 3 GB per row on
+    a ~6 GB base, close to the estimate.
+- **Turning gradient checkpointing off saved 25–27%**: 18.4 → 13.8 s/step at 2×16 and 13.4 at
+  4×8. That's the expected size, since it drops one recomputed forward pass per step. Losses
+  after 50 steps match the other runs.
+- **Epoch time** (727 steps on the full train split): 8B ≈ **2.8 h** with checkpointing off at
+  2×16, against 3.7 h before.
 
 ## The double-forward fix, measured (Qwen3-1.7B, 4-bit, 8×4)
 - `resume-drill-2` (before) against `e3-drill-fixed` (after), same config:
@@ -51,8 +57,22 @@ Configs: `configs/train_llm/qlora/llama31_8b/bench*.yaml`.*
 - **Cause:** asking trl 1.16 for `return_outputs=True` re-ran a full-logits forward pass on
   every step. See `plans/llm_finetune_handoff.md` §3.
 
-## Decision rule for E6 (the 8B with `v2.yaml`)
-- If a 4-bit run with gradient checkpointing off fits and is **at least 15% faster**, use it.
-- Otherwise use **bf16 with gradient checkpointing at 8×4**. It's the same speed as 4-bit and
-  has no quantization error.
+## Decision for E6 (the 8B with `v2.yaml`)
+- **The rule set in advance:** if 4-bit with gradient checkpointing off fits and is at least 15%
+  faster, use it. Otherwise use bf16 with checkpointing at 8×4.
+- **Adopted (2026-10-21): 4-bit, gradient checkpointing off, 2×16**, in
+  `qlora/llama31_8b/v2.yaml`.
+  - 4×8 was 3% faster but peaked at 18.6 of 22 GB. The benchmark used the 1,600 oldest train
+    rows; the full split, and the eval batches during training, may run longer, so the extra
+    10 GB of headroom is worth about 5 minutes an epoch.
+  - The trade-off: 4-bit's NF4 weights carry a small quantization error that bf16 doesn't. bf16
+    can't turn checkpointing off on 22 GB (its weights alone are 16 GB), so it would be about
+    33% slower per epoch.
+- `bench.yaml` pins the old reference (checkpointing on, 8×4), so every E3 run still
+  reproduces.
+- **Applied, unmeasured, to the smaller models:**
+  - `llama32_1b/v2` turns checkpointing off at 8×4. At about a quarter of the 8B's activation
+    memory, the estimate is around 8 GB.
+  - `llama32_3b/v2` turns it off at 4×8, estimated around 10 GB.
+  - E4 and E5 report their real peaks (`train/peak_gpu_reserved_gb`).
 - The 8-bit details are in `quantization_8bit.md`.

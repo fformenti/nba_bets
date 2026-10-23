@@ -50,6 +50,7 @@ configs/
 │       ├── llama32_1b/
 │       │   ├── v2.yaml                 # Current recipe on an L4
 │       │   ├── compact.yaml            # v2 + compact prompt layout, own Hub dataset
+│       │   ├── seed43.yaml             # v2 with training.seed 43 (E7 seed repeat, the noise floor)
 │       │   └── venue20.yaml            # v2 + last-season venue line to 20 venue games, own Hub dataset
 │       ├── llama32_3b/v2.yaml          # Current recipe on an L4
 │       ├── qwen3_1p7b/

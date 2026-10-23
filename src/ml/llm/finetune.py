@@ -30,10 +30,15 @@ RESUME_DIR = "last-checkpoint"
 
 
 def get_hf_token() -> str:
-    """Return the HF write token, raising a message that names the variable."""
+    """Return the HF token, raising a message that names the variable.
+
+    Passed explicitly to every Hub call: the variable's project-specific name
+    means huggingface_hub never finds it on its own.
+    """
     return require_env(
         HF_TOKEN_ENV_VAR,
-        "A token with write scope is required to push adapters and checkpoints to the Hub.",
+        "A token is required to read the gated base model, the dataset and adapters, "
+        "and needs write scope to push adapters and checkpoints to the Hub.",
     )
 
 
@@ -165,7 +170,9 @@ def build_tokenizer(config: LLMTrainingConfig):
     """Load the tokenizer with right-side padding on the EOS token."""
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(config.base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.base_model, trust_remote_code=True, token=get_hf_token()
+    )
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
     return tokenizer
@@ -179,6 +186,7 @@ def build_base_model(config: LLMTrainingConfig, tokenizer):
         config.base_model,
         quantization_config=build_quant_config(config),
         device_map="auto",
+        token=get_hf_token(),
     )
     base_model.generation_config.pad_token_id = tokenizer.pad_token_id
     logger.info(
@@ -344,14 +352,18 @@ def load_train_dataset(config: LLMTrainingConfig):
 
 
 def load_eval_dataset(config: LLMTrainingConfig):
-    """Load the in-training evaluation split, honouring ``data.max_eval_samples``."""
+    """Load the in-training evaluation split, honouring ``data.max_eval_samples``.
+
+    The sample is drawn with ``evaluation.seed``, not ``training.seed``, so a
+    seed repeat (E7) scores its eval curve on the same games as the original.
+    """
     from src.ml.llm.dataset import load_hf_split
 
     return load_hf_split(
         config,
         config.data.eval_split,
         max_samples=config.data.max_eval_samples,
-        shuffle_seed=config.training.seed,
+        shuffle_seed=config.evaluation.seed,
     )
 
 

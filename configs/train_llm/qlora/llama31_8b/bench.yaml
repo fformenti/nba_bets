@@ -15,6 +15,11 @@ data:
 
 training:
   eval_strategy: "no"
+  # The E3 reference setting, pinned so the benchmark still reproduces after
+  # v2.yaml adopted its winner (no checkpointing, 2 x 16).
+  gradient_checkpointing: true
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 4
 
 hub:
   push_checkpoints: false

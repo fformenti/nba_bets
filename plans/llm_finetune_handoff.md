@@ -1,398 +1,246 @@
-# LLM fine-tuning: findings so far and the experiment plan (handoff, updated 2026-10-21)
+# LLM fine-tuning handoff (updated 2026-10-23)
 
-Start a new session from this file. It summarises the review of the first fine-tune, the code
-changes made so far, the results of experiments E0–E3, and what to run next. **E3 has one step
-left: two runs with gradient checkpointing off at smaller micro-batches (§6). See §5 for exactly
-what the user runs next.** Durable write-ups of finished findings live in
-`project_knowledge/llm_training/`.
+## 0. Start here
 
-## 1. Context and goals
+**Where things stand, in five lines:**
+1. A LoRA fine-tune reads a pre-game stats prompt and answers with the signed home margin (`+7`). It is judged on validation log-loss after Platt recalibration.
+2. **Every model lands at 0.628–0.630:** Llama-3.2-1B, Llama-3.2-3B, the first 8B run (test_run2) and XGBoost on the same features. The features set the ceiling, not model size.
+3. **The working config is Llama-3.2-1B with the compact prompt** (`configs/train_llm/qlora/llama32_1b/compact.yaml`, E11). One run takes 21 min on a Colab L4. New 1B experiments `_include` it.
+4. **The noise floor is known (E7):** a different seed moves log-loss by 0.0004. A change wins only if it beats E4 by ≥ 0.002 *and* a paired bootstrap excludes zero (§2).
+5. **Prompt tweaks don't move it either (E11, E12, 2026-10-23).** **Next, Claude does N2**, a CPU-only blend of the LLM and XGBoost. Then the user decides between E8 (learning curve) and scoping new data (injuries).
 
-- **Task:** a LoRA fine-tune of a causal LM (TRL `SFTTrainer`) that reads a pre-game stats prompt
-  and answers with the signed NBA home margin, e.g. `+15`. The prompt ends with `Home margin =`,
-  and the completion has no leading space.
-- **Metrics:** sign accuracy is primary and RMSE in points is secondary. Experiments are judged
-  on **validation log-loss after Platt recalibration** (§4).
-- **The user is learning fine-tuning.** The priority is learning, and beating Polymarket is a
-  stretch goal. Explain the reasoning behind each choice, and run experiments one change at a
-  time, cheapest first.
-- **Hard rule:** Polymarket prices are **never** a model input; they are a benchmark only.
-  Injury and availability data are allowed later.
-- **Out of scope for now:** the 2025/26 test-season gap. That data hasn't been gathered yet.
-- **Platform:** Colab Pro (L4, 24 GB) driven through the repo CLI. Budget ≤ $50/month, no local
-  GPU. Hub user `fformenti`. W&B is used for tracking (entity `felipeformenti`, project
-  `nba-bets`).
-- **Data:** HF dataset `fformenti/nba-bets` with 23,247 train, 2,949 validation (three seasons)
-  and 1,018 test games. The prompt config is `configs/llm_prompt/per_team.yaml`.
+**Read in this order:** this section, then §3 (next steps), §2 (scoreboard), then whatever §4 or `project_knowledge/llm_training/` the step needs. `plans/llm_findings_2026-10-23.md` summarizes the latest session (E7, E11, E12).
 
-## 2. Code changes (all uncommitted on `feature/train_LLM`)
+**How to work with this user:**
+- **Explaining:** the user is learning fine-tuning. Explain the reasoning behind each choice, and give a recommendation rather than a menu.
+- **Experiments:** change one thing per experiment, cheapest first. Judge every result against the noise floor E7 measured (§2).
+- **Actions for the user:** when a step needs them (Colab runs, Hub deletions, syncing Drive), write the exact steps, the values to set and *why* the step matters.
+- **End of session:** update this file. Write finished findings up durably in `project_knowledge/llm_training/` (one topic per file); the user asked for that folder.
+- **Ask first:**
+  - before pushing anything to the Hugging Face Hub;
+  - before committing (nothing is committed unless the user asks);
+  - before deleting the user's files.
+- **Project rules** (`CLAUDE.md`):
+  - `uv` only, never `pip` or `python`.
+  - Secrets go through `src/config/secrets.py::require_env`, never at import.
+  - CLI modules hold no logic.
+  - Update `.claude/docs/PROJECT_STRUCTURE.md` when files under `src/` or `configs/` change.
+- **Hard rules:**
+  - Polymarket prices are never a model input; they are a benchmark only.
+  - Don't touch `src/ml/llm/make_dataset.ipynb`; it holds the user's own uncommitted edits.
+  - Test is scored **once**, in E15.
 
-542 tests pass (`uv run --extra gpu pytest`). Nothing is committed yet; the user hasn't asked for
-a commit.
+**Tools that work locally** (the gpu extra is installed: `uv sync --extra gpu`):
+- **Score a run:**
+  `uv run python -m src.cli.inspect_llm --config <any llm config> --run-name <run> --split validation --summarize-only --calibrate-with validation`.
+  - It reads `outputs/llm/eval/<run>/inspection_validation.csv` and writes nothing.
+  - Read `log_loss`, `accuracy_p_home` and `auc_p_home` from the *second* summary, the one after Platt recalibration.
+- **W&B API** (entity `felipeformenti`, project `nba-bets`):
+  - Connect with `wandb.Api()`, after setting `WANDB_API_KEY` from `require_env("WANDB_API_KEY", "", secrets_file=GLOBAL_SECRETS_FILE)`.
+  - Summary keys: `train_runtime`, `train_samples_per_second`, `train/peak_gpu_reserved_gb`.
+  - For pure s/step, take the median `_timestamp` delta between `train/loss` rows. `train_runtime` includes evals.
+- **HF API:** connect with `HfApi(token=require_env("HF_llm_training_token", ""))`. The Hub user is `fformenti`.
+- **Compare two runs, paired:** align both CSVs on `game_id` and run `diagnostics.py::recalibrate` on each. Then bootstrap the per-game log-loss difference. `seed_noise.md` describes the method; the script was a throwaway, so N2 should add it as a library function.
+- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 544 pass.
 
-### Session 3 (2026-10-21)
-- **E3 results pulled from W&B** and written up in
-  `project_knowledge/llm_training/e3_speed_benchmark.md` (summary in §6).
-- **8-bit cast warning silenced.** In 8-bit mode, `build_quant_config` attaches a logging filter
-  (`_drop_int8_cast_notice`) to `bitsandbytes.autograd._functions`. It drops only
-  `MatMul8bitLt: inputs will be cast ... to float16`, which LLM.int8 logs on every matmul under
-  bf16 training.
-  - The cast itself is expected and harmless. The user wants to keep 8-bit for future models.
-  - See `project_knowledge/llm_training/quantization_8bit.md`. A test in
-    `tests/test_llm_training_config.py` checks that other bitsandbytes warnings still show.
-- **E3 step 4 configs:** `bench_nogc_b2x16.yaml` and `bench_nogc_b4x8.yaml`.
-- **Colab runner:**
-  - Drive is no longer unmounted after each run, only on release or in the new "End of session"
-    cell (§5).
-  - The setup cell uninstalls torchao.
-  - The user's duplicate config cell is removed.
+## 1. Goals and setup
 
-### Session 2 (2026-10-20)
-- **The GPU stack is pinned to trl 1.x.**
-  - The `gpu` extra now requires `trl>=1.16,<2` and `peft>=0.21`.
-  - `uv.lock` was refreshed to trl 1.16.0 and peft 0.21.2. trl needs `datasets>=4.7`, so uv also
-    moved datasets 4.4→5.1, pyarrow 21→25 and mlflow 3.8→3.17. The lock now matches what Colab's
-    unlocked `pip install .[gpu]` gets, and all tests pass on it.
-  - `uv sync --extra gpu` works on the Mac, because bitsandbytes now ships a macOS arm64 wheel.
-    That makes the trl tests runnable locally.
-- **trl 0.x code removed** (`src/ml/llm/finetune.py`): the logits-based hit counter, the liger
-  branch and the virtual-token slice. `first_completion_token_hits(is_top1, label_mask)` is the
-  only counter left.
-- **Fixed a double forward pass in training.** See the finding in §3. `compute_loss` now catches
-  trl's fused output with a forward hook instead of asking for `return_outputs=True`.
-  - `tests/test_llm_trainer_trl.py` trains a tiny random Llama with LoRA on CPU through the real
-    trl. It asserts exactly one forward per micro-batch, and that `first_token_accuracy` is
-    logged in train and in eval.
-  - It's skipped when the gpu extra isn't installed.
-- **Peak GPU memory is logged.** `peak_gpu_allocated_gb` and `peak_gpu_reserved_gb` go to the
-  console, W&B and MLflow at the end of every training run (`finetune.py::peak_gpu_memory`).
-- **Inspection does one prompt pass instead of two** (`src/ml/llm/diagnostics.py`).
-  - `score_prompts` runs:
-    1. `prompt_pass`;
-    2. `sign_and_margin`'s two sign steps, on copies of the cache;
-    3. `greedy_decode` on the original cache.
-  - It replaces `model.generate` followed by a second prompt pass. Expect inspection to take
-    roughly half as long.
-  - It's checked against `model.generate` + the old two-pass `sign_and_margin` on a tiny random
-    Llama: a left-padded batch, one row stopping early on EOS, and every step's logits compared.
-    A deliberate off-by-one in decode positions fails that test.
-- **`tokenization_check` follows trl 1.x:** the completion starts at the common prefix of the
-  prompt and prompt+completion tokenizations.
-- **E3 configs:** `configs/train_llm/qlora/llama31_8b/bench.yaml` plus
-  `bench_{8bit,bf16,nogc,b2x16}.yaml`, which change one thing each.
-- **Colab runner** (local `notebooks/colab_runner.ipynb`, gitignored): the copy-to-Drive step
-  now creates `outputs/llm/eval/<RUN_NAME>` first. Before, it failed on runs that inspect nothing,
-  such as bench runs.
-- **macOS test gotcha:** lightgbm's OpenMP and torch's segfault together in a multithreaded
-  forward pass. The two tests that run real forwards call `torch.set_num_threads(1)`. Colab is
-  unaffected.
+- **Task:** the model reads a pre-game stats prompt that ends `Home margin =` and completes with the signed margin, with no leading space.
+  - It's trained with TRL `SFTTrainer` and LoRA, with loss on the completion only.
+  - Sign accuracy is primary; RMSE in points is secondary.
+  - Experiments are compared on **validation log-loss after Platt recalibration**.
+- **The user's goals:** learning comes first. Beating Polymarket is a stretch goal; on test, Polymarket scores 70.0% and 0.579.
+  - Injury and availability data are allowed as future inputs.
+  - The 2025/26 test-season gap is out of scope until that data exists.
+- **Platform:**
+  - Colab Pro with an L4 (22 GB usable), driven through the repo CLI by `colab_notebooks/colab_runner.ipynb`.
+  - Budget ≤ $50/month, no local GPU.
+  - Tracking is W&B. Adapters push to the Hub as `fformenti/<RUN_NAME>`.
+- **Data:** HF dataset `fformenti/nba-bets`: 23,247 train, 2,949 validation (three seasons) and 1,018 test games.
+  - Splits come from `src/ml/datasets/splits.py::build_splits`, the same function the XGBoost pipeline uses.
+  - The prompt config is `configs/llm_prompt/per_team.yaml`, about 426 tokens per prompt.
+- **The v2 recipe** (`configs/train_llm/qlora/_defaults.yaml` plus each model's `v2.yaml`):
+  - 4-bit NF4, LoRA r16/α32/dropout 0.05 on q/k/v/o.
+  - 1 epoch (727 steps), effective batch 32, lr 2e-4 cosine, warmup 0.05, `adamw_torch_fused`, max_grad_norm 1.0.
+  - Eval every 100 steps on 1,000 validation rows.
+  - **Gradient checkpointing off.** The micro-batch is 8×4 for the 1B, 4×8 for the 3B and 2×16 for the 8B.
 
-### Session 1
-- **Resume works** (`src/ml/llm/finetune.py`):
-  - `hub_strategy="checkpoint"` pushes `last-checkpoint/` (adapter, optimizer, scheduler, RNG
-    and trainer state).
-  - `find_resumable_checkpoint` downloads that folder. Rerunning with the same `--run-name`
-    resumes.
-- **W&B** (`src/ml/llm/train.py::_configure_wandb_env`):
-  - `WANDB_RUN_ID=<run_name>` and `WANDB_RESUME=allow`, so a resumed run continues the same
-    W&B run.
-  - `log_model` and `watch` both default to `"false"`. test_run2 uploaded 13.8 GB of checkpoints
-    to W&B.
-- **New config knobs** (`src/ml/config/schema.py`):
-  - `training.tf32`, `load_best_model_at_end`, `metric_for_best_model` and
-    `early_stopping_patience`, with validators.
-  - `data.train_sample_strategy: first|random`.
-  - `wandb.log_model`.
-- **Diagnostics** (`src/ml/llm/diagnostics.py`, `src/cli/inspect_llm.py`):
-  - `p_home` is computed in fp32 from the last hidden state. With bf16, 4.8% of test_run2's
-    validation games had exactly 0.5, and ties went greedily to "+".
-  - Expected-value margin: E[margin] = Σ P(sign)·Σ P(m|sign)·m. This needs single-token
-    magnitudes; Qwen3 tokenizes digit by digit, so its RMSE is skipped.
-  - The summary adds log-loss, Brier, AUC, a 10-bin calibration table, the share predicted home
-    and three RMSEs: greedy, expected, and predicting the mean.
-  - Flags: `--base-only`, `--few-shot K`, and `--calibrate-with SPLIT` (cross-fitted Platt
-    recalibration, CPU only, used together with `--summarize-only`).
-- **Prompt variants** (`src/ml/llm/serialization.py`):
-  - `configs/llm_prompt/per_team_compact.yaml` (`layout: compact`) cuts prompts from 425 to 282
-    tokens (−34%).
-  - `per_team_venue20.yaml` keeps the "Adj last-season venue win%" line until a team's 20th
-    venue game; the line appears in 40% of rows instead of 0.8%.
-  - Both need datasets built and pushed (`fformenti/nba-bets-compact`,
-    `fformenti/nba-bets-venue20`) before E11/E12. **Not built yet.**
-- **Configs** (`configs/train_llm/`):
-  - `qlora/_defaults.yaml` is the v2 recipe: 4-bit NF4, r16/α32/dropout 0.05, 1 epoch, batch
-    8×4 = 32, lr 2e-4, warmup 0.05, `adamw_torch_fused`, max_grad_norm 1.0, eval/save every
-    100 steps, `max_eval_samples` 1000.
-  - `qlora/llama31_8b/baseline.yaml` pins test_run2 exactly.
-  - `qlora/<model>/v2.yaml` exists for `llama31_8b`, `llama32_1b`, `llama32_3b`, `qwen3_1p7b`
-    and `qwen3_4b`.
-  - Extra variants: `llama32_1b/compact.yaml`, `llama32_1b/venue20.yaml` and
-    `qwen3_1p7b/resume_drill.yaml`.
-- **Colab runner:** `notebooks/colab_runner.ipynb`. It is gitignored, and the user keeps a copy
-  on Drive. Its config cell has `LLM_CONFIG`, `RUN_NAME`, `INSPECT_SPLITS`, `TRAIN`,
-  `TRAIN_ARGS`, `INSPECT_ARGS` and `RELEASE_RUNTIME_WHEN_DONE`. The run cell uses a `run()`
-  subprocess helper that:
-  - fails loudly when a command fails;
-  - kills the child process when the cell is stopped;
-  - copies `outputs/llm/eval/<RUN_NAME>` to Drive, then calls `drive.flush_and_unmount()`.
+## 2. Scoreboard (validation, Platt cross-fit, all 2,949 games)
 
-## 3. Findings
+| Run | Accuracy | Log-loss | AUC | Picked home | Notes |
+|---|---|---|---|---|---|
+| Always pick home | 54.9% | 0.688 | 0.50 | 100% | |
+| base-8b-0shot | 55.4% | 0.684 | 0.561 | 83% | wrong answer format (E1) |
+| **base-8b-5shot (the floor)** | 61.2% | **0.659** | 0.640 | 65% | beating it shows training does something |
+| resume-drill-2 | 62.2% | 0.648 | 0.660 | 62% | Qwen3-1.7B, only 60 steps |
+| **test_run2 (the old bar)** | 64.0% | **0.628** | 0.694 | 62% | 8B, LLM.int8, 2 epochs, 9.7 h |
+| **e4-llama32-1b (the comparison base)** | 64.2% | **0.629** | 0.695 | 61% | 1 epoch, 31 min |
+| e5-llama32-3b | 63.8% | 0.630 | 0.690 | 62% | 86 min |
+| e7-llama32-1b-seed43 | 64.3% | 0.628 | 0.694 | 60% | E4 with seed 43 |
+| e12-llama32-1b-venue20 | 64.4% | 0.628 | 0.694 | 61% | venue line in 40% of prompts; a tie, not adopted |
+| **e11-llama32-1b-compact (working config)** | 64.5% | 0.629 | 0.694 | 61% | prompt −34% tokens; a tie; 21 min, 5.8 GB |
+| XGBoost (E0) | — | 0.628 | — | — | same features; learning curve nearly flat |
 
-### Every trl 1.x run so far paid for a second forward pass (found and fixed in session 2)
-- **What happened:** our `compute_loss` override called
-  `super().compute_loss(..., return_outputs=True)` to read the outputs for
-  `first_token_accuracy`. trl 1.16 computes the loss with a *fused* LM head that never builds the
-  `(batch, seq, vocab)` logits. Asked for outputs, it runs **a second, full-logits forward pass**
-  on every train and eval step, with a FutureWarning. On the tiny test model this showed as 4
-  forwards for 2 steps.
-- **Why it matters:** with gradient checkpointing a step is about four forward passes' worth of
-  compute, so one extra forward is roughly +25% time. On top of that come Llama's 128k-vocab
-  logits: about 0.9 GB per micro-batch of 8.
-- **Before-fix number:** resume-drill-2 (Qwen3-1.7B, 4-bit, 8×4) trained at **8.7 s per
-  optimizer step**, or 3.7 samples/s. That's from W&B history, counting only intervals without
-  an eval. Each eval of 200 rows plus checkpoint push added about 27 s.
-  - At that pace one epoch (727 steps) is about 1.8 h for a 1.7B model, so the earlier size
-    ladder estimates were optimistic.
-- **After the fix (E3 step 0, `e3-drill-fixed`, same config):** **6.7 s per step**, 24% faster.
-  An eval of 200 rows dropped from 27 s to 12.5 s, 54% faster, because eval no longer computes
-  full logits twice. The loss and first-token-accuracy curves match resume-drill-2 to within
-  noise, so the metric is unchanged.
-  - One epoch (727 steps) of the 1.7B is now about 1.35 h of pure training.
-- **Affected runs:** E2 (resume-drill-1/-2). test_run2 ran from a copied notebook trainer and was
-  not affected.
-- **Lesson:** when subclassing a library trainer, check what the hook point costs. "Return the
-  outputs" was free in trl 0.x and a full extra pass in 1.x.
+- **Noise floor (E7):**
+  - E4 and E7 differ by 0.0004 log-loss. The paired SD is 0.0008, and their `p_home` correlate at 0.993.
+  - **A change wins only if** it beats E4's 0.6286 by ≥ 0.002 **and** a paired bootstrap of the per-game difference has a 95% interval excluding zero.
+  - "Not worse" means the interval includes zero and the point estimate is within 0.002.
+  - → `project_knowledge/llm_training/seed_noise.md`
+- **Raw outputs lean home.** Before calibration the fine-tunes pick home 70–71% of the time against a true rate of 55%. Platt removes the lean without changing the ranking.
+- Write-ups: `project_knowledge/llm_training/size_ladder.md` (E4–E6), `seed_noise.md` (E7), `prompt_variants.md` (E11, E12), `e3_speed_benchmark.md` and `quantization_8bit.md`.
 
-### Phase 2 diagnosis of test_run2 (Llama-3.1-8B, LLM.int8, 2 epochs, 9.7 h on L4)
-- **Validation:** 64.2% accuracy and log-loss 0.630. **Test:** 66.9%. It ties XGBoost (64.8 /
-  67.2) on the same features and trails Polymarket (70.0%, log-loss 0.579).
-- **The data sets the ceiling, not the model.** The model and XGBoost hit the same ceiling with
-  the same features. An XGBoost learning curve (E0) is nearly flat: 0.6330 with 10% of the data
-  and 0.6276 with 100%. The best XGBoost depth is 2.
-- **Training was healthy but wasteful:**
-  - It converged within one epoch; the second epoch bought nothing.
-  - 8-bit is slow.
+## 3. Next steps, in priority order
+
+*Done:*
+- *N1, E7 (the seed repeat).*
+- *N3, both datasets on the Hub (2026-10-23).*
+- *N4, E12 venue20 (a tie, not adopted) and E11 compact (a tie, 33% faster, adopted).*
+
+*See §2, `seed_noise.md` and `prompt_variants.md`. Before any Colab run, set a new `LLM_CONFIG` and `RUN_NAME`: reusing a `RUN_NAME` resumes that run and overwrites its CSVs.*
+
+### N2. Blend the LLM and XGBoost (Claude, CPU only)
+- **Question:** do the two models carry different information? If their validation `p_home` correlate well below 1, an average can beat both. It costs no GPU time.
+- **Inputs:**
+  - E4's `outputs/llm/eval/e4-llama32-1b/inspection_validation.csv` (`game_id`, `p_home`, `truth`).
+  - XGBoost's validation `p_home` per gameId, trained on the same train split. **These don't exist yet.**
+    - E0's 0.628 came from an ad-hoc script in session 1, and its predictions weren't saved.
+    - `outputs/tuning/backtest_predictions.csv` is a walk-forward backtest from August with different training windows. It covers only 984 of the 2,949 validation games, so it can't be used.
+- **To do:**
+  1. Find out how the classifier pipeline trains on `build_splits`: `make train`, `src/ml/training/experiment.py`, `configs/train/*.yaml`.
+  2. Add a library function that returns validation `p_home` by gameId, plus a thin CLI or a Makefile flag. Libraries never have `__main__`.
+  3. Report the correlation, each model's calibrated log-loss on the same games, and the log-loss of the average and of a logistic stack. Cross-fit the stack the way the Platt step does.
+  4. Add the paired comparison as a library function, for example `diagnostics.py::paired_log_loss_gap`: align on `game_id`, recalibrate each model, then bootstrap. Later experiments reuse it. The throwaway scripts used for E7/E11/E12 sorted by `game_id`, recalibrated each run and bootstrapped 5,000 times with `default_rng(0)`.
+- **LLM side:** use E11 (`e11-llama32-1b-compact`, the working config) and E4 as a cross-check. Their `p_home` correlate at 0.994.
+- **Success:** the blend passes the §2 win rule against E4.
+- **For contrast:** two LLM seeds correlate at 0.993, and averaging them gained nothing (E7). A blend helps only if XGBoost's correlation with the LLM is clearly lower.
+
+### N5. E8, learning curve (user, Colab, about 15 min in total)
+- **Why:** eval loss and first-token accuracy plateau by about step 200–300 of 727 (E4, E5, E11). This tests whether more data helps, which decides whether gathering more seasons is worth it.
+- **Runs:** 10 / 25 / 50% of train with `data.train_sample_strategy: random` and `data.max_train_samples` set accordingly.
+  - Create configs `llama32_1b/lc10.yaml` etc. that `_include` **`compact.yaml`**.
+  - 100% is E11.
+- **Success:** the size where log-loss stops improving within the noise.
+- **Rank against the data project:** if the curve is already flat at 25%, more seasons won't help, and only new kinds of information will.
+
+### Deprioritized, with reasons
+- **E9 (learning rate 1e-4/4e-4) and E10 (LoRA r64, all-linear targets):** model size didn't move the ceiling, so capacity tweaks are unlikely to.
+- **E13/E14 (Qwen3, Gemma, Phi):** the same argument. Qwen3 also tokenizes digit by digit, so it has no expected-margin RMSE.
+- **E6 (the 8B on v2):** skipped by the user's decision (2026-10-21), about 3 h for a likely tie. Its config `qlora/llama31_8b/v2.yaml` is ready. Revisit only if new features change the picture.
+- **1B in bf16 instead of 4-bit:** an optional quality check. It removes NF4 quantization error, and the 1B fits easily. If tried, it's one change: `quantization.mode: none`.
+
+### The real lever, for the user to scope
+**New information.** Every model hits the same ceiling with the same features. Injuries and availability (allowed) are the obvious candidate. It's a data project:
+- find a source;
+- add it to the ETL and the prompt config;
+- build the dataset.
+
+N1–N4 are done, and E12 showed that one more view of existing stats adds nothing. **Raise this with the user now**, alongside N2's result.
+
+### E15, last
+The best config, trained on the full train split. **Score test once.** Report it against XGBoost (67.2%) and Polymarket (69.9% / 0.579). Scoring test needs `SCORE_TEST=True` in `colab_notebooks/test_llm.ipynb`.
+
+## 4. Findings, condensed
+
+- **Prompt variants (E11/E12, 2026-10-23):**
+  - **venue20:** keeping last-season venue win% in 40% of prompts changed nothing (−0.0002 [−0.0009, +0.0004]), even on the games that show it. Its `p_home` correlate with E4's at 0.9987. Not adopted.
+  - **compact:** a tie (+0.0001 [−0.0013, +0.0015]) at 1.48 s/step against 2.21, and 5.8 GB against 7.9. Adopted.
+  - → `project_knowledge/llm_training/prompt_variants.md`
+- **Seed noise (E7, 2026-10-21):**
+  - A new seed moves log-loss by 0.0004 (paired SD 0.0008). Picks agree in 96% of games, and averaging seeds gains nothing.
+  - The in-training eval sample used to follow `training.seed`; it now follows `evaluation.seed`.
+  - → `project_knowledge/llm_training/seed_noise.md`
+- **Size ladder (E4/E5, 2026-10-21):** the 1B ties test_run2 in 1/19th of the time, and the 3B is no better. The features set the ceiling. → `project_knowledge/llm_training/size_ladder.md`
+- **Speed on an L4 (E3, 2026-10-20):**
+  - Precision (4-bit, 8-bit, bf16) and micro-batch size barely change the 8B's speed (18.3–19.4 s/step); the card is compute-bound.
+  - Turning gradient checkpointing off is 25% faster (13.8 s/step at 2×16, 12.3 GB). It needs 4-bit's memory headroom.
+  - 8-bit is the slowest mode and uses bf16's memory.
+  - → `project_knowledge/llm_training/e3_speed_benchmark.md`, `quantization_8bit.md`
+- **A double forward pass (fixed, 2026-10-20):**
+  - Our `compute_loss` override asked trl 1.16 for `return_outputs=True`, which silently ran a second full-logits forward pass on every step.
+  - Fixed with a forward hook. Training is 24% faster and eval 54% faster.
+  - Lesson: when subclassing a library trainer, measure what the hook point costs.
+- **test_run2 diagnosis:**
+  - Validation 64.2% / 0.630 raw. Test 66.9%, tying XGBoost (67.2%).
+  - It converged within one epoch; the second bought nothing.
   - With an effective batch of 8, 78% of steps hit the gradient clip.
-  - Each evaluation took 1.1 h.
-  - 35% of prompt tokens were whitespace.
-- **It favours the home team about 9.5 points too often.** Most of the rest of the apparent
-  lean came from bf16 ties.
-  - Greedy decoding collapses the margin to ±5/±7. Greedy RMSE is 15.0, against 16.4 for
-    predicting the mean.
-- **E0, Platt recalibration of test_run2:**
-  - Validation log-loss (cross-fit) goes from 0.6304 to 0.6282.
-  - Test log-loss, fitted on validation, goes from 0.6101 to 0.6060.
-  - The share of test games predicted home falls from 62.2% to 57.2% (actual 53.2%).
+  - 35% of prompt tokens were whitespace (E11 removes them).
+  - Greedy decoding collapses margins to ±5/±7. Use the probability-weighted expected margin; its RMSE is 13.9 on the 1B.
+- **E1, untuned 8B:**
+  - Zero-shot fails on the format: the prompt ends in `=` and the base model wants a space.
+  - 5-shot learns the format but leans away from home, probably recency bias from the shot order.
+  - Fine-tuning mostly teaches the format and sharpens what the base model already reads: game by game, p_home from 5-shot and from test_run2 correlate at 0.68.
+  - 5-shot costs 4.5 h; don't repeat it casually.
+- **E2:** resume from the Hub's `last-checkpoint/` works, and W&B continues the same run.
+- **Dropped:** recency weighting of training games, which hurt log-loss in the sklearn backtest.
 
-### E2: the resume drill passed (Qwen3-1.7B, 60 steps, 1,920 rows)
-- The run was stopped at step 30 and the same cell rerun. Training continued from the Hub's
-  `last-checkpoint/`, and W&B continued the same run.
-- `first_token_accuracy` is logged.
-- The model learned the answer format completely: sign mass 0.998.
+## 5. Running on Colab
 
-### E1: untuned baselines (Llama-3.1-8B, 4-bit, all 2,949 validation games)
-- **Zero-shot fails on the format.** P(bare `+`/`-`) is 6e-5. Because the prompt ends with `=`,
-  the base model wants a space token (`" +"`/`" -"`) and writes `0.5 * …`.
-  - Lesson: much of what fine-tuning teaches here is the answer format.
-- **5-shot learns the format** (sign mass 0.987) but leans away: only 37% of answers are "+".
-  The likely cause is recency bias, since the five shots in order are `+6, +11, +6, -7, -12`.
-  This is untested. Platt recalibration removes the lean.
-- **The fine-tune mostly sharpens what the base model already reads from the stats.** Game by
-  game, `p_home` from 5-shot and from test_run2 correlate at 0.68.
-- **Cost:** 5-shot took about 4.5 h (2,470-token prompts) and zero-shot about 30 min. Don't
-  repeat 5-shot for other models unless one is a serious candidate.
+1. **Sync the repo to Drive** at `MyDrive/nba_bets`. The setup cell rsyncs it to local disk and skips `outputs/`.
+2. **Open `colab_notebooks/colab_runner.ipynb` on an L4.** In the config cell:
+   - **Train and inspect:** set `LLM_CONFIG`, a new `RUN_NAME`, `TRAIN=True` and `INSPECT_SPLITS=["validation"]`.
+   - **Benchmark, train only:** the same with `INSPECT_SPLITS=[]`.
+   - **Untuned baseline:** `TRAIN=False` with `INSPECT_ARGS="--base-only [--few-shot 5 --batch-size 8]"`.
+3. **Run all.** For a second run in the same session, rerun only the config cell and the run cell.
+4. **Download** `MyDrive/nba_bets/outputs/llm/eval/<RUN_NAME>/` into the repo's `outputs/llm/eval/<RUN_NAME>/`.
+   - That's the only eval location; code reads and writes nothing else.
+   - Keep the folder name equal to `RUN_NAME`.
+5. **To score adapters already on the Hub without training,** use `colab_notebooks/test_llm.ipynb`. The user wrote it.
+   - It reuses CSVs already on Drive and prints the Platt-calibrated scoreboard.
+   - It has a playground cell. Scoring test is guarded by `SCORE_TEST`.
 
-## 4. Scoreboard (validation, Platt cross-fit, 2,949 games)
+**Gotchas:**
+- **`RUN_NAME`:** it names the Hub repo, the W&B run and the eval folder. Reusing a name *resumes* training and overwrites its CSVs.
+- **Releasing the runtime:** Colab Pro has no background execution. Use `RELEASE_RUNTIME_WHEN_DONE=True` for single runs; the call is `google.colab.runtime.unassign()`.
+- **Drive:** never unmount it mid-session; a second run in the same session couldn't remount it. The run cell flushes and unmounts only when releasing. With release off, run the "End of session" cell before disconnecting.
+- **torchao:** Colab preinstalls torchao 0.10, and peft ≥ 0.21 raises on it when wrapping an unquantized (bf16) model. The setup cell uninstalls it.
+- **`.gdoc` files:** Drive's Google Docs shortcuts can't be rsynced; the setup cell excludes `*.gdoc`.
+- **HF token:** the Colab secret `HF_llm_training_token` needs read access to the gated Meta Llama repos. That access is already granted for 3.2-1B, 3.2-3B and 3.1-8B.
 
-The command for any run is
-`uv run python -m src.cli.inspect_llm --config <any llm config> --run-name <run> --split validation --summarize-only --calibrate-with validation`.
-CSVs live in `outputs/llm/eval/<run>/inspection_validation.csv`. When the user downloads from
-Drive, they land in `outputs/eval/` and have to be copied over.
+## 6. Artifact inventory (what to keep where)
 
-| Run | Accuracy | Log-loss | AUC | Share picked home |
-|---|---|---|---|---|
-| Always pick home | 54.9% | 0.688 | 0.50 | 100% |
-| base-8b-0shot | 55.4% | 0.684 | 0.561 | 83% |
-| **base-8b-5shot (the floor)** | 61.2% | **0.659** | 0.640 | 65% |
-| resume-drill-2 (Qwen3-1.7B, 60 steps) | 62.2% | 0.648 | 0.660 | 62% |
-| **test_run2 (the bar to beat)** | 64.0% | **0.628** | 0.694 | 62% |
-| XGBoost (E0, for reference) | — | 0.628 | — | — |
-
-The decision rule: a fine-tune must beat **0.659** to show training does anything, and
-**0.628** to beat test_run2. Report accuracy, AUC, calibration and RMSE alongside log-loss.
-
-**Reading speed and memory from W&B** (Claude can do this locally through the API with the
-`WANDB_API_KEY` in `~/.secrets/env`):
-- The run summary has `train_runtime`, `train_samples_per_second`, `peak_gpu_allocated_gb` and
-  `peak_gpu_reserved_gb`.
-- `train_runtime` includes in-training evals. For pure step time, use the history's
-  `_timestamp` deltas between `train/global_step` logs.
-
-## 5. Before the next GPU run
-
-### Closed in session 2
-1. Inspection's second prompt pass is gone (§2).
-2. HF access to `meta-llama/Llama-3.2-1B`, `-3B` and `Meta-Llama-3.1-8B` was verified by
-   downloading each one's `config.json` with the project token.
-3. Version drift is fixed: trl and peft are pinned to 1.x and the lock refreshed (§2).
-
-### Still true
-- **Colab gotchas:**
-  - Choose an L4 runtime; the setup cell asserts that CUDA is available.
-  - Colab Pro has no background execution, so set `RELEASE_RUNTIME_WHEN_DONE=True` for long
-    runs.
-  - Every run needs a new `RUN_NAME`, which names the Hub repo, the W&B run and the eval folder.
-    Reusing a name resumes training and overwrites the CSVs.
-  - `--base-only` runs don't push anything to the Hub or W&B.
-  - Colab preinstalls **torchao 0.10**. peft ≥ 0.21 raises `ImportError: Found an incompatible
-    version of torchao` whenever it wraps an *unquantized* model, as in bf16 runs. With
-    bitsandbytes layers the bnb dispatcher matches first, so 4-bit and 8-bit never reach the
-    check. The setup cell now runs `pip uninstall -y torchao`; nothing in the repo uses it. This
-    first hit `e3-bf16` on 2026-10-20.
-  - **Never unmount Drive mid-session.** The run cell used to end with
-    `drive.flush_and_unmount()`, and the next run in the session couldn't remount, even with
-    `force_remount=True`. The only way out was a new runtime and a full reinstall.
-    - Now Drive stays mounted from the setup cell. The run cell flushes and unmounts only when
-      `RELEASE_RUNTIME_WHEN_DONE=True`, right before releasing.
-    - With release off, run the last cell, "End of session", before disconnecting, so the final
-      copies reach Drive.
-  - Colab's secret `HF_llm_training_token` must be the same token verified above. If it's a
-    fine-grained token, it needs "Read access to contents of all public gated repos you can
-    access".
-- **Don't touch `src/ml/llm/make_dataset.ipynb`.** It has the user's own uncommitted edits.
-
-### Actions for the user, in order
-Steps 1–3 of the 2026-10-20 list ran: E3 steps 0–3 are done (§6). What's left:
-
-1. **Sync the repo to Drive** (`MyDrive/nba_bets`), including `notebooks/colab_runner.ipynb`.
-   Then **start a fresh runtime** (*Runtime → Disconnect and delete runtime*, then reconnect).
-   - *Why:* the new notebook keeps Drive mounted between runs, and the new bench configs only
-     reach Colab once Drive has them.
-2. **Run E3 step 4 in one L4 session**, about 35 min.
-   1. The config cell is already set to `LLM_CONFIG="qlora/llama31_8b/bench_nogc_b2x16"`,
-      `RUN_NAME="e3-nogc-b2x16"`, `INSPECT_SPLITS=[]` and `RELEASE_RUNTIME_WHEN_DONE=False`.
-      *Run all*.
-   2. Then set `LLM_CONFIG="qlora/llama31_8b/bench_nogc_b4x8"` and `RUN_NAME="e3-nogc-b4x8"`,
-      and rerun **only the config cell and the run cell**.
-   3. A `CUDA out of memory` is a result (most likely for b4x8).
-   4. Run the last cell ("End of session"), then disconnect and delete the runtime.
-   - *Why:* gradient checkpointing off is the only setting left that should speed up the 8B
-     (§6). These two runs show whether it fits at a smaller micro-batch.
-3. **Tell Claude which of the two finished.** Claude pulls the numbers from W&B, sets
-   `qlora/llama31_8b/v2.yaml` for E6 by the decision rule in §6, and updates
-   `project_knowledge/llm_training/e3_speed_benchmark.md`.
-4. **Delete the benchmark Hub repos:** on huggingface.co, open each `fformenti/e3-*` model repo
-   (`e3-drill-fixed`, `e3-4bit`, `e3-8bit`, `e3-8bit-replay`, `e3-bf16`, `e3-b2x16`, plus the two
-   step-4 runs and `e3-nogc` if it exists), then *Settings → Delete this model*.
-   - *Why:* each holds a 50- or 60-step adapter that no experiment will use.
-5. **Then E4 and E5** (§6), the same way with `INSPECT_SPLITS=["validation"]` and
-   `RELEASE_RUNTIME_WHEN_DONE=True`.
-   - Afterwards, download `MyDrive/nba_bets/outputs/llm/eval/<RUN_NAME>/` into the repo's
-     `outputs/llm/eval/`, so Claude can add the runs to §4.
-
-## 6. Experiment plan (cheapest first, one change each)
-
-Decisions use full validation. Test is scored **once**, in E15.
-
-### E3: speed benchmark (about 1.5 h total, one Colab session)
-- **Goal:** find the fastest 8B setup that fits in 24 GB. Success means at least 1.5× the
-  samples/s of 8-bit. Secondary goal: measure the double-pass fix.
-- **Step 0, the fix (`e3-drill-fixed`):** rerun `qwen3_1p7b/resume_drill` unchanged and compare
-  pure s/step against **8.7 s** before the fix.
-- **Step 1, precision:** `bench` (4-bit NF4), `bench_8bit` (LLM.int8, as test_run2) and
-  `bench_bf16` (no quantization; about 16 GB of weights).
-  - Each run is 50 optimizer steps on the same 1,600 oldest train rows. There's no eval and no
-    checkpoint push.
-  - The default load dtype is `"auto"`, so bf16 really loads bf16 rather than fp32.
-- **Step 2, gradient checkpointing:** `bench_nogc` turns it off, trading memory for about 25%
-  less compute.
-- **Step 3, micro-batch:** `bench_b2x16` uses 2×16 instead of 8×4, keeping an effective batch
-  of 32.
-- Steps 2 and 3 build on 4-bit. **If bf16 wins step 1**, change their `_include` to
-  `bench_bf16.yaml` and rerun both.
-- **Record:** `train_samples_per_second` and `train/peak_gpu_reserved_gb` from the W&B summary.
-  An OOM disqualifies a variant.
-- **Results** (L4; s/step is the median interval between logged steps; full write-up in
-  `project_knowledge/llm_training/e3_speed_benchmark.md`):
-
-  | Run | s/step | samples/s | Peak reserved | Notes |
-  |---|---|---|---|---|
-  | `e3-drill-fixed` (Qwen3-1.7B) | 6.7 | 3.9* | 2.7 GB | was 8.7–8.8 s/step before the fix |
-  | `e3-4bit` (8B) | 18.4 | 1.73 | 8.2 GB | |
-  | `e3-bf16` | 18.3 | 1.73 | 18.7 GB | |
-  | `e3-8bit` | 19.4 | 1.64 | 18.6 GB | `e3-8bit-replay` reproduced it |
-  | `e3-b2x16` | 18.3 | 1.74 | 6.6 GB | |
-  | `e3-nogc` | — | — | OOM | 8 rows × ~2.9 GB of activations overflow 22 GB |
-
-  \* The drill's samples/s includes its six evals.
-  - **Precision and micro-batch don't change speed** (all within about 6%). The L4 is
-    compute-bound on the 8B's matmuls. **The 1.5×-over-8-bit goal can't be reached through
-    precision.** Final losses are equal within noise.
-  - **8-bit is dominated:** it's the slowest and has bf16's memory. It's kept for future models
-    (see `project_knowledge/llm_training/quantization_8bit.md`).
-- **Step 4, gradient checkpointing off at smaller micro-batches** (pending): `bench_nogc_b2x16`
-  (about 12 GB expected, fits) and `bench_nogc_b4x8` (about 17 GB, borderline). Only 4-bit
-  leaves room for this.
-- **Decision rule for E6:**
-  - If a 4-bit run with gradient checkpointing off fits and is **at least 15% faster** than 18.4
-    s/step, put 4-bit, gc off and that micro-batch into `qlora/llama31_8b/v2.yaml`.
-  - Otherwise use **bf16, gc on, 8×4** (`quantization.mode: none`). It's the same speed as 4-bit
-    with no quantization error, and fits at 18.7 GB.
-
-### E4–E6: size ladder with the v2 config, 1 epoch, full train set
-- **Runs:**
-  - E4: Llama-3.2-1B (`qlora/llama32_1b/v2`).
-  - E5: Llama-3.2-3B (`qlora/llama32_3b/v2`).
-  - E6: Llama-3.1-8B (`qlora/llama31_8b/v2`, with E3's winner).
-- **Durations:**
-  - 8B ≈ **3.7 h** per epoch (727 steps × 18.3 s), plus evals. Less if step 4 wins.
-  - The 1B and 3B aren't measured yet. E4 gives the 1B speed. Interpolating between the
-    Qwen3-1.7B drill (6.7 s/step, about 1.35 h per epoch) and the 8B, a guess is about 1 h for
-    the 1B and about 2 h for the 3B.
-- **Success criteria:**
-  - 8B-v2 at least matches test_run2 (0.628 calibrated / 64%) in at most a third of the time.
-  - **Adopt 1B as the working model** if it's within 0.005 log-loss and 1 point of 8B. That
-    makes E7–E12 nearly free.
-- **After each run,** score validation with the recalibrated summary and add it to the
-  scoreboard in §4. Watch `eval_loss` and `eval_first_token_accuracy` in W&B for the point
-  where improvement flattens.
-- **If 1B becomes the working model,** rerun E3's precision step on it before E7. Its bf16
-  weights are only about 2.5 GB, so 4-bit's dequantization overhead probably buys nothing
-  there. That needs a `qlora/llama32_1b/bench*.yaml` pair modelled on the 8B ones.
-
-### E7: seed repeat
-- Repeat the working model with `training.seed: 43`, one change only.
-- The difference between the two seeds is the noise floor. **A later "win" must exceed twice
-  that difference.**
-
-### E8–E15 (later, all on the working model)
-| # | Experiment | Success criterion |
+| Where | Keep | Delete / done |
 |---|---|---|
-| E8 | Learning curve: 10 / 25 / 50 / 100% of train with `train_sample_strategy: random` | Find the plateau → subset size for E9+ |
-| E9 | LR 1e-4 / 2e-4 / 4e-4 | Change only if > 2× noise |
-| E10 | LoRA r 16 vs 64; attention only vs all linear layers | Same rule |
-| E11 | Compact prompt (`llama32_1b/compact.yaml`) | Not worse than noise → adopt (−34% tokens) |
-| E12 | Venue line kept until the 20th venue game (`llama32_1b/venue20.yaml`) | Better log-loss on early-season games |
-| E13 | Cross-family: Qwen3-1.7B / 4B | Compare; note digit tokenization (no expected-margin RMSE) |
-| E14 | Gemma 4 / Phi-4-mini, **after a license check** | Same |
-| E15 | Final: best config, full train, **score test once** | Report vs XGBoost 67.2% and Polymarket 69.9% / 0.579 |
+| **HF models** | `test_run2` (the reference), `e4-llama32-1b` (the comparison base), `e11-llama32-1b-compact` (working config) | deleted: all `e3-*`. **To delete:** `e5-llama32-3b`, `e7-llama32-1b-seed43` (its job was the noise number), `e12-llama32-1b-venue20` (not adopted), `resume-drill-1`, `resume-drill-2`, `test_run`; and `nba-bets-2026-07-16_18.03.32` / `nba-bets-2026-07-23_11.34.23` if the user confirms they're the July notebook experiments |
+| **HF datasets** | `nba-bets`, `nba-bets-compact` (working config); `games` until the user says it's obsolete | optional: `nba-bets-venue20` (rebuildable with one command) |
+| **W&B** | everything: small, free, and cited by the write-ups | optional: `e3-nogc` (OOM, empty) |
+| **Drive `outputs/llm/eval/`** | `base-8b-0shot`, `base-8b-5shot`, `test_run2`, `resume-drill-2`, `e4-llama32-1b`, `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e11-llama32-1b-compact`, `e12-llama32-1b-venue20` | the `e3-*` folders (each holds only a session `mlflow.db`) |
+| **Repo `outputs/llm/eval/`** | the same nine folders (merged 2026-10-21; `outputs/eval/` is gone) | — |
 
-- **E11/E12 need their datasets first.** Build and push them locally (CPU, a few minutes each).
-  Claude can run these, but pushing to the Hub needs the user's go-ahead:
-  `make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact ARGS=--push`, and the same with
-  `venue20`. If the working model isn't 1B, copy the two configs to that model's folder first.
-- **Dropped:** recency weighting of training games. The sklearn backtest showed it hurt
-  log-loss.
+Each eval folder's `mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
 
-## 7. How to run an experiment on Colab
-1. Sync the repo to Drive at `MyDrive/nba_bets`; `outputs/` is skipped.
-2. Open `notebooks/colab_runner.ipynb` on an L4 runtime and set the config cell:
-   - **To train and inspect:** `LLM_CONFIG="qlora/<model>/<variant>"`, a new `RUN_NAME`,
-     `TRAIN=True`, `INSPECT_SPLITS=["validation"]`.
-   - **To train only** (benchmarks): the same with `INSPECT_SPLITS=[]`.
-   - **For an untuned baseline:** `TRAIN=False` and
-     `INSPECT_ARGS="--base-only [--few-shot 5 --batch-size 8]"`.
-3. Run all cells. To resume after a disconnect, rerun with the same `RUN_NAME`. Within one
-   session, a further run only needs the config cell and the run cell.
-4. Download `outputs/llm/eval/<RUN_NAME>/` from Drive into the repo, then summarize locally
-   with the command in §4.
+## 7. Code change log (uncommitted unless the user has committed since)
+
+**Session 3 (2026-10-21):**
+- **8-bit cast warning:** `finetune.py::build_quant_config` filters bitsandbytes' per-matmul `MatMul8bitLt: inputs will be cast ... to float16` notice in 8-bit mode. The filter is `_drop_int8_cast_notice`, and a test checks it.
+- **Speed configs:** the E3 configs `bench_nogc_b2x16` and `bench_nogc_b4x8`. `bench.yaml` pins the old reference.
+- **v2 configs:** gradient checkpointing is off in the 8B, 1B and 3B `v2.yaml`, at 2×16, 8×4 and 4×8. The 1B change reaches `compact` and `venue20`.
+- **E7 config:** `llama32_1b/seed43.yaml`, with a test.
+- **Eval sample seed:** `finetune.py::load_eval_dataset` draws the 1,000-row in-training eval sample with `evaluation.seed` instead of `training.seed`. Every run so far used 42 for both, so their samples are unchanged. Tested by `test_eval_sample_ignores_the_training_seed`.
+- **Colab runner:**
+  - Drive stays mounted between runs.
+  - The setup cell uninstalls torchao and excludes `.gdoc` files.
+  - `runtime.unassign()` replaces a call that didn't exist.
+  - The duplicate config cell is gone.
+
+**Session 2 (2026-10-20):**
+- **Dependencies:** pinned `trl>=1.16,<2` and `peft>=0.21`, and refreshed `uv.lock`.
+  - datasets 5.1, pyarrow 25 and mlflow 3.17 came along.
+  - `uv sync --extra gpu` works on macOS.
+- **trl 0.x code removed.**
+- **Double forward fixed:** the hook in `FirstTokenAccuracySFTTrainer.compute_loss`. `tests/test_llm_trainer_trl.py` trains a tiny Llama through the real trl and asserts one forward per micro-batch.
+- **Peak memory:** `peak_gpu_memory()` logs it to W&B and MLflow.
+- **Inspection:** one prompt pass instead of two (`diagnostics.py::score_prompts`). It's tested against `model.generate` step by step.
+- **`tokenization_check`:** follows trl 1.x's common-prefix rule.
+- **macOS:** lightgbm's and torch's OpenMP segfault together, so the tests that run real forwards call `torch.set_num_threads(1)`.
+
+**Session 1:**
+- **Resume from the Hub:** `hub_strategy="checkpoint"` plus `find_resumable_checkpoint`.
+- **W&B:** the run id is the run name, and resume is allowed. `log_model` is off.
+- **Config knobs:** `tf32`, best-model and early-stopping options, `train_sample_strategy` and `wandb.log_model`.
+- **Diagnostics:**
+  - `p_home` computed in fp32.
+  - The expected margin.
+  - Log-loss, Brier, AUC, a calibration table and three RMSEs.
+  - The flags `--base-only`, `--few-shot` and `--calibrate-with`.
+- **Prompt variants:** `per_team_compact.yaml` and `per_team_venue20.yaml`. Their datasets were built and pushed on 2026-10-23.
+- **Configs:** `qlora/_defaults.yaml` (v2), `llama31_8b/baseline.yaml` (pins test_run2 exactly, 8-bit) and `baseline_t4.yaml` (fp16 for a T4).

@@ -94,12 +94,25 @@ def test_bench_variants_change_one_thing_each(variant, changed):
     assert bench["data"]["max_train_samples"] == 1600
     assert bench["training"]["eval_strategy"] == "no"
     assert bench["quantization"]["mode"] == "4bit"
+    # The E3 reference, pinned in bench.yaml after v2.yaml moved to E3's winner.
+    assert bench["training"]["gradient_checkpointing"] is True
+    assert (bench["training"]["per_device_train_batch_size"], bench["training"]["gradient_accumulation_steps"]) == (8, 4)
     for dotted, value in changed.items():
         section, key = dotted.split(".")
         assert config[section][key] == value
         config[section][key] = bench[section][key]
     config.pop("description"), bench.pop("description")
     assert config == bench
+
+
+def test_seed_repeat_changes_only_the_seed():
+    v2 = load_llm_training_config(CONFIGS / "llama32_1b" / "v2.yaml").model_dump()
+    repeat = load_llm_training_config(CONFIGS / "llama32_1b" / "seed43.yaml").model_dump()
+
+    assert (v2["training"]["seed"], repeat["training"]["seed"]) == (42, 43)
+    repeat["training"]["seed"] = 42
+    repeat.pop("description"), v2.pop("description")
+    assert repeat == v2
 
 
 def test_early_stopping_requires_best_model_tracking():
@@ -161,3 +174,18 @@ def test_train_sample_strategy_picks_the_sampling(strategy, expected_seed):
         load_train_dataset(config)
 
     assert load.call_args.kwargs == {"max_samples": 100, "shuffle_seed": expected_seed}
+
+
+def test_eval_sample_ignores_the_training_seed():
+    # E7 (training.seed 43) drew a different 1,000-game eval sample from E4's,
+    # so the two eval curves could not be compared.
+    from src.ml.llm.finetune import load_eval_dataset
+
+    seeds = []
+    for name in ("v2.yaml", "seed43.yaml"):
+        config = load_llm_training_config(CONFIGS / "llama32_1b" / name)
+        with patch("src.ml.llm.dataset.load_hf_split") as load:
+            load_eval_dataset(config)
+        seeds.append(load.call_args.kwargs["shuffle_seed"])
+
+    assert seeds == [42, 42]

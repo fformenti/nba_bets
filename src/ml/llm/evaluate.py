@@ -16,6 +16,7 @@ from src.ml.llm.finetune import (
     build_base_model,
     build_hub_model_id,
     build_tokenizer,
+    get_hf_token,
 )
 from src.ml.llm.testers import BatchedClassificationTester
 
@@ -34,7 +35,7 @@ def _load_adapter_model(config: LLMTrainingConfig, hub_model_id: Optional[str], 
     if hub_model_id is not None:
         from peft import PeftModel
 
-        model = PeftModel.from_pretrained(model, hub_model_id, revision=revision)
+        model = PeftModel.from_pretrained(model, hub_model_id, revision=revision, token=get_hf_token())
     model.eval()
     return tokenizer, model
 
