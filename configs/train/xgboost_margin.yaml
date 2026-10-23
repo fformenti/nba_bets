@@ -30,8 +30,6 @@ model:
     hyperparameter_tuning:
       scoring: "neg_mean_absolute_error"
 
-paths:
-  outputs: "outputs/xgboost_margin"
 
 mlflow:
   experiment_name: "nba_bets_xgboost_margin"

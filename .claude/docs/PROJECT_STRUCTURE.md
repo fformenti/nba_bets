@@ -85,6 +85,7 @@ src/
 │   ├── reconcile_postponed.py          # make reconcile-postponed
 │   ├── retry_unresolved.py             # make retry-unresolved
 │   ├── migrate_incremental_layout.py   # make migrate-incremental (one-time)
+│   ├── migrate_outputs_layout.py       # make migrate-outputs (one-time; outputs/ → runs/ layout)
 │   ├── predict_upcoming.py             # make predict-upcoming
 │   ├── score_predictions.py            # make score-predictions
 │   ├── train_classifier.py             # make train
@@ -92,16 +93,18 @@ src/
 │   ├── train_llm.py                    # make train-llm
 │   ├── evaluate_llm.py                 # make evaluate-llm
 │   ├── inspect_llm.py                  # make inspect-llm
+│   ├── plot_run.py                     # make plot RUN=<run_id>|latest
+│   ├── plot_compare.py                 # make plot-compare NAME=... SERIES="run[:model[:cal]] ..."
 │   ├── place_bets.py                   # make bet-polymarket GAME_DATE=...
 │   ├── build_game_slug_lookup.py       # make build-game-slug-lookup
 │   ├── build_polymarket_odds.py        # make build-polymarket-odds
 │   ├── delete_experiment.py            # make delete-experiment EXPERIMENT=...
 │   ├── delete_model.py                 # make delete-model ARGS=...
-│   ├── plot_home_win_ratio.py          # make plot-home-win-ratio
-│   └── plot_home_win_ratio_line.py     # make plot-home-win-ratio-line
+│   ├── plot_home_win_ratio.py          # make plot-home-win-ratio (table, then bar chart)
+│   └── plot_home_win_ratio_line.py     # make plot-home-win-ratio-line (table, then line chart)
 │
 ├── config/
-│   ├── paths.py                        # All data path constants
+│   ├── paths.py                        # All data and output path constants (RunPaths: outputs/runs/<id>/)
 │   ├── constants.py                    # Dates, team maps, neutral court labels
 │   ├── secrets.py                      # require_env(): the only way to read a key
 │   └── aws.py                          # AWS config
@@ -191,18 +194,31 @@ src/
 │   │   ├── train.py                    # Run orchestration + tracking
 │   │   ├── diagnostics.py              # Raw outputs, sign probabilities, expected margin, calibration, Platt
 │   │   ├── evaluate.py                 # Score an adapter as a sign classifier
-│   │   └── testers.py                  # RegressionTester / ClassificationTester
+│   │   ├── results.py                  # Inspection frame → shared result files (raw + Platt series)
+│   │   └── testers.py                  # RegressionTester / ClassificationTester (no file output)
 │   │
 │   ├── prediction/
 │   │   ├── pipeline.py                 # run_prediction_pipeline() + upsert_predictions()
 │   │   ├── features.py                 # Inference-time feature construction
 │   │   └── io.py                       # Load upcoming-game JSON
 │   │
-│   ├── evaluation/
+│   ├── evaluation/                     # Compute only; figures live in plotting/
 │   │   ├── metrics.py                  # Classification metrics, Brier, ECE
-│   │   ├── visualization.py            # Confusion matrix, ROC, calibration, SHAP
-│   │   ├── analysis.py                 # Prediction error pattern analysis
+│   │   ├── analysis.py                 # Breakdown tables (season phase), predictions ⋈ metadata
 │   │   └── polymarket_baseline.py      # Model vs market, on mutually-covered games
+│   │
+│   ├── results/                        # THE result-file schema every family writes (docs/OUTPUTS.md)
+│   │   ├── schema.py                   # predictions columns, validation, RunInfo (run.json)
+│   │   ├── store.py                    # Read/write outputs/runs/<run_id>/ (upsert per series)
+│   │   ├── scoring.py                  # score_predictions(): one metric definition for ML and LLM
+│   │   └── migrate.py                  # One-time move of the old outputs/ layout
+│   │
+│   ├── plotting/                       # Reads result files, draws; training never imports it
+│   │   ├── charts.py                   # Confusion, ROC, calibration, reliability, importance, SHAP, Boruta
+│   │   ├── breakdowns.py               # Accuracy by team, season, matchup, overtime, court, season phase
+│   │   ├── llm.py                      # Plotly per-series figures (accuracy trend, confidence, margin scatter)
+│   │   ├── eda.py                      # EDA figures, drawn from outputs/eda/<topic>/tables/
+│   │   └── report.py                   # build_run_report(), build_comparison(), log_report_to_mlflow()
 │   │
 │   ├── tracking/
 │   │   ├── mlflow_tracker.py           # MLflowTracker context manager
@@ -211,7 +227,7 @@ src/
 │   │
 │   └── utils/
 │       ├── validation.py               # Data validation helpers
-│       └── shap.py                     # SHAP output compatibility
+│       └── shap.py                     # SHAP output compatibility; compute_shap_frame() for model/shap.csv
 │
 ├── betting/                            # Polymarket — consumes model output, not modelling
 │   ├── slugs.py                        # slugify(), get_game_slug(), slug candidates
@@ -225,7 +241,7 @@ src/
 │   └── scoring.py                      # score_predictions(): live accuracy vs played games
 │
 ├── eda/
-│   └── home_win_ratio_by_season.py     # Home win ratio bar chart by season
+│   └── home_win_ratio_by_season.py     # Home win ratio per season → eda/home_win_ratio/tables/ (no figures)
 │
 └── utils/
     └── logging_config.py               # Shared logging setup
@@ -261,9 +277,11 @@ src/
   share an output directory).
 - `dead_code/` — code removed because nothing referenced it, kept rather than
   deleted. See its README.
-- `outputs/` (gitignored) — training artifacts: per-experiment plots, CV results,
-  feature selection, and LLM evaluation charts.
-- `docs/` — `RUNPOD_TRAINING.md`, GPU box setup for LLM fine-tuning.
+- `outputs/` (gitignored) — `runs/<run_id>/` (per-game predictions, metrics,
+  run.json, model introspection, derived `report/`), `comparisons/`, `eda/`,
+  `checkpoints/` (LLM), `archive/` (pre-2026-10-23 outputs). See docs/OUTPUTS.md.
+- `docs/` — `OUTPUTS.md` (outputs layout and result schema), `RUNPOD_TRAINING.md`
+  (GPU box setup for LLM fine-tuning), pipeline and rebuild audits.
 - `sandbox/` (gitignored) — exploratory notebooks.
 - `mlruns/`, `mlflow.db` (gitignored) — MLflow tracking.
 - `.claude/` — project settings, hooks, skills, and this doc.

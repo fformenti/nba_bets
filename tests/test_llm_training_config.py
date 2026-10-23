@@ -68,11 +68,10 @@ def test_post_process_keeps_the_sign_of_integer_predictions():
     assert ClassificationTester.post_process("no number") == 0
 
 
-def test_batched_classifier_scores_in_chunks(tmp_path, monkeypatch):
+def test_batched_classifier_scores_in_chunks():
     """BatchedClassificationTester calls the predictor once per chunk and keeps row order."""
     from src.ml.llm.testers import BatchedClassificationTester
 
-    monkeypatch.setattr("plotly.graph_objects.Figure.show", lambda self: None)
     data = [
         {"game_id": i, "completion": c} for i, c in enumerate(["+5", "-3", "+2", "-7", "+1"])
     ]
@@ -83,17 +82,17 @@ def test_batched_classifier_scores_in_chunks(tmp_path, monkeypatch):
         calls.append(len(rows))
         return [answers[row["game_id"]] for row in rows]
 
-    metrics = BatchedClassificationTester(
-        predict_batch, data, title="t", size=5, batch_size=2, output_dir=tmp_path
-    ).run()
+    tester = BatchedClassificationTester(predict_batch, data, title="t", size=5, batch_size=2)
+    metrics = tester.run()
 
     assert calls == [2, 2, 1]
     assert metrics == {"accuracy": 3 / 5, "n_correct": 3, "size": 5}
-    assert sorted(p.name for p in tmp_path.iterdir()) == [
-        "accuracy_trend.html",
-        "confidence_accuracy.html",
-        "scatter.html",
-    ]
+    # It writes nothing: the scored games come back in the shared result schema.
+    predictions = tester.predictions("r", "validation")
+    assert predictions["game_id"].tolist() == [0, 1, 2, 3, 4]
+    assert predictions["model"].unique().tolist() == ["r-greedy"]
+    assert (predictions["y_pred"] == predictions["y_true"]).sum() == 3
+    assert predictions["p_home"].isna().all()
 
 
 class _WhitespaceTokenizer:

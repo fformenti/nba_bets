@@ -157,5 +157,5 @@ The eight folds evaluate 2014/15 – 2021/22. If conference imbalance widens
 enough to change this, the way to find out is to re-run the comparison, not to
 reintroduce the split on the strength of the original argument. Two of the folds
 (2019/20, 2020/21) are COVID-affected. Per-fold results were written to
-`outputs/tuning/`, which is gitignored, and the harness that produced them has
+`outputs/tuning/` (now `outputs/archive/2026-08-12_season_decay_tuning/`), which is gitignored, and the harness that produced them has
 since been removed — the numbers above are the record, not a cache.

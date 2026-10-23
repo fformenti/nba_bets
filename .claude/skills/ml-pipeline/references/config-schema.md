@@ -58,15 +58,14 @@ model:
     max_depth: 15
     ...
 
-evaluation:
-  save_visualizations: true
-  output_dir: "outputs"
-
 paths:
   model_registry: "models"
-  outputs: "outputs"
   save_local_models: false
 ```
+
+No config chooses where results go. Every run writes `outputs/runs/<config>-<timestamp>/`,
+declared once in `src/config/paths.py` (`RunPaths`); figures come from `make plot`, never
+from training. See docs/OUTPUTS.md.
 
 > **Pydantic gotcha**: `ExperimentConfig` uses `extra="ignore"` — typos in YAML keys are silently dropped. Always verify key names against `src/ml/config/schema.py`.
 

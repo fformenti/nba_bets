@@ -76,6 +76,3 @@ tracking:
     # Local sqlite dies with an ephemeral GPU box - copy mlflow.db back after
     # a run, or point this at a remote tracking server.
     tracking_uri: "sqlite:///mlflow.db"
-
-paths:
-  output_dir: "outputs/llm"

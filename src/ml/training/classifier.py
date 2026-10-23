@@ -88,6 +88,8 @@ def train_classifier(config_path: Optional[Path] = None, promote: bool = False):
             "and the prediction pipeline only serves classifiers."
         )
 
+    # Also the run's folder under outputs/runs/, so the MLflow run and its result
+    # files carry the same name.
     run_name = generate_run_name(config_path=config_path, include_timestamp=True)
 
     with MLflowTracker(
@@ -98,7 +100,9 @@ def train_classifier(config_path: Optional[Path] = None, promote: bool = False):
         tracker.log_config(config.model_dump())
         _log_feature_configs(config, config_path, tracker)
         train = train_regression_model if regression else train_single_model
-        result = train(config=config, config_path=config_path, tracker=tracker)
+        result = train(
+            config=config, config_path=config_path, tracker=tracker, run_id=run_name
+        )
 
     if result:
         best_model = result.get("best_model_name", "N/A")

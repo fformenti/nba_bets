@@ -54,8 +54,6 @@ feature_engineering:
       delta: false
       enabled: true
 
-paths:
-  outputs: "outputs/llm_features"
 
 mlflow:
   experiment_name: "nba_bets_llm_features"

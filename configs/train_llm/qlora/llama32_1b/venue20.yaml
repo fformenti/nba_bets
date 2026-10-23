@@ -11,6 +11,3 @@ _include:
 data:
   dataset_name: "fformenti/nba-bets-venue20"
   prompt_config: "configs/llm_prompt/per_team_venue20.yaml"
-
-paths:
-  output_dir: "outputs/llm/qlora/llama32_1b_venue20"

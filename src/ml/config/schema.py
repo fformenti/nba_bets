@@ -320,18 +320,13 @@ class ModelConfig(BaseModel):
     neural_network: dict[str, Any] = Field(default_factory=dict)
 
 
-class EvaluationConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    save_visualizations: bool = True
-    output_dir: str = "outputs"
-
-
 class PathsConfig(BaseModel):
+    """Local model registry only. Result files go to outputs/runs/<run_id>/,
+    which src/config/paths.py declares; a config never chooses it."""
+
     model_config = ConfigDict(extra="ignore")
 
     model_registry: str = "models"
-    outputs: str = "outputs"
     save_local_models: bool = True
 
 
@@ -368,7 +363,6 @@ class ExperimentConfig(BaseModel):
     preprocessing: PreprocessingConfig = PreprocessingConfig()
     feature_selection: FeatureSelectionConfig = FeatureSelectionConfig()
     model: ModelConfig = ModelConfig()
-    evaluation: EvaluationConfig = EvaluationConfig()
     paths: PathsConfig = PathsConfig()
     mlflow: MLflowConfig = MLflowConfig()
 
@@ -629,12 +623,6 @@ class LLMTrackingConfig(BaseModel):
     mlflow: LLMMLflowConfig = LLMMLflowConfig()
 
 
-class LLMPathsConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    output_dir: str = "outputs/llm"
-
-
 class LLMTrainingConfig(BaseModel):
     """Configuration for QLoRA supervised fine-tuning of a causal LM."""
 
@@ -654,4 +642,3 @@ class LLMTrainingConfig(BaseModel):
     training: LLMTrainerConfig = LLMTrainerConfig()
     evaluation: LLMEvaluationConfig = LLMEvaluationConfig()
     tracking: LLMTrackingConfig = LLMTrackingConfig()
-    paths: LLMPathsConfig = LLMPathsConfig()

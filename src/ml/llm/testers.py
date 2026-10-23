@@ -1,14 +1,17 @@
 import math
 import re
 from itertools import accumulate
-from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from IPython.display import clear_output
-from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score
 from tqdm.auto import tqdm
+
+from src.ml.plotting.llm import series_figures
+from src.ml.results import build_predictions
 
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
@@ -259,6 +262,7 @@ class ClassificationTester:
         self.title = title or RegressionTester.make_title(predictor)
         self.size = size
         self.titles = []
+        self.game_ids = []
         self.guesses = []
         self.truths = []
         self.corrects = []
@@ -286,178 +290,35 @@ class ClassificationTester:
         title = f"game {datapoint['game_id']}"
         return title, guess, truth, correct, color
 
-    def chart(self, title):
-        df = pd.DataFrame(
-            {
-                "truth": self.truths,
-                "guess": self.guesses,
-                "title": self.titles,
-                "correct": self.corrects,
-                "color": self.colors,
-            }
-        )
+    def predictions(self, run_id: str, split: str, model: Optional[str] = None) -> pd.DataFrame:
+        """The scored games in the shared result schema (src/ml/results).
 
-        df["hover"] = [
-            f"{t}\nGuess={g:+.0f} Actual={y:+.0f}\n{'Correct' if c else 'Wrong'}"
-            for t, g, y, c in zip(df["title"], df["guess"], df["truth"], df["correct"])
-        ]
-
-        min_val = float(min(df["truth"].min(), df["guess"].min()))
-        max_val = float(max(df["truth"].max(), df["guess"].max()))
-        if min_val == max_val:
-            min_val -= 1
-            max_val += 1
-
-        fig = px.scatter(
-            df,
-            x="truth",
-            y="guess",
-            color="color",
-            color_discrete_map={"green": "green", "red": "red"},
-            title=title,
-            labels={"truth": "Actual Diff", "guess": "Predicted Diff"},
-            width=800,
-            height=600,
-        )
-
-        for tr in fig.data:
-            mask = df["color"] == tr.name
-            tr.customdata = df.loc[mask, ["hover"]].to_numpy()
-            tr.hovertemplate = "%{customdata[0]}<extra></extra>"
-            tr.marker.update(size=6)
-
-        # Quadrant guides at zero (sign boundary)
-        fig.add_hline(y=0, line_width=1, line_dash="dot", line_color="gray")
-        fig.add_vline(x=0, line_width=1, line_dash="dot", line_color="gray")
-
-        fig.update_xaxes(range=[min_val, max_val])
-        fig.update_yaxes(range=[min_val, max_val])
-        fig.update_layout(showlegend=False)
-        return fig
-
-    def accuracy_trend_chart(self):
-        n = len(self.corrects)
-        running_sums = list(accumulate(self.corrects))
-        x = list(range(1, n + 1))
-        running_acc = [s / i for s, i in zip(running_sums, x)]
-
-        final_acc = running_acc[-1]
-        title = f"{self.title} Accuracy: {final_acc:.1%}"
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=running_acc,
-                mode="lines",
-                line=dict(width=3, color="firebrick"),
-                name="Cumulative Accuracy",
-                hovertemplate="n=%{x}<br>Accuracy=%{y:.1%}<extra></extra>",
-            )
-        )
-        fig.add_hline(
-            y=0.5,
-            line_width=1,
-            line_dash="dash",
-            line_color="gray",
-            annotation_text="chance (50%)",
-        )
-
-        fig.update_layout(
-            title=title,
-            xaxis_title="Number of Datapoints",
-            yaxis_title="Accuracy",
-            yaxis=dict(tickformat=".0%", range=[0, 1]),
-            width=800,
-            height=300,
-            template="plotly_white",
-            showlegend=False,
-        )
-        return fig
-
-    def confidence_accuracy_chart(self):
-        """Accuracy among top-k predictions by |predicted point_diff| (desc).
-
-        Games with a larger predicted margin are treated as higher confidence;
-        the curve shows whether those are easier to get right.
+        Generation yields a margin, not a probability, so ``p_home`` is empty.
+        ``model`` defaults to ``<run_id>-greedy``: ``inspect_llm`` writes the
+        same adapter's first-token probabilities as ``<run_id>``, and the two
+        must not overwrite each other in one predictions file.
         """
-        n = len(self.corrects)
-        ranked = sorted(
-            zip(self.guesses, self.corrects),
-            key=lambda pair: abs(pair[0]),
-            reverse=True,
+        return build_predictions(
+            run_id=run_id,
+            model=model or f"{run_id}-greedy",
+            split=split,
+            game_ids=self.game_ids,
+            y_true=[int(t > 0) for t in self.truths],
+            y_pred=[int(g > 0) for g in self.guesses],
+            pred_margin=self.guesses,
+            true_margin=self.truths,
         )
-        margins = [abs(g) for g, _ in ranked]
-        corrects_ranked = [c for _, c in ranked]
-
-        running_sums = list(accumulate(corrects_ranked))
-        x = [i / n for i in range(1, n + 1)]
-        running_acc = [s / i for s, i in zip(running_sums, range(1, n + 1))]
-        overall_acc = running_sums[-1] / n
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=running_acc,
-                mode="lines",
-                line=dict(width=3, color="steelblue"),
-                name="Accuracy @ coverage",
-                customdata=list(zip(range(1, n + 1), margins)),
-                hovertemplate=(
-                    "Coverage=%{x:.1%}<br>"
-                    "Top-n=%{customdata[0]}<br>"
-                    "|pred|=%{customdata[1]:.1f}<br>"
-                    "Accuracy=%{y:.1%}<extra></extra>"
-                ),
-            )
-        )
-        fig.add_hline(
-            y=overall_acc,
-            line_width=1,
-            line_dash="dash",
-            line_color="gray",
-            annotation_text=f"overall ({overall_acc:.1%})",
-        )
-        fig.add_hline(
-            y=0.5,
-            line_width=1,
-            line_dash="dot",
-            line_color="lightgray",
-            annotation_text="chance (50%)",
-        )
-
-        fig.update_layout(
-            title=(
-                f"{self.title} Confidence Curve<br>"
-                f"<sup>Sorted by |predicted point_diff| descending</sup>"
-            ),
-            xaxis_title="Coverage (fraction of games, high |pred| first)",
-            yaxis_title="Cumulative Accuracy",
-            xaxis=dict(tickformat=".0%", range=[0, 1]),
-            yaxis=dict(tickformat=".0%", range=[0, 1]),
-            width=800,
-            height=400,
-            template="plotly_white",
-            showlegend=False,
-        )
-        return fig
 
     def report(self):
-        # Labels from sign: positive → 1, non-positive → 0
-        y_true = [int(t > 0) for t in self.truths]
-        y_pred = [int(g > 0) for g in self.guesses]
-        acc = accuracy_score(y_true, y_pred)
-        n_correct = sum(self.corrects)
-        title = f"{self.title} results<br><b>Accuracy:</b> {acc:.1%} ({n_correct}/{self.size})"
-        self.accuracy_trend_chart().show()
-        self.confidence_accuracy_chart().show()
-        self.chart(title).show()
+        """Show the figures in a notebook. Nothing is written to disk."""
+        for fig in series_figures(self.predictions("notebook", "validation"), self.title).values():
+            fig.show()
 
     def run(self):
         for i in tqdm(range(self.size)):
             title, guess, truth, correct, color = self.run_datapoint(i)
             self.titles.append(title)
+            self.game_ids.append(self.data[i]["game_id"])
             self.guesses.append(guess)
             self.truths.append(truth)
             self.corrects.append(correct)
@@ -473,7 +334,8 @@ class BatchedClassificationTester(ClassificationTester):
 
     ``batch_predictor(list[datapoint]) -> list[str]`` answers a whole chunk at
     once, so a GPU model decodes the batch in one ``generate`` instead of one
-    prompt at a time. Grading and charts are the parent's, unchanged.
+    prompt at a time. Grading is the parent's, unchanged. It draws nothing: the
+    caller writes :meth:`predictions` and ``make plot`` draws them.
     """
 
     def __init__(
@@ -483,11 +345,9 @@ class BatchedClassificationTester(ClassificationTester):
         title=None,
         size=DEFAULT_SIZE,
         batch_size=16,
-        output_dir=None,
     ):
         super().__init__(batch_predictor, data, title=title, size=size)
         self.batch_size = batch_size
-        self.output_dir = Path(output_dir) if output_dir else None
 
     def run_batch(self, start: int) -> None:
         rows = [self.data[i] for i in range(start, min(start + self.batch_size, self.size))]
@@ -499,6 +359,7 @@ class BatchedClassificationTester(ClassificationTester):
             truth = ground_truth(datapoint)
             correct = self.is_correct(guess, truth)
             self.titles.append(f"game {datapoint['game_id']}")
+            self.game_ids.append(datapoint["game_id"])
             self.guesses.append(guess)
             self.truths.append(truth)
             self.corrects.append(correct)
@@ -508,24 +369,6 @@ class BatchedClassificationTester(ClassificationTester):
         n_correct = sum(self.corrects)
         return {"accuracy": n_correct / self.size, "n_correct": n_correct, "size": self.size}
 
-    def report(self):
-        m = self.metrics()
-        title = (
-            f"{self.title} results<br><b>Accuracy:</b> {m['accuracy']:.1%} "
-            f"({m['n_correct']}/{m['size']})"
-        )
-        figures = {
-            "accuracy_trend": self.accuracy_trend_chart(),
-            "confidence_accuracy": self.confidence_accuracy_chart(),
-            "scatter": self.chart(title),
-        }
-        if self.output_dir:
-            self.output_dir.mkdir(parents=True, exist_ok=True)
-        for name, fig in figures.items():
-            fig.show()
-            if self.output_dir:
-                fig.write_html(self.output_dir / f"{name}.html")
-
     def run(self) -> dict:
         self.size = min(self.size, len(self.data))
         with tqdm(total=self.size) as bar:
@@ -533,6 +376,4 @@ class BatchedClassificationTester(ClassificationTester):
                 self.run_batch(start)
                 bar.update(len(self.corrects) - bar.n)
                 bar.set_postfix(acc=f"{sum(self.corrects) / len(self.corrects):.1%}")
-        clear_output(wait=True)
-        self.report()
         return self.metrics()

@@ -2,12 +2,14 @@
 
 Kept separate from training so a finished adapter can be re-scored (different
 split, different sample size, different revision) without another GPU run.
+Writes the greedy answers to ``outputs/runs/<run_name>/`` as the series
+``<run_name>-greedy``; ``make plot RUN=<run_name>`` draws them.
 """
 
 from pathlib import Path
 from typing import Any, Optional
 
-from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH, LLM_EVAL_OUTPUTS_DIR
+from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH, RunPaths
 from src.ml.config.loader import load_llm_training_config
 from src.ml.config.schema import LLMTrainingConfig
 from src.ml.tracking.mlflow_tracker import MLflowTracker
@@ -19,6 +21,7 @@ from src.ml.llm.finetune import (
     get_hf_token,
 )
 from src.ml.llm.testers import BatchedClassificationTester
+from src.ml.results import RunInfo, git_commit, read_run_info, write_predictions, write_run_info
 
 from src.utils.logging_config import get_logger
 
@@ -93,9 +96,8 @@ def run_evaluation(
     split: Optional[str] = None,
     size: Optional[int] = None,
     revision: Optional[str] = None,
-    output_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
-    """Score the adapter for *run_name* and write charts to *output_dir*.
+    """Score the adapter for *run_name* and write its predictions to the run folder.
 
     Returns the metrics dict from :class:`BatchedClassificationTester` plus the
     resolved split and hub model id.
@@ -112,14 +114,28 @@ def run_evaluation(
     predict_batch = build_batch_predictor(config, hub_model_id, revision=revision)
 
     set_seed(config.evaluation.seed)
-    metrics = BatchedClassificationTester(
+    tester = BatchedClassificationTester(
         predict_batch,
         data,
         title=run_name,
         size=size,
         batch_size=config.evaluation.batch_size,
-        output_dir=output_dir,
-    ).run()
+    )
+    metrics = tester.run()
+    write_predictions(tester.predictions(run_name, split), run_name, split)
+    try:
+        info = read_run_info(run_name)
+    except FileNotFoundError:
+        info = RunInfo(
+            run_id=run_name,
+            family="llm",
+            task="classification",
+            selected_model=f"{run_name}-greedy",
+            git_commit=git_commit(),
+        )
+    info.splits.setdefault(split, {"n_games": metrics["size"]})
+    info.extra.update({"base_model": config.base_model, "hub_model_id": hub_model_id})
+    write_run_info(info)
 
     logger.info(f"Accuracy: {metrics['accuracy']:.1%} ({metrics['n_correct']}/{metrics['size']})")
     return {**metrics, "split": split, "hub_model_id": hub_model_id}
@@ -140,8 +156,7 @@ def run_tracked_evaluation(
             "(e.g. configs/train_llm/qlora/llama31_8b/baseline.yaml)."
         )
     config = load_llm_training_config(resolved)
-
-    output_dir = LLM_EVAL_OUTPUTS_DIR / run_name
+    run_paths = RunPaths(run_name)
 
     def _evaluate():
         return run_evaluation(
@@ -150,7 +165,6 @@ def run_tracked_evaluation(
             split=split,
             size=size,
             revision=revision,
-            output_dir=output_dir,
         )
 
     mlflow_config = config.tracking.mlflow
@@ -175,7 +189,7 @@ def run_tracked_evaluation(
             tracker.log_metrics(
                 {"eval_accuracy": result["accuracy"], "eval_n_correct": result["n_correct"]}
             )
-            tracker.log_artifacts(str(output_dir), artifact_path="eval_charts")
+            tracker.log_artifacts(str(run_paths.root), artifact_path="results")
 
-    logger.info(f"Charts written to {output_dir}")
+    logger.info(f"Results written to {run_paths.root} - draw them with `make plot RUN={run_name}`")
     return result

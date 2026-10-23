@@ -112,6 +112,6 @@ Example: the same validation game (`22100230`) early in 2021/22.
   - models `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e12-llama32-1b-venue20`, `resume-drill-1`,
     `resume-drill-2` and `test_run`;
   - dataset `nba-bets-venue20`, which one command rebuilds.
-- **Keep every eval folder** in `outputs/llm/eval/`; the scoreboard comes from them.
+- **Keep every run folder** in `outputs/runs/` (was `outputs/llm/eval/` until the 2026-10-23 outputs restructure, docs/OUTPUTS.md); the scoreboard comes from them.
 - **Before any Colab run,** set a new `RUN_NAME`. Reusing a name resumes that run and overwrites its
   CSVs.

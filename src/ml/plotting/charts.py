@@ -1,4 +1,9 @@
-"""Visualization utilities for model evaluation."""
+"""Figure functions for model evaluation.
+
+Everything here takes arrays or tables and returns a figure. Nothing here
+trains, scores or reads a model: the inputs come from a run's result files
+(see :mod:`src.ml.plotting.report`).
+"""
 
 from datetime import datetime
 
@@ -8,10 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from itertools import cycle
 from typing import Optional
-from sklearn.base import BaseEstimator
 from sklearn.metrics import confusion_matrix, roc_curve, auc
-
-from src.ml.utils.shap import extract_binary_shap_values
 
 # Set style
 sns.set_style("whitegrid")
@@ -183,49 +185,17 @@ def plot_confusion_matrix(
 
 
 def plot_feature_importance(
-    model: BaseEstimator,
-    feature_names: list,
+    importance: pd.DataFrame,
     top_n: int = 20,
     title: str = "Feature Importance",
     figsize: tuple = (10, 8),
 ) -> plt.Figure:
+    """Horizontal bars of the ``top_n`` largest importances.
+
+    ``importance`` has columns ``feature`` and ``importance`` - the shape of a
+    run's ``model/feature_importance.csv``.
     """
-    Plot feature importance for tree-based models.
-
-    Parameters
-    ----------
-    model : BaseEstimator
-        Trained model with feature_importances_ attribute
-    feature_names : list
-        List of feature names
-    top_n : int, default=20
-        Number of top features to display
-    title : str, default='Feature Importance'
-        Plot title
-    figsize : tuple, default=(10, 8)
-        Figure size
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        Figure object
-    """
-    if not hasattr(model, "feature_importances_"):
-        raise ValueError("Model does not have feature_importances_ attribute")
-
-    importances = model.feature_importances_
-
-    # Create DataFrame for easier sorting
-    importance_df = (
-        pd.DataFrame(
-            {
-                "feature": feature_names,
-                "importance": importances,
-            }
-        )
-        .sort_values("importance", ascending=False)
-        .head(top_n)
-    )
+    importance_df = importance.sort_values("importance", ascending=False).head(top_n)
 
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -515,31 +485,72 @@ def plot_calibration_curve(
     return fig
 
 
+def plot_reliability_comparison(
+    y_true,
+    series: dict,
+    n_bins: int = 10,
+    title: str = "Calibration Comparison",
+    figsize: tuple = (10, 8),
+    dashed: Optional[set] = None,
+) -> plt.Figure:
+    """Reliability diagram for any number of ``{label: probabilities}`` series.
+
+    Every series must be scored on the rows of ``y_true``. Marker area follows
+    each bin's share of games, since sparse bins are noisy. ``dashed`` names
+    series drawn dashed and faded - a raw curve next to its recalibrated twin.
+    """
+    from src.ml.evaluation.metrics import compute_brier_score
+
+    dashed = dashed or set()
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot([0, 1], [0, 1], ":", color="gray", lw=1.5, label="Perfectly Calibrated")
+
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for (label, proba), color in zip(series.items(), cycle(colors)):
+        mean_pred, fraction_pos, n_per_bin = _reliability_diagram_points(y_true, proba, n_bins)
+        is_dashed = label in dashed
+        alpha = 0.45 if is_dashed else 1.0
+        brier = compute_brier_score(y_true, proba)
+        ax.plot(
+            mean_pred, fraction_pos, "--" if is_dashed else "-",
+            color=color, lw=2, alpha=alpha, label=f"{label} (Brier={brier:.4f})",
+        )
+        ax.scatter(
+            mean_pred, fraction_pos,
+            s=20 + 400 * n_per_bin / max(n_per_bin.sum(), 1), color=color, alpha=alpha,
+        )
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("Mean Predicted P(home win)", fontsize=12)
+    ax.set_ylabel("Actual Home-Win Rate", fontsize=12)
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.legend(fontsize=9, loc="upper left")
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    stamp_timestamp(fig)
+    return fig
+
+
 def plot_boruta_shap_results(
-    selector,
+    results: dict,
     top_n: int = 30,
     title: str = "Boruta-SHAP Feature Selection",
     figsize: tuple = (12, 10),
 ) -> plt.Figure:
     """Plot Boruta-SHAP results as a color-coded horizontal bar chart.
 
-    Parameters
-    ----------
-    selector : BorutaShapSelector
-        Fitted selector with feature_importances_ and get_support().
-    top_n : int
-        Number of top features to display.
-    title : str
-        Plot title.
-    figsize : tuple
-        Figure size.
-
-    Returns
-    -------
-    matplotlib.figure.Figure
+    ``results`` is a run's ``model/feature_selection.json``, i.e.
+    :meth:`BorutaShapSelector.to_dict`.
     """
-    support = selector.get_support()
-    importances = selector.feature_importances_
+    support = {
+        **{f: "confirmed" for f in results["confirmed_features"]},
+        **{f: "rejected" for f in results["rejected_features"]},
+        **{f: "tentative" for f in results["tentative_features"]},
+    }
+    importances = results["feature_importances"]
+    max_shadow = results.get("max_shadow_importances") or []
 
     # Sort by importance descending, take top_n
     sorted_features = sorted(importances, key=importances.get, reverse=True)[:top_n]
@@ -560,8 +571,8 @@ def plot_boruta_shap_results(
     ax.grid(True, alpha=0.3, axis="x")
 
     # Max shadow threshold line (average across iterations)
-    if selector.max_shadow_importances_:
-        avg_shadow = np.mean(selector.max_shadow_importances_)
+    if max_shadow:
+        avg_shadow = np.mean(max_shadow)
         ax.axvline(x=avg_shadow, color="gray", linestyle="--", lw=1.5, label=f"Avg max shadow ({avg_shadow:.4f})")
         ax.legend(fontsize=10)
 
@@ -580,72 +591,34 @@ def plot_boruta_shap_results(
 
 
 def plot_shap_summary(
-    model,
-    X_transformed: np.ndarray,
-    feature_names: list,
+    shap_frame: pd.DataFrame,
     title: str = "SHAP Feature Contribution",
     top_n: int = 20,
-    max_samples: int = 500,
     figsize: tuple = (12, 10),
 ) -> plt.Figure:
-    """
-    Generate a SHAP beeswarm summary plot for tree-based models.
+    """SHAP beeswarm from a run's ``model/shap.csv``.
 
-    Parameters
-    ----------
-    model : tree-based estimator (RF, GB, XGB, LGBM)
-    X_transformed : np.ndarray
-        Preprocessed feature matrix (already passed through the preprocessor)
-    feature_names : list
-        Feature names corresponding to X_transformed columns
-    title : str
-        Plot title
-    top_n : int
-        Number of top features to display
-    max_samples : int
-        Max rows to use for SHAP computation (subsampled for performance)
-    figsize : tuple
-        Figure size
-
-    Returns
-    -------
-    matplotlib.figure.Figure
+    ``shap_frame`` is long: one row per (game_id, feature) with ``shap_value``
+    and the preprocessed ``feature_value``. The values are computed at training
+    time by :func:`src.ml.utils.shap.compute_shap_frame`; this only draws them.
     """
     import shap
 
-    if hasattr(X_transformed, "values"):
-        X_transformed = X_transformed.values
-    X_transformed = np.asarray(X_transformed, dtype=np.float64)
-
-    # Subsample for performance
-    if X_transformed.shape[0] > max_samples:
-        rng = np.random.RandomState(42)
-        idx = rng.choice(X_transformed.shape[0], max_samples, replace=False)
-        X_transformed = X_transformed[idx]
-
-    explainer = shap.TreeExplainer(model)
-    shap_values = extract_binary_shap_values(explainer, X_transformed)
-
-    # Clamp top_n to actual number of features
-    n_features = shap_values.shape[1]
-    top_n = min(top_n, n_features)
+    shap_values = shap_frame.pivot(index="game_id", columns="feature", values="shap_value")
+    feature_values = shap_frame.pivot(index="game_id", columns="feature", values="feature_value")
+    feature_values = feature_values[shap_values.columns]
 
     # Limit to top_n features by mean |SHAP|
-    mean_abs = np.abs(shap_values).mean(axis=0)
-    top_idx = np.argsort(mean_abs)[::-1][:top_n]
-    shap_values_top = shap_values[:, top_idx]
-    X_top = X_transformed[:, top_idx]
-    feature_names_top = [feature_names[i] for i in top_idx]
-
-    # Mean |SHAP| per top feature (sorted descending = top feature at y=0)
-    mean_abs_top = mean_abs[top_idx]
+    mean_abs = shap_values.abs().mean(axis=0).sort_values(ascending=False)
+    top = mean_abs.index[: min(top_n, len(mean_abs))]
+    top_n = len(top)
 
     fig, ax = plt.subplots(figsize=figsize)
     plt.sca(ax)
     shap.summary_plot(
-        shap_values_top,
-        X_top,
-        feature_names=feature_names_top,
+        shap_values[top].to_numpy(dtype=np.float64),
+        feature_values[top].to_numpy(dtype=np.float64),
+        feature_names=list(top),
         show=False,
         plot_size=None,
         cmap=plt.cm.viridis,
@@ -654,7 +627,7 @@ def plot_shap_summary(
     # Overlay mean |SHAP| annotations at the right edge of the plot
     # SHAP beeswarm places the top feature at the highest y position (top_n - 1)
     x_max = ax.get_xlim()[1]
-    for i, val in enumerate(mean_abs_top):
+    for i, val in enumerate(mean_abs[top]):
         y_pos = top_n - 1 - i
         ax.annotate(
             f"avg |SHAP|={val:.4f}",

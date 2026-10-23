@@ -2,10 +2,12 @@
 
     make inspect-llm LLM_RUN=nba-bets-2026-07-27
 
-Writes ``outputs/llm/eval/<run_name>/inspection_<split>.csv`` - one row per
+Writes ``outputs/runs/<run_name>/llm/inspection_<split>.csv`` - one row per
 game with the raw decoded text, the parsed number, P(+), P(-), the expected
-margin and the top first tokens - and prints a summary. ``--summarize-only``
-re-summarizes a saved CSV without a GPU.
+margin and the top first tokens - plus the run's shared result files
+(``predictions/<split>.csv``, ``metrics/<split>.json``, ``run.json``) that
+``make plot`` and ``make plot-compare`` read. ``--summarize-only`` re-summarizes
+a saved CSV without a GPU.
 
 Baselines for the untuned base model (``--run-name`` then only names the
 output folder)::
@@ -28,7 +30,7 @@ import json  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 
-from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH, LLM_EVAL_OUTPUTS_DIR  # noqa: E402
+from src.config.paths import DEFAULT_TRAIN_LLM_CONFIG_PATH, RunPaths  # noqa: E402
 from src.ml.config.loader import load_llm_training_config  # noqa: E402
 from src.ml.llm.diagnostics import (  # noqa: E402
     inspect_adapter,
@@ -36,6 +38,8 @@ from src.ml.llm.diagnostics import (  # noqa: E402
     recalibrate,
     summarize,
 )
+from src.ml.llm.finetune import build_hub_model_id  # noqa: E402
+from src.ml.llm.results import write_inspection_results  # noqa: E402
 from src.utils.logging_config import get_logger, setup_logging  # noqa: E402
 
 logger = get_logger(__name__)
@@ -76,8 +80,8 @@ def main() -> None:
     setup_logging(level="INFO")
     config = load_llm_training_config(args.config)
     split = args.split or config.evaluation.split
-    run_dir = LLM_EVAL_OUTPUTS_DIR / args.run_name
-    csv_path = run_dir / f"inspection_{split}.csv"
+    run_paths = RunPaths(args.run_name)
+    csv_path = run_paths.inspection(split)
 
     if args.summarize_only:
         frame = read_inspection_csv(csv_path)
@@ -93,8 +97,20 @@ def main() -> None:
             base_only=args.base_only,
             few_shot=args.few_shot,
         )
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
-        frame.to_csv(csv_path, index=False)
+        write_inspection_results(
+            frame,
+            run_id=args.run_name,
+            split=split,
+            seed=config.evaluation.seed,
+            config_path=str(args.config),
+            extra={
+                "base_model": config.base_model,
+                "hub_model_id": None if args.base_only else build_hub_model_id(config, args.run_name),
+                "revision": args.revision,
+                "base_only": args.base_only,
+                "few_shot": args.few_shot,
+            },
+        )
         tokenization = json.dumps(tok_check, indent=2, ensure_ascii=False)
         logger.info(f"Tokenization of the first row (as trl trains it):\n{tokenization}")
         logger.info(f"Per-game rows written to {csv_path}")
@@ -105,7 +121,7 @@ def main() -> None:
         calibration = (
             None
             if args.calibrate_with == split
-            else read_inspection_csv(run_dir / f"inspection_{args.calibrate_with}.csv")
+            else read_inspection_csv(run_paths.inspection(args.calibrate_with))
         )
         calibrated = summarize(recalibrate(frame, calibration, seed=config.evaluation.seed))
         logger.info(

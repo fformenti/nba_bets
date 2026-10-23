@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.ml.evaluation.analysis import plot_season_phase_accuracy
-from src.ml.evaluation.visualization import plot_calibration_curve, plot_roc_curve
+from src.ml.plotting.breakdowns import plot_season_phase_accuracy
+from src.ml.plotting.charts import plot_calibration_curve, plot_roc_curve
 
 
 @pytest.fixture

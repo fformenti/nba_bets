@@ -1,7 +1,7 @@
 description: "QLoRA SFT of Qwen3-1.7B on nba-bets point-differential prompts (v2 settings)"
 
 # Everything comes from ../_defaults.yaml; this file only sets what depends on
-# the GPU (an L4 here) and where outputs go.
+# the GPU (an L4 here). Checkpoints go to outputs/checkpoints/<run_name>/.
 
 _include:
   - "../../_defaults.yaml"
@@ -20,6 +20,3 @@ training:
 evaluation:
   max_new_tokens: 5
   batch_size: 32
-
-paths:
-  output_dir: "outputs/llm/qlora/qwen3_1p7b"

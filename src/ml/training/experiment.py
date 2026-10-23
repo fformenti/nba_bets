@@ -2,13 +2,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from src.config.paths import (
     REGULAR_SEASON_GAMES_FEATURES_PATH,
     TRAIN_DEFAULTS_CONFIG_PATH,
+    RunPaths,
 )
 from src.ml.config.loader import load_yaml_config
 from src.ml.config.schema import ExperimentConfig
@@ -26,24 +26,12 @@ from src.ml.evaluation.metrics import (
     get_model_display_name,
     print_metrics_summary,
 )
-from src.ml.evaluation.analysis import (
-    compute_season_phase_metrics,
-    generate_analysis,
-    plot_season_phase_accuracy,
-)
+from src.ml.evaluation.analysis import compute_season_phase_metrics
 from src.ml.evaluation.polymarket_baseline import (
     align_market_to_rows,
     build_scored_frame,
     compare_to_market,
     load_market_probabilities,
-)
-from src.ml.evaluation.visualization import (
-    plot_boruta_shap_results,
-    plot_calibration_curve,
-    plot_confusion_matrix,
-    plot_feature_importance,
-    plot_prediction_accuracy_by_bin,
-    plot_roc_curve,
 )
 from src.ml.features.selection import run_feature_selection
 from src.ml.features.engineering import identify_feature_types
@@ -55,6 +43,14 @@ from src.ml.models.baseline import (
     RecordDifferenceBaseline,
 )
 from src.ml.models.registry import ModelRegistry
+from src.ml.results import (
+    RunInfo,
+    build_predictions,
+    git_commit,
+    write_predictions,
+    write_run_info,
+)
+from src.ml.utils.shap import compute_shap_frame
 from src.utils.logging_config import get_logger
 
 from .model_factory import clean_feature_names
@@ -130,9 +126,11 @@ def _log_polymarket_baseline(
     y_true: pd.Series,
     pipeline: Any,
     X_test: pd.DataFrame,
-    output_dir: Path,
 ) -> None:
-    """Score the shipped model against Polymarket's tip-off prices, if we have them.
+    """Log the shipped model against Polymarket's tip-off prices, if we have them.
+
+    MLflow metrics only. The same comparison as a table and as figures is drawn
+    by the plotting module from the run's predictions (`make plot`).
 
     Never fatal. The odds table comes from a separate network step
     (`make build-polymarket-odds`), and a training run that cannot reach
@@ -149,10 +147,6 @@ def _log_polymarket_baseline(
         comparison = compare_to_market(scored)
         if comparison.empty:
             return
-
-        tables_dir = output_dir / "tables"
-        tables_dir.mkdir(parents=True, exist_ok=True)
-        comparison.to_csv(tables_dir / "polymarket_baseline.csv", index=False)
 
         # The comparison table above scores every model on the whole test split,
         # where the market row necessarily covers fewer games. This block is the
@@ -181,101 +175,106 @@ def _log_polymarket_baseline(
         logger.warning(f"Polymarket baseline failed: {exc}")
 
 
-def _save_market_comparison_plots(
-    metadata_test: pd.DataFrame,
-    y_test: pd.Series,
-    y_test_pred: np.ndarray,
-    y_test_proba: np.ndarray,
-    uncalibrated_proba: Optional[np.ndarray],
-    best_cal_proba: Optional[np.ndarray],
-    best_calibration_method: Optional[str],
-    y_pred_baseline: Optional[np.ndarray],
-    output_dir: Path,
-    model_name: str,
+def _true_margin(metadata: pd.DataFrame, index: pd.Index) -> Optional[np.ndarray]:
+    """Home minus away points for ``index``, or ``None`` if the scores aren't metadata."""
+    if "homeScore" not in metadata.columns or "awayScore" not in metadata.columns:
+        return None
+    rows = metadata.loc[index]
+    return (
+        pd.to_numeric(rows["homeScore"], errors="coerce")
+        - pd.to_numeric(rows["awayScore"], errors="coerce")
+    ).to_numpy()
+
+
+def _series(
+    run_id: str,
+    model: str,
+    split: str,
+    splits: Any,
+    index: pd.Index,
+    y_true: pd.Series,
+    y_pred: np.ndarray,
+    p_home: Optional[np.ndarray],
+    calibration: str = "none",
+) -> pd.DataFrame:
+    """One (model, calibration) series of ``split`` in the shared result schema."""
+    return build_predictions(
+        run_id=run_id,
+        model=model,
+        split=split,
+        calibration=calibration,
+        game_ids=splits.metadata.loc[index, "gameId"],
+        y_true=y_true.loc[index],
+        y_pred=y_pred,
+        p_home=p_home,
+        true_margin=_true_margin(splits.metadata, index),
+    )
+
+
+def _write_model_introspection(
+    run_paths: RunPaths,
+    best_pipeline: Any,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    game_ids_test: pd.Series,
+    fallback_feature_names: list,
 ) -> None:
-    """Model-vs-market twins of the ROC, calibration and season-phase figures.
+    """Write what the shipped model says about its features: importances and SHAP.
 
-    Separate files rather than extra lines on the existing three, because they
-    are drawn on a different slate: the odds backfill starts at 2024/25 and drops
-    markets that never traded, so the market prices only part of the test split.
-    Every series here is sliced to the games *both* sides cover — the rule
-    :mod:`src.ml.evaluation.polymarket_baseline` already states — and the game
-    count goes in each title so the two twins can never be read as one.
-
-    Never fatal, for the same reason :func:`_log_polymarket_baseline` isn't.
+    Never fatal: a model family without ``feature_importances_`` or a tree
+    explainer simply gets no file, and the report skips that figure.
     """
+    if hasattr(best_pipeline, "named_steps"):
+        trained_model = best_pipeline.named_steps["model"]
+        preprocessor_fitted = best_pipeline.named_steps["preprocessor"]
+    elif hasattr(best_pipeline, "estimator") and hasattr(
+        best_pipeline.estimator, "named_steps"
+    ):
+        trained_model = best_pipeline.estimator.named_steps["model"]
+        preprocessor_fitted = best_pipeline.estimator.named_steps["preprocessor"]
+    else:
+        trained_model = best_pipeline
+        preprocessor_fitted = None
+
+    feature_names = fallback_feature_names
+    if preprocessor_fitted is not None and hasattr(
+        preprocessor_fitted, "get_feature_names_out"
+    ):
+        try:
+            feature_names = clean_feature_names(
+                list(preprocessor_fitted.get_feature_names_out(list(X_train.columns)))
+            )
+        except Exception as e:
+            logger.warning(
+                f"Could not extract feature names from preprocessor: {e}. Using original."
+            )
+
+    run_paths.model_dir.mkdir(parents=True, exist_ok=True)
+    if hasattr(trained_model, "feature_importances_"):
+        if len(feature_names) != len(trained_model.feature_importances_):
+            logger.error(
+                f"Feature names length ({len(feature_names)}) does not match "
+                f"feature importances length ({len(trained_model.feature_importances_)}). "
+                f"Skipping feature importance."
+            )
+        else:
+            pd.DataFrame(
+                {"feature": feature_names, "importance": trained_model.feature_importances_}
+            ).sort_values("importance", ascending=False).to_csv(
+                run_paths.feature_importance, index=False
+            )
+
+    if preprocessor_fitted is None:
+        return
     try:
-        covered, market_proba = align_market_to_rows(metadata_test["gameId"])
-        n_covered = int(covered.sum())
-        if n_covered == 0:
-            logger.info("No test game is priced by Polymarket; skipping comparison plots.")
-            return
-
-        y_true = y_test[covered]
-        suffix = f" - {model_name} (n={n_covered} shared games)"
-
-        viz_dir = output_dir / "visualizations"
-        analysis_dir = output_dir / "analysis"
-        tables_dir = output_dir / "tables"
-        for directory in (viz_dir, analysis_dir, tables_dir):
-            directory.mkdir(parents=True, exist_ok=True)
-
-        fig_roc = plot_roc_curve(
-            y_true,
-            y_test_proba[covered],
-            title=f"ROC Curve vs Polymarket{suffix}",
-            model_label=model_name,
-            reference_curves={"Polymarket": market_proba},
-        )
-        fig_roc.savefig(viz_dir / "roc_curve_vs_market.png", dpi=300, bbox_inches="tight")
-        plt.close(fig_roc)
-
-        if uncalibrated_proba is not None:
-            fig_cal = plot_calibration_curve(
-                y_true,
-                uncalibrated_proba[covered],
-                best_cal_proba[covered] if best_cal_proba is not None else None,
-                calibration_method=best_calibration_method or "sigmoid",
-                y_pred_proba_market=market_proba,
-                title=f"Calibration Curve vs Polymarket{suffix}",
-                # Three near-coincident curves; the bin counts stay on the
-                # two-series `calibration_curve.png` next to this one.
-                annotate_counts=False,
-            )
-            fig_cal.savefig(
-                viz_dir / "calibration_curve_vs_market.png", dpi=300, bbox_inches="tight"
-            )
-            plt.close(fig_cal)
-
-        if (
-            "games_played_HT" in metadata_test.columns
-            and "games_played_VT" in metadata_test.columns
-        ):
-            # The market's hard call is just its favourite, as in `compare_to_market`.
-            comparisons = {"Polymarket": (market_proba >= 0.5).astype(int)}
-            if y_pred_baseline is not None:
-                comparisons["Record baseline"] = np.asarray(y_pred_baseline)[covered]
-
-            fig_phase, table = plot_season_phase_accuracy(
-                y_true,
-                y_test_pred[covered],
-                metadata_test.loc[covered],
-                comparison_preds=comparisons,
-                title=f"Accuracy by Season Phase vs Polymarket{suffix}",
-            )
-            fig_phase.savefig(
-                analysis_dir / "season_phase_accuracy_vs_market.png",
-                dpi=300,
-                bbox_inches="tight",
-            )
-            table.to_csv(tables_dir / "season_phase_accuracy_vs_market.csv", index=False)
-            plt.close(fig_phase)
-
-        logger.info(f"Market comparison plots saved ({n_covered} shared games).")
-    except FileNotFoundError as exc:
-        logger.info(f"Skipping Polymarket comparison plots: {exc}")
-    except Exception as exc:
-        logger.warning(f"Polymarket comparison plots failed: {exc}")
+        compute_shap_frame(
+            trained_model,
+            preprocessor_fitted.transform(X_test),
+            feature_names,
+            game_ids=game_ids_test.to_numpy(),
+        ).to_csv(run_paths.shap_values, index=False)
+    except Exception as e:
+        logger.warning(f"Could not compute SHAP values: {e}")
 
 
 def _market_reference_model(
@@ -395,13 +394,22 @@ def train_single_model(
     config: ExperimentConfig,
     config_path: Optional[Path],
     tracker: Any,
+    run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Train, select on validation, and write the run's result files.
+
+    Writes ``outputs/runs/<run_id>/`` and draws nothing: figures come from
+    ``make plot``, which reads those files (docs/OUTPUTS.md).
+    """
     data_config = config.data
     split_config = config.splitting
     model_config = config.model.model_dump()
     explicit_param_keys_by_model = _extract_explicit_model_param_keys()
-    eval_config = config.evaluation
     paths_config = config.paths
+    run_id = run_id or generate_run_name(config_path=config_path, include_timestamp=True)
+    run_paths = RunPaths(run_id)
+    # Every (model, calibration, split) series this run scores, in the shared schema.
+    prediction_frames: list[pd.DataFrame] = []
     feat_eng_config = config.feature_engineering
     filters_config = config.filters
     weighting_config = config.weighting
@@ -454,7 +462,6 @@ def train_single_model(
 
     games_enriched = splits.games_enriched
     metadata = splits.metadata
-    y = splits.y
     X_train, X_val, X_test = splits.X_train, splits.X_val, splits.X_test
     y_train, y_val, y_test = splits.y_train, splits.y_val, splits.y_test
     X_test_baseline, y_test_baseline = splits.X_test_baseline, splits.y_test_baseline
@@ -524,26 +531,8 @@ def train_single_model(
             artifact_file="feature_tracking/selected_features.json",
         )
 
-        # Save JSON artifact with full results
-        output_dir = Path(paths_config.outputs)
-        fs_dir = output_dir / "feature_selection"
-        fs_dir.mkdir(parents=True, exist_ok=True)
-        boruta_selector.save_json(fs_dir / "boruta_shap_results.json")
-
-        # Generate visualization
-        if eval_config.save_visualizations:
-            viz_dir = output_dir / "visualizations"
-            viz_dir.mkdir(parents=True, exist_ok=True)
-            fig_boruta = plot_boruta_shap_results(
-                boruta_selector,
-                top_n=50,
-                title="Boruta-SHAP Feature Selection",
-            )
-            fig_boruta.savefig(
-                viz_dir / "boruta_shap_selection.png", dpi=300, bbox_inches="tight"
-            )
-            plt.close(fig_boruta)
-            logger.info("Boruta-SHAP visualization saved.")
+        # Full results, for the Boruta figure and for "has Boruta ever seen X".
+        boruta_selector.save_json(run_paths.feature_selection)
 
     # logger.info(f"Features sent to model: {list(X_train.columns)}")
     logger.info(
@@ -669,6 +658,31 @@ def train_single_model(
             tracker.log_metrics(market_reference["test_metrics"])
             tracker.set_tags({"model_type": "baseline"})
 
+    # Baselines are fit on test and have no validation rows. The two threshold
+    # baselines make hard calls only: their predict_proba is that call as 0/1,
+    # which would score as a probability it never was. Polymarket is not written
+    # at all: it is external data, and plotting joins it by gameId.
+    for name, emits_probability in (
+        ("record_baseline", False),
+        ("point_differential_baseline", False),
+        ("home_win_baseline", True),
+    ):
+        baseline_data = models_to_train.get(name)
+        if not baseline_data:
+            continue
+        baseline_pipeline = baseline_data["pipeline"]
+        prediction_frames.append(
+            _series(
+                run_id, name, "test", splits, X_test.index, y_test,
+                y_pred=baseline_pipeline.predict(X_test_baseline),
+                p_home=(
+                    _positive_class_proba(baseline_pipeline, X_test_baseline)
+                    if emits_probability
+                    else None
+                ),
+            )
+        )
+
     # dict.fromkeys dedups while preserving order: a name listed in both the
     # seeded baselines and config.model.train_models would otherwise be trained
     # twice, which a multi-family sweep makes easy to do by accident.
@@ -708,6 +722,17 @@ def train_single_model(
                 "test_metrics": test_metrics,
                 "val_metrics": val_metrics,
             }
+            for split, X_split, y_split in (
+                ("validation", X_val, y_val),
+                ("test", X_test, y_test),
+            ):
+                prediction_frames.append(
+                    _series(
+                        run_id, model_name, split, splits, X_split.index, y_split,
+                        y_pred=pipeline.predict(X_split),
+                        p_home=_positive_class_proba(pipeline, X_split),
+                    )
+                )
 
             with tracker.child_run(model_name):
                 tracker.log_metrics(test_metrics)
@@ -747,9 +772,7 @@ def train_single_model(
 
                     # Save cv_results as CSV artifact
                     cv_results_df = grid_search_info["cv_results"]
-                    output_dir = Path(paths_config.outputs)
-                    output_dir.mkdir(parents=True, exist_ok=True)
-                    cv_path = output_dir / "cv_results" / f"{model_name}.csv"
+                    cv_path = run_paths.cv_results(model_name)
                     cv_path.parent.mkdir(parents=True, exist_ok=True)
                     cv_results_df.to_csv(cv_path, index=False)
                     tracker.log_artifact(str(cv_path), artifact_path="tuning")
@@ -898,7 +921,6 @@ def train_single_model(
     calibrated_pipeline = None
     uncalibrated_proba = None
     best_calibration_method = None
-    best_cal_proba = None
 
     if "baseline" not in best_model_name:
         y_test_proba_uncal = _positive_class_proba(best_pipeline, X_test)
@@ -970,6 +992,27 @@ def train_single_model(
                         "ece": ece_cal["ece"],
                         "proba": y_test_proba_cal,
                     }
+                    # Validation gets the out-of-fold probabilities the method
+                    # was chosen on; the refit model saw every validation row,
+                    # so its in-sample probabilities would flatter it.
+                    prediction_frames.extend(
+                        [
+                            _series(
+                                run_id, best_model_name, "validation", splits,
+                                X_val.index, y_val,
+                                y_pred=(oof_cal >= 0.5).astype(int),
+                                p_home=oof_cal,
+                                calibration=method,
+                            ),
+                            _series(
+                                run_id, best_model_name, "test", splits,
+                                X_test.index, y_test,
+                                y_pred=cal_model.predict(X_test),
+                                p_home=y_test_proba_cal,
+                                calibration=method,
+                            ),
+                        ]
+                    )
                     tracker.log_metrics(
                         {
                             f"val_brier_score_{method}": round(brier_val, 4),
@@ -996,7 +1039,6 @@ def train_single_model(
                 calibration_results, key=lambda m: calibration_results[m]["val_brier"]
             )
             best_calibration_method = best_cal_method
-            best_cal_proba = calibration_results[best_cal_method]["proba"]
             best_delta = calibration_results[best_cal_method]["val_delta"]
             best_se = calibration_results[best_cal_method]["val_se"]
             # Adopting on *any* improvement shipped a calibrator on a 0.0003 Brier
@@ -1055,201 +1097,58 @@ def train_single_model(
 
     # Test accuracy answers "is the model right?"; this answers "is it better
     # than the market?", which is the only version of the question that decides
-    # whether to bet. Deliberately outside `save_visualizations` — it is a
-    # metric, not a chart — and non-fatal, since the odds table is fetched by a
-    # separate network step that a training run must not depend on.
+    # whether to bet. Non-fatal, since the odds table is fetched by a separate
+    # network step that a training run must not depend on.
     _log_polymarket_baseline(
         tracker=tracker,
         game_ids=metadata_test["gameId"],
         y_true=y_test,
         pipeline=best_pipeline,
         X_test=X_test,
-        output_dir=Path(paths_config.outputs),
     )
 
-    if eval_config.save_visualizations:
-        logger.info("Generating visualizations...")
-        output_dir = Path(paths_config.outputs)
-        viz_dir = output_dir / "visualizations"
-        viz_dir.mkdir(parents=True, exist_ok=True)
+    _write_model_introspection(
+        run_paths=run_paths,
+        best_pipeline=best_pipeline,
+        X_train=X_train,
+        X_test=X_test,
+        game_ids_test=metadata_test["gameId"],
+        fallback_feature_names=(
+            numerical_features + (boolean_features or []) + (categorical_features or [])
+        ),
+    )
 
-        y_test_pred = best_pipeline.predict(X_test)
-
-        class_names = sorted(y.unique())
-        fig_cm = plot_confusion_matrix(
-            y_test,
-            y_test_pred,
-            class_names=class_names,
-            title=f"Test Set Confusion Matrix - {best_model_name}",
+    selected_calibration = best_calibration_method if calibrated_pipeline is not None else "none"
+    predictions = pd.concat(prediction_frames, ignore_index=True)
+    for split in ("validation", "test"):
+        write_predictions(predictions[predictions["split"] == split], run_id, split)
+    write_run_info(
+        RunInfo(
+            run_id=run_id,
+            family="sklearn",
+            task="classification",
+            selected_model=best_model_name,
+            selected_calibration=selected_calibration,
+            best_calibrator=best_calibration_method,
+            config_path=str(config_path) if config_path else None,
+            mlflow_run_id=tracker.get_run_id(),
+            mlflow_tracking_uri=config.mlflow.tracking_uri,
+            git_commit=git_commit(),
+            splits={
+                "validation": {"n_games": len(X_val)},
+                "test": {"n_games": len(X_test)},
+            },
+            extra={
+                "description": config.description,
+                "n_features": len(X_train.columns),
+                "split_method": splits.split_method,
+                "test_start_season": split_config.test_start_season,
+                "val_seasons": split_config.val_seasons,
+            },
         )
-        fig_cm.savefig(viz_dir / "confusion_matrix.png", dpi=300, bbox_inches="tight")
-        plt.close(fig_cm)
-
-        y_test_proba = None
-        if "baseline" not in best_model_name:
-            if hasattr(best_pipeline, "named_steps"):
-                trained_model = best_pipeline.named_steps["model"]
-                preprocessor_fitted = best_pipeline.named_steps["preprocessor"]
-            elif hasattr(best_pipeline, "estimator") and hasattr(
-                best_pipeline.estimator, "named_steps"
-            ):
-                trained_model = best_pipeline.estimator.named_steps["model"]
-                preprocessor_fitted = best_pipeline.estimator.named_steps[
-                    "preprocessor"
-                ]
-            else:
-                trained_model = best_pipeline
-                preprocessor_fitted = None
-
-            # Resolved for both the importance and SHAP plots below.
-            if preprocessor_fitted is not None and hasattr(
-                preprocessor_fitted, "get_feature_names_out"
-            ):
-                try:
-                    feature_names = clean_feature_names(
-                        list(
-                            preprocessor_fitted.get_feature_names_out(
-                                list(X_train.columns)
-                            )
-                        )
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Could not extract feature names from preprocessor: {e}. Using original."
-                    )
-                    feature_names = (
-                        numerical_features
-                        + (boolean_features or [])
-                        + (categorical_features or [])
-                    )
-            else:
-                feature_names = (
-                    numerical_features
-                    + (boolean_features or [])
-                    + (categorical_features or [])
-                )
-
-            if hasattr(trained_model, "feature_importances_"):
-                if len(feature_names) != len(trained_model.feature_importances_):
-                    logger.error(
-                        f"Feature names length ({len(feature_names)}) does not match "
-                        f"feature importances length ({len(trained_model.feature_importances_)}). "
-                        f"Skipping feature importance plot."
-                    )
-                else:
-                    fig_importance = plot_feature_importance(
-                        trained_model,
-                        feature_names,
-                        top_n=20,
-                        title=f"Feature Importance - {best_model_name}",
-                    )
-                    fig_importance.savefig(
-                        viz_dir / "feature_importance.png", dpi=300, bbox_inches="tight"
-                    )
-                    plt.close(fig_importance)
-
-            # --- SHAP summary plot ---
-            try:
-                from src.ml.evaluation.visualization import plot_shap_summary
-
-                X_test_transformed = preprocessor_fitted.transform(X_test)
-                if hasattr(X_test_transformed, "toarray"):
-                    X_test_transformed = X_test_transformed.toarray()
-                elif hasattr(X_test_transformed, "values"):
-                    X_test_transformed = X_test_transformed.values
-                fig_shap = plot_shap_summary(
-                    trained_model,
-                    X_test_transformed,
-                    feature_names,
-                    title=f"SHAP Feature Contribution - {best_model_name}",
-                    top_n=20,
-                )
-                fig_shap.savefig(
-                    viz_dir / "shap_summary.png", dpi=300, bbox_inches="tight"
-                )
-                plt.close(fig_shap)
-                logger.info("SHAP summary plot saved.")
-            except Exception as e:
-                logger.warning(f"Could not generate SHAP plot: {e}")
-
-            y_test_proba = best_pipeline.predict_proba(X_test)
-            if y_test_proba.ndim > 1:
-                y_test_proba = y_test_proba[:, 1]
-            fig_roc = plot_roc_curve(
-                y_test,
-                y_test_proba,
-                title=f"ROC Curve - {best_model_name}",
-            )
-            fig_roc.savefig(viz_dir / "roc_curve.png", dpi=300, bbox_inches="tight")
-            plt.close(fig_roc)
-
-            fig_acc_bin = plot_prediction_accuracy_by_bin(
-                y_test,
-                y_test_proba,
-                title=f"Prediction Accuracy by Probability Bin - {best_model_name}",
-            )
-            fig_acc_bin.savefig(
-                viz_dir / "prediction_accuracy_by_bin.png", dpi=300, bbox_inches="tight"
-            )
-            plt.close(fig_acc_bin)
-
-            # Calibration curve
-            if uncalibrated_proba is not None and best_cal_proba is not None:
-                fig_cal = plot_calibration_curve(
-                    y_test,
-                    uncalibrated_proba,
-                    best_cal_proba,
-                    calibration_method=best_calibration_method,
-                    title=f"Calibration Curve - {best_model_name}",
-                )
-                fig_cal.savefig(
-                    viz_dir / "calibration_curve.png", dpi=300, bbox_inches="tight"
-                )
-                plt.close(fig_cal)
-                logger.info("Calibration curve saved.")
-
-        logger.info(f"Visualizations saved to {viz_dir}")
-
-        # Metadata-based analysis: error patterns, accuracy breakdowns, calibration
-        logger.info("Generating metadata-based analysis...")
-        _record_baseline_data = models_to_train.get("record_baseline")
-        _y_pred_baseline = (
-            _record_baseline_data["pipeline"].predict(X_test_baseline)
-            if _record_baseline_data
-            else None
-        )
-        generate_analysis(
-            y_true=y_test,
-            y_pred=y_test_pred,
-            y_pred_proba=y_test_proba,
-            metadata=metadata_test,
-            output_dir=output_dir,
-            model_name=best_model_name,
-            y_pred_baseline=_y_pred_baseline,
-        )
-        logger.info(
-            f"Analysis saved to {output_dir / 'analysis'} and {output_dir / 'tables'}"
-        )
-
-        # The market twins of the ROC, calibration and season-phase figures. Kept
-        # apart from `generate_analysis` because they are drawn on a narrower
-        # slate — the games Polymarket priced — and mixing the two would make
-        # every chart above ambiguous about which games it describes.
-        if y_test_proba is not None:
-            _save_market_comparison_plots(
-                metadata_test=metadata_test,
-                y_test=y_test,
-                y_test_pred=y_test_pred,
-                y_test_proba=y_test_proba,
-                uncalibrated_proba=uncalibrated_proba,
-                best_cal_proba=best_cal_proba,
-                best_calibration_method=best_calibration_method,
-                y_pred_baseline=_y_pred_baseline,
-                output_dir=output_dir,
-                model_name=best_model_name,
-            )
-
-        tracker.log_artifacts(str(output_dir), artifact_path="outputs")
+    )
+    tracker.log_artifacts(str(run_paths.root), artifact_path="results")
+    logger.info(f"Results written to {run_paths.root} - draw them with `make plot RUN={run_id}`")
 
     if paths_config.save_local_models:
         logger.info(f"Saving best model ({best_model_name}) locally...")
@@ -1288,10 +1187,10 @@ def train_single_model(
         dataset_name=splits.date_range_name,
     )
 
-    run_id = tracker.get_run_id()
+    mlflow_run_id = tracker.get_run_id()
     run_model_uri = None
-    if run_id:
-        run_model_uri = f"runs:/{run_id}/{artifact_path}"
+    if mlflow_run_id:
+        run_model_uri = f"runs:/{mlflow_run_id}/{artifact_path}"
         logger.info(f"Model logged at run URI: {run_model_uri}")
         tags = {"model_run_uri": run_model_uri, "model_name": best_model_name}
         if registered_model_name:
@@ -1304,4 +1203,5 @@ def train_single_model(
         "models_to_train": models_to_train,
         "registered_model_name": registered_model_name,
         "run_model_uri": run_model_uri,
+        "run_id": run_id,
     }

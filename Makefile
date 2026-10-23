@@ -6,6 +6,7 @@
         reconcile-postponed retry-unresolved migrate-incremental \
         predict-upcoming score-predictions bet-polymarket \
         train build-llm-dataset train-llm evaluate-llm inspect-llm \
+        plot plot-compare migrate-outputs \
         delete-experiment delete-model plot-home-win-ratio plot-home-win-ratio-line \
         historical-etl full-rebuild predict-upcoming-games \
         process-results-pipeline daily-cycle
@@ -14,6 +15,9 @@ TRAIN_CONFIG      ?= all_models
 PREDICTION_CONFIG ?= predict_classifier
 LLM_CONFIG        ?= qlora/llama31_8b/baseline
 LLM_RUN           ?=
+# A run under outputs/runs/ for `make plot`; `latest` is the most recent one.
+RUN               ?= latest
+SPLIT             ?=
 # Where finished-game outcomes come from: nba_api | placeholder.
 # See src/etl/collectors/results/ — 'placeholder' reads hand-dropped files.
 SOURCE            ?= nba_api
@@ -114,8 +118,28 @@ score-predictions:
 # Sweep all four families — same features,
 # same splits, best one registered — with:
 #   make train TRAIN_CONFIG=all_models
+#
+# Training writes result files only (outputs/runs/<config>-<timestamp>/); the
+# second line draws them, as its own process. See docs/OUTPUTS.md.
 train:
 	uv run python -m src.cli.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml $(if $(PROMOTE),--promote,)
+	uv run python -m src.cli.plot_run --run latest
+
+# ─── Figures (read result files, never train) ───────────────────────────────
+
+# One run's report: make plot RUN=<run_id> [SPLIT=validation]
+plot:
+	uv run python -m src.cli.plot_run --run $(RUN) $(if $(SPLIT),--split $(SPLIT),)
+
+# Several runs on shared games and axes:
+#   make plot-compare NAME=llm_vs_xgb SERIES="e11-llama32-1b-compact xgboost-20261023-141500"
+# Each series is run_id[:model[:calibration]]. Pass MARKET=1 to add Polymarket.
+plot-compare:
+	uv run python -m src.cli.plot_compare --name $(NAME) --series $(SERIES) $(if $(SPLIT),--split $(SPLIT),) $(if $(MARKET),--market,)
+
+# One-time: move the pre-run-layout outputs/ into runs/, archive/, eda/.
+migrate-outputs:
+	uv run python -m src.cli.migrate_outputs_layout $(ARGS)
 
 # Build the LLM dataset from the ML models' splits, so both families are scored
 # on the same games. Pass ARGS=--push to upload to the Hub.

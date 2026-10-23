@@ -1,7 +1,7 @@
 description: "QLoRA SFT of Llama-3.1-8B on nba-bets point-differential prompts (v2 settings)"
 
 # Everything comes from ../_defaults.yaml; this file only sets what depends on
-# the GPU (an L4 here) and where outputs go.
+# the GPU (an L4 here). Checkpoints go to outputs/checkpoints/<run_name>/.
 
 _include:
   - "../../_defaults.yaml"
@@ -27,6 +27,3 @@ training:
 evaluation:
   max_new_tokens: 5
   batch_size: 32
-
-paths:
-  output_dir: "outputs/llm/qlora/llama31_8b"

@@ -33,7 +33,8 @@
 **Tools that work locally** (the gpu extra is installed: `uv sync --extra gpu`):
 - **Score a run:**
   `uv run python -m src.cli.inspect_llm --config <any llm config> --run-name <run> --split validation --summarize-only --calibrate-with validation`.
-  - It reads `outputs/llm/eval/<run>/inspection_validation.csv` and writes nothing.
+  - It reads `outputs/runs/<run>/llm/inspection_validation.csv` and writes nothing.
+- **Scoreboard without a GPU:** `make plot-compare NAME=<name> SERIES="<run> <run> ..."` scores each run's Platt series on the games they share (`outputs/comparisons/<name>/tables/scoreboard.csv`). Its numbers equal the second summary above. Layout: `docs/OUTPUTS.md`.
   - Read `log_loss`, `accuracy_p_home` and `auc_p_home` from the *second* summary, the one after Platt recalibration.
 - **W&B API** (entity `felipeformenti`, project `nba-bets`):
   - Connect with `wandb.Api()`, after setting `WANDB_API_KEY` from `require_env("WANDB_API_KEY", "", secrets_file=GLOBAL_SECRETS_FILE)`.
@@ -101,13 +102,15 @@
 ### N2. Blend the LLM and XGBoost (Claude, CPU only)
 - **Question:** do the two models carry different information? If their validation `p_home` correlate well below 1, an average can beat both. It costs no GPU time.
 - **Inputs:**
-  - E4's `outputs/llm/eval/e4-llama32-1b/inspection_validation.csv` (`game_id`, `p_home`, `truth`).
-  - XGBoost's validation `p_home` per gameId, trained on the same train split. **These don't exist yet.**
+  - E4's per-game predictions: `outputs/runs/e4-llama32-1b/predictions/validation.csv` (shared schema: `game_id`, `p_home`, `y_true`, `calibration` none/platt). The raw inspection CSV is at `outputs/runs/e4-llama32-1b/llm/inspection_validation.csv`.
+  - XGBoost's validation `p_home` per gameId, trained on the same train split. **These exist now (2026-10-23):** every `make train` writes them.
+    - `outputs/runs/xgboost-20261023-165536/predictions/validation.csv`, series `xgboost` with `calibration` `none` and `sigmoid` (out-of-fold on validation). Same 2,949 gameIds as the LLM runs.
+    - On those games: xgboost [sigmoid] log-loss 0.6268, accuracy 65.1%, AUC 0.698; e11 [platt] 0.6286; e4 [platt] 0.6286 (`outputs/comparisons/llm_vs_xgboost/`).
     - E0's 0.628 came from an ad-hoc script in session 1, and its predictions weren't saved.
-    - `outputs/tuning/backtest_predictions.csv` is a walk-forward backtest from August with different training windows. It covers only 984 of the 2,949 validation games, so it can't be used.
+    - `outputs/archive/2026-08-12_season_decay_tuning/backtest_predictions.csv` is a walk-forward backtest from August with different training windows. It covers only 984 of the 2,949 validation games, so it can't be used.
 - **To do:**
-  1. Find out how the classifier pipeline trains on `build_splits`: `make train`, `src/ml/training/experiment.py`, `configs/train/*.yaml`.
-  2. Add a library function that returns validation `p_home` by gameId, plus a thin CLI or a Makefile flag. Libraries never have `__main__`.
+  1. ~~Find out how the classifier pipeline trains on `build_splits`.~~
+  2. ~~Add a library function that returns validation `p_home` by gameId.~~ Done: `src.ml.results.read_predictions(run_id, ["validation"])`.
   3. Report the correlation, each model's calibrated log-loss on the same games, and the log-loss of the average and of a logistic stack. Cross-fit the stack the way the Platt step does.
   4. Add the paired comparison as a library function, for example `diagnostics.py::paired_log_loss_gap`: align on `game_id`, recalibrate each model, then bootstrap. Later experiments reuse it. The throwaway scripts used for E7/E11/E12 sorted by `game_id`, recalibrated each run and bootstrapped 5,000 times with `default_rng(0)`.
 - **LLM side:** use E11 (`e11-llama32-1b-compact`, the working config) and E4 as a cross-check. Their `p_home` correlate at 0.994.
@@ -181,8 +184,9 @@ The best config, trained on the full train split. **Score test once.** Report it
    - **Benchmark, train only:** the same with `INSPECT_SPLITS=[]`.
    - **Untuned baseline:** `TRAIN=False` with `INSPECT_ARGS="--base-only [--few-shot 5 --batch-size 8]"`.
 3. **Run all.** For a second run in the same session, rerun only the config cell and the run cell.
-4. **Download** `MyDrive/nba_bets/outputs/llm/eval/<RUN_NAME>/` into the repo's `outputs/llm/eval/<RUN_NAME>/`.
-   - That's the only eval location; code reads and writes nothing else.
+4. **Download** `MyDrive/nba_bets/outputs/runs/<RUN_NAME>/` into the repo's `outputs/runs/<RUN_NAME>/`.
+   - That's the only run location; code reads and writes nothing else. `make plot RUN=<RUN_NAME>` draws it.
+   - **Drive still holds the old layout** (`outputs/llm/eval/`) until someone runs `uv run python -m src.cli.migrate_outputs_layout --outputs-dir <Drive mount>/nba_bets/outputs` once. Until then the notebooks' reuse cell finds nothing and rescores.
    - Keep the folder name equal to `RUN_NAME`.
 5. **To score adapters already on the Hub without training,** use `colab_notebooks/test_llm.ipynb`. The user wrote it.
    - It reuses CSVs already on Drive and prints the Platt-calibrated scoreboard.
@@ -203,12 +207,19 @@ The best config, trained on the full train split. **Score test once.** Report it
 | **HF models** | `test_run2` (the reference), `e4-llama32-1b` (the comparison base), `e11-llama32-1b-compact` (working config) | deleted: all `e3-*`. **To delete:** `e5-llama32-3b`, `e7-llama32-1b-seed43` (its job was the noise number), `e12-llama32-1b-venue20` (not adopted), `resume-drill-1`, `resume-drill-2`, `test_run`; and `nba-bets-2026-07-16_18.03.32` / `nba-bets-2026-07-23_11.34.23` if the user confirms they're the July notebook experiments |
 | **HF datasets** | `nba-bets`, `nba-bets-compact` (working config); `games` until the user says it's obsolete | optional: `nba-bets-venue20` (rebuildable with one command) |
 | **W&B** | everything: small, free, and cited by the write-ups | optional: `e3-nogc` (OOM, empty) |
-| **Drive `outputs/llm/eval/`** | `base-8b-0shot`, `base-8b-5shot`, `test_run2`, `resume-drill-2`, `e4-llama32-1b`, `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e11-llama32-1b-compact`, `e12-llama32-1b-venue20` | the `e3-*` folders (each holds only a session `mlflow.db`) |
-| **Repo `outputs/llm/eval/`** | the same nine folders (merged 2026-10-21; `outputs/eval/` is gone) | — |
+| **Drive `outputs/llm/eval/`** (old layout; migrate to `outputs/runs/`, see §5) | `base-8b-0shot`, `base-8b-5shot`, `test_run2`, `resume-drill-2`, `e4-llama32-1b`, `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e11-llama32-1b-compact`, `e12-llama32-1b-venue20` | the `e3-*` folders (each holds only a session `mlflow.db`) |
+| **Repo `outputs/runs/`** | the same nine runs, migrated 2026-10-23 from `outputs/llm/eval/` (docs/OUTPUTS.md) | — |
 
-Each eval folder's `mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
+Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
 
 ## 7. Code change log (uncommitted unless the user has committed since)
+
+**Outputs restructure (2026-10-23):**
+- `outputs/` is now `runs/<run_id>/`, `comparisons/`, `eda/`, `checkpoints/`, `archive/`; every path lives in `src/config/paths.py`. Full layout and schema: `docs/OUTPUTS.md`.
+- Training and evaluation write result files only (`predictions/<split>.csv`, `metrics/<split>.json`, `run.json`); figures come from `make plot` / `make plot-compare` (`src/ml/plotting/`).
+- `inspect_llm` writes the shared predictions (raw + Platt) beside the inspection CSV; LLM checkpoints moved to `outputs/checkpoints/<run>/` (`paths.output_dir` removed from every LLM config).
+- Both Colab notebooks read and write `outputs/runs/`; the scoreboard cell calls `build_comparison`.
+- The nine eval folders were migrated (`make migrate-outputs`); their converted metrics reproduce §2's accuracy and log-loss exactly. §2's AUC column mixes raw and Platt-cross-fitted AUC, so it differs from `metrics/validation.json` by ≤ 0.003.
 
 **Session 3 (2026-10-21):**
 - **8-bit cast warning:** `finetune.py::build_quant_config` filters bitsandbytes' per-matmul `MatMul8bitLt: inputs will be cast ... to float16` notice in 8-bit mode. The filter is `_drop_int8_cast_notice`, and a test checks it.

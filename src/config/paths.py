@@ -4,6 +4,7 @@ Path constants for data files and directories.
 All paths are relative to PROJECT_ROOT for portability.
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 from src.config.constants import LEAGUE_SCHEDULE_FILE
 
@@ -189,14 +190,103 @@ PREDICTION_SCORED_GAMES_PATH = PREDICTIONS_DIR / "prediction_scored_games.csv"
 GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"
 
 # ===== Outputs =====
+# Every path under outputs/ is declared here and nowhere else. Layout, schema and
+# rules: docs/OUTPUTS.md.
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
-ENRICHED_GAMES_VIZ_DIR = OUTPUTS_DIR / "enriched_games" / "viz"
-HOME_WIN_RATIO_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_by_season.png"
-HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH = ENRICHED_GAMES_VIZ_DIR / "home_win_ratio_line_by_season.png"
+# One folder per training or evaluation run, ML and LLM alike, so the plotting
+# code reads every run through the same paths.
+RUNS_DIR = OUTPUTS_DIR / "runs"
+# Figures and tables that put several runs on the same axes.
+COMPARISONS_DIR = OUTPUTS_DIR / "comparisons"
+EDA_OUTPUTS_DIR = OUTPUTS_DIR / "eda"
+# LLM training state (checkpoints, downloaded resume snapshots). Large and
+# regenerable from the Hub, so it stays out of runs/, which gets copied around.
+CHECKPOINTS_DIR = OUTPUTS_DIR / "checkpoints"
+# Outputs written before the run layout existed. Kept as-is and never plotted:
+# they hold figures and aggregates, not the per-game predictions plotting reads.
+ARCHIVE_OUTPUTS_DIR = OUTPUTS_DIR / "archive"
 
-# LLM fine-tuning: checkpoints, downloaded resume snapshots and eval charts
-LLM_OUTPUTS_DIR = OUTPUTS_DIR / "llm"
-LLM_EVAL_OUTPUTS_DIR = LLM_OUTPUTS_DIR / "eval"
+# EDA follows the run rule too: the table is the result, the figures are drawn from it.
+HOME_WIN_RATIO_DIR = EDA_OUTPUTS_DIR / "home_win_ratio"
+HOME_WIN_RATIO_BY_SEASON_CSV_PATH = HOME_WIN_RATIO_DIR / "tables" / "home_win_ratio_by_season.csv"
+HOME_WIN_RATIO_FIGURES_DIR = HOME_WIN_RATIO_DIR / "figures"
+HOME_WIN_RATIO_BY_SEASON_PNG_PATH = HOME_WIN_RATIO_FIGURES_DIR / "home_win_ratio_by_season.png"
+HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH = HOME_WIN_RATIO_FIGURES_DIR / "home_win_ratio_line_by_season.png"
+
+
+@dataclass(frozen=True)
+class RunPaths:
+    """Every file inside ``outputs/runs/<run_id>/``.
+
+    The run root holds primary results, written by training and evaluation.
+    ``report/`` holds what the plotting module derives from them and is safe to
+    delete.
+    """
+
+    run_id: str
+    runs_dir: Path = RUNS_DIR
+
+    @property
+    def root(self) -> Path:
+        return self.runs_dir / self.run_id
+
+    @property
+    def run_json(self) -> Path:
+        return self.root / "run.json"
+
+    def predictions(self, split: str) -> Path:
+        return self.root / "predictions" / f"{split}.csv"
+
+    def metrics(self, split: str) -> Path:
+        return self.root / "metrics" / f"{split}.json"
+
+    # sklearn: what the fitted model says about its features.
+    @property
+    def model_dir(self) -> Path:
+        return self.root / "model"
+
+    def cv_results(self, model_name: str) -> Path:
+        return self.model_dir / "cv_results" / f"{model_name}.csv"
+
+    @property
+    def feature_selection(self) -> Path:
+        return self.model_dir / "feature_selection.json"
+
+    @property
+    def feature_importance(self) -> Path:
+        return self.model_dir / "feature_importance.csv"
+
+    @property
+    def shap_values(self) -> Path:
+        return self.model_dir / "shap.csv"
+
+    # LLM: per-game diagnostics no other model family has.
+    @property
+    def llm_dir(self) -> Path:
+        return self.root / "llm"
+
+    def inspection(self, split: str) -> Path:
+        return self.llm_dir / f"inspection_{split}.csv"
+
+    def llm_summary(self, split: str) -> Path:
+        return self.llm_dir / f"summary_{split}.json"
+
+    # The Colab session's MLflow database, copied next to the run it tracked.
+    @property
+    def tracking_db(self) -> Path:
+        return self.root / "tracking" / "mlflow.db"
+
+    @property
+    def report_dir(self) -> Path:
+        return self.root / "report"
+
+    @property
+    def figures_dir(self) -> Path:
+        return self.report_dir / "figures"
+
+    @property
+    def tables_dir(self) -> Path:
+        return self.report_dir / "tables"
 
 
 def project_relpath(path: Path) -> str:

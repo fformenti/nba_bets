@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from src.config.paths import CHECKPOINTS_DIR
 from src.config.secrets import (
     GLOBAL_SECRETS_FILE,
     HF_TOKEN_ENV_VAR,
@@ -464,7 +465,7 @@ def run_training(
     login(token, add_to_git_credential=True)
 
     hub_model_id = build_hub_model_id(config, run_name)
-    output_dir = Path(config.paths.output_dir) / run_name
+    output_dir = CHECKPOINTS_DIR / run_name
 
     checkpoint = None
     if resume == "auto":

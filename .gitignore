@@ -14,7 +14,7 @@
 
 explanations/
 scratchpad
-notebooks
+# notebooks
 sandbox
 .env
 .direnv/

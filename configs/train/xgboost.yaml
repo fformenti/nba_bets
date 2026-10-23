@@ -26,8 +26,6 @@ model:
   train_models:
     - xgboost
 
-paths:
-  outputs: "outputs/xgboost"
 
 mlflow:
   experiment_name: "nba_bets_xgboost"

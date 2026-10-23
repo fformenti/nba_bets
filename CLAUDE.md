@@ -57,6 +57,12 @@ falls back to it non-overriding, so the box's own exports still win.
   committed by default. Everything else derived stays ignored.
 - **Training does not deploy.** `make train` logs the run URI; only
   `PROMOTE=1` repoints `configs/predict/predict_classifier.yaml`.
+- **Training and EDA write results; only `src/ml/plotting/` draws.** Every run,
+  ML or LLM, writes per-game predictions in one shared schema to
+  `outputs/runs/<run_id>/`. EDA writes tables to `outputs/eda/<topic>/tables/`.
+  `make plot` / `make plot-compare` and the EDA figures read those files. No
+  training, evaluation or EDA code imports plotting, and no output path is
+  written outside `src/config/paths.py`. Layout and schema: docs/OUTPUTS.md.
 
 ### Data Flow
 

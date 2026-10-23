@@ -23,6 +23,13 @@ from src.ml.evaluation.metrics import compute_regression_metrics, get_model_disp
 from src.ml.features.engineering import identify_feature_types
 from src.ml.features.preprocessing import create_preprocessing_pipeline
 from src.ml.models.trainer import ModelTrainer
+from src.ml.results import (
+    RunInfo,
+    build_predictions,
+    git_commit,
+    write_predictions,
+    write_run_info,
+)
 from src.utils.logging_config import get_logger
 
 from .runners import train_model_with_config
@@ -46,6 +53,43 @@ def _split_metrics(trainer: ModelTrainer, X: pd.DataFrame, y: pd.Series, prefix:
     return metrics
 
 
+def _margin_series(
+    run_id: str,
+    model: str,
+    split: str,
+    splits,
+    index: pd.Index,
+    y_true: pd.Series,
+    y_pred: np.ndarray,
+    in_points: bool,
+) -> pd.DataFrame:
+    """One regressor's margins for ``split`` in the shared result schema.
+
+    ``pred_margin`` is only filled when the target is the margin in points; a
+    ``margin_scaled`` prediction is in other units, and writing it there would
+    put two scales in one column. The winner call is valid either way: scaling
+    is positive, so it never flips a sign.
+    """
+    metadata = splits.metadata.loc[index]
+    true_margin = None
+    if {"homeScore", "awayScore"} <= set(metadata.columns):
+        true_margin = (
+            pd.to_numeric(metadata["homeScore"], errors="coerce")
+            - pd.to_numeric(metadata["awayScore"], errors="coerce")
+        ).to_numpy()
+    y_pred = np.asarray(y_pred, dtype=float)
+    return build_predictions(
+        run_id=run_id,
+        model=model,
+        split=split,
+        game_ids=metadata["gameId"],
+        y_true=(np.asarray(y_true.loc[index]) > 0).astype(int),
+        y_pred=(y_pred > 0).astype(int),
+        pred_margin=y_pred if in_points else None,
+        true_margin=true_margin,
+    )
+
+
 def _summary(metrics: dict, prefix: str) -> str:
     return (
         f"MAE: {metrics[f'{prefix}_mae']:.3f} | RMSE: {metrics[f'{prefix}_rmse']:.3f} | "
@@ -57,8 +101,17 @@ def train_regression_model(
     config: ExperimentConfig,
     config_path: Optional[Path],
     tracker: Any,
+    run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Train every model in ``config.model.train_models`` as a regressor; ship the best on val MAE."""
+    """Train every model in ``config.model.train_models`` as a regressor; ship the best on val MAE.
+
+    Writes the same result files as the classifier, with ``pred_margin`` filled
+    and ``p_home`` empty, so a regressor's winner calls plot next to a
+    classifier's on the same games.
+    """
+    from src.ml.training.experiment import generate_run_name
+
+    run_id = run_id or generate_run_name(config_path=config_path, include_timestamp=True)
     target = config.data.target_column
     if config.feature_selection.enabled:
         # Boruta-SHAP ranks features with an LGBMClassifier (src/ml/features/selection.py).
@@ -130,6 +183,13 @@ def train_regression_model(
         tracker.log_metrics(baseline)
         tracker.set_tags({"model_type": "baseline"})
 
+    in_points = target == "margin"
+    prediction_frames = [
+        _margin_series(
+            run_id, "mean_baseline", "test", splits, X_test.index, y_test, mean_margin, in_points
+        )
+    ]
+
     results: Dict[str, Dict[str, Any]] = {}
     for model_name in config.model.train_models:
         logger.info(f"\n{'=' * 60}\nTraining {get_model_display_name(model_name)} regressor\n{'=' * 60}")
@@ -160,6 +220,16 @@ def train_regression_model(
             "val_metrics": val_metrics,
             "test_metrics": test_metrics,
         }
+        for split, X_split, y_split in (
+            ("validation", X_val, y_val),
+            ("test", X_test, y_test),
+        ):
+            prediction_frames.append(
+                _margin_series(
+                    run_id, model_name, split, splits, X_split.index, y_split,
+                    trainer.model.predict(X_split), in_points,
+                )
+            )
         with tracker.child_run(model_name):
             tracker.log_metrics({**val_metrics, **test_metrics})
             tracker.set_tags({"model_type": model_name})
@@ -177,6 +247,32 @@ def train_regression_model(
     tracker.log_metrics(best["test_metrics"])
     tracker.set_tags({"best_model": best_model_name})
 
+    predictions = pd.concat(prediction_frames, ignore_index=True)
+    for split in ("validation", "test"):
+        write_predictions(predictions[predictions["split"] == split], run_id, split)
+    write_run_info(
+        RunInfo(
+            run_id=run_id,
+            family="sklearn",
+            task="regression",
+            selected_model=best_model_name,
+            config_path=str(config_path) if config_path else None,
+            mlflow_run_id=tracker.get_run_id(),
+            mlflow_tracking_uri=config.mlflow.tracking_uri,
+            git_commit=git_commit(),
+            splits={
+                "validation": {"n_games": len(X_val)},
+                "test": {"n_games": len(X_test)},
+            },
+            extra={
+                "description": config.description,
+                "target_column": target,
+                "n_features": len(X_train.columns),
+                "split_method": splits.split_method,
+            },
+        )
+    )
+
     artifact_path = f"nba_{best_model_name}"
     tracker.log_model(
         best["pipeline"],
@@ -184,8 +280,8 @@ def train_regression_model(
         input_example=X_train.head(5),
         dataset_name=splits.date_range_name,
     )
-    run_id = tracker.get_run_id()
-    run_model_uri = f"runs:/{run_id}/{artifact_path}" if run_id else None
+    mlflow_run_id = tracker.get_run_id()
+    run_model_uri = f"runs:/{mlflow_run_id}/{artifact_path}" if mlflow_run_id else None
     if run_model_uri:
         logger.info(f"Model logged at run URI: {run_model_uri}")
         tracker.set_tags({"model_run_uri": run_model_uri, "model_name": best_model_name})
@@ -195,4 +291,5 @@ def train_regression_model(
         "best_model_data": best,
         "models_to_train": results,
         "run_model_uri": run_model_uri,
+        "run_id": run_id,
     }

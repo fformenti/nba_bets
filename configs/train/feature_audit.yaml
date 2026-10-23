@@ -25,8 +25,9 @@
 # last_season_record and neutral_court were retired with evidence, and how
 # games_behind_leader — uncoupled, and confirmed — earned its place.
 #
-# Not a candidate for promotion. Read the artifact at
-# outputs/feature_audit/feature_selection/, not the test metrics: this trains
+# Not a candidate for promotion. Read the run's model/feature_selection.json
+# (outputs/runs/feature_audit-<timestamp>/; pass B from August is archived at
+# outputs/archive/2026-08-12_feature_audit/), not the test metrics: this trains
 # one untuned xgboost on ~90 partly-collinear features and is expected to score
 # worse than xgboost.yaml.
 #
@@ -97,8 +98,6 @@ model:
       # set this run exists to discard is time spent on nothing.
       enabled: true
 
-paths:
-  outputs: "outputs/feature_audit"
 
 mlflow:
   experiment_name: "nba_bets_feature_audit"

@@ -2,8 +2,9 @@
 
     make evaluate-llm LLM_RUN=nba-bets-2026-07-27
 
-Charts land in ``outputs/llm/eval/<run_name>/`` as standalone HTML, so they can
-be scp'd off a headless box and opened locally.
+Predictions land in ``outputs/runs/<run_name>/`` (the shared result schema), so
+they can be scp'd off a headless box and drawn locally with
+``make plot RUN=<run_name>``.
 """
 
 import os

@@ -22,7 +22,7 @@ with MLflowTracker(experiment_name="nba_bets_classification", run_name=run_name)
     tracker.set_tags({"task": "classification", "experiment_type": ..., "best_model": ...})
     tracker.log_metrics({"accuracy": ..., "f1": ..., "roc_auc": ...})
     tracker.log_model(model, artifact_path="model", registered_model_name="nba_classification_xgboost")
-    tracker.log_artifacts(output_dir, artifact_path="visualizations")
+    tracker.log_artifacts(str(RunPaths(run_id).root), artifact_path="results")  # result files; make plot adds report/
     tracker.log_artifact(str(file_path), artifact_path="predictions")
     run_id = tracker.get_run_id()
 ```

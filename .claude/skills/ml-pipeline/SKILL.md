@@ -25,7 +25,9 @@ description: >
 src/ml/
 ├── config/        # Pydantic schemas + YAML loader
 ├── datasets/      # load_features(), temporal_split(), stratified_split()
-├── evaluation/    # compute_classification_metrics(), visualizations
+├── evaluation/    # compute_classification_metrics(), breakdown tables (compute only)
+├── results/       # result-file schema: predictions/<split>.csv, metrics, run.json
+├── plotting/      # figures from result files (make plot / make plot-compare)
 ├── features/      # engineering.py (delta/lag/conference features), preprocessing.py
 ├── models/        # ModelTrainer, baseline models, ModelRegistry
 ├── prediction/    # io.py (load_upcoming_games())
@@ -57,7 +59,7 @@ Scikit-learn API required: `fit()`, `predict()`, `predict_proba()`, `score()`.
 3. Temporal/stratified/random split → preprocessor fit on train only
 4. Train `RecordDifferenceBaseline`, `PointDifferentialBaseline`, `random_forest`, `gradient_boosting`
 5. Best model selected by `test_accuracy` from `test_metrics`
-6. Saves visualizations, optionally registers model (→ mlflow skill for registry details)
+6. Writes result files to `outputs/runs/<config>-<timestamp>/` (no figures; `make plot` draws them — docs/OUTPUTS.md), optionally registers model (→ mlflow skill for registry details)
 7. Metrics stored as `{model_name}_test_accuracy`, `{model_name}_test_f1`, etc.
 
 ## Prediction flow summary

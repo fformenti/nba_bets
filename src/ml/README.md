@@ -14,7 +14,9 @@ src/ml/
 ├── training/    train_classifier() → train_single_model() → runners
 ├── llm/         Same experiment, text encoding
 ├── prediction/  Inference on upcoming games
-├── evaluation/  Metrics and plots
+├── evaluation/  Metrics and breakdown tables (compute only)
+├── results/     Result-file schema every family writes (docs/OUTPUTS.md)
+├── plotting/    Figures drawn from result files; nothing here imports it
 ├── tracking/    MLflow wrapper + ops tools
 └── utils/       Validation, SHAP compatibility
 ```

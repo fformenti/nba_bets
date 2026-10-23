@@ -11,6 +11,3 @@ _include:
 data:
   dataset_name: "fformenti/nba-bets-compact"
   prompt_config: "configs/llm_prompt/per_team_compact.yaml"
-
-paths:
-  output_dir: "outputs/llm/qlora/llama32_1b_compact"

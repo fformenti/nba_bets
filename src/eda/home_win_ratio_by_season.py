@@ -1,26 +1,18 @@
-"""EDA: Home team win ratio by NBA season."""
+"""EDA: Home team win ratio by NBA season - the table.
+
+Writes ``outputs/eda/home_win_ratio/tables/home_win_ratio_by_season.csv``. The
+two figures are drawn from that file by :mod:`src.ml.plotting.eda`, so the
+numbers behind them can be read without the chart.
+"""
 
 import logging
+from pathlib import Path
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-import numpy as np
 import pandas as pd
-import seaborn as sns
 
-from src.config.paths import (
-    HOME_WIN_RATIO_BY_SEASON_PNG_PATH,
-    HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH,
-    REGULAR_SEASON_GAMES_PATH,
-)
+from src.config.paths import HOME_WIN_RATIO_BY_SEASON_CSV_PATH, REGULAR_SEASON_GAMES_PATH
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
-
-ROLLING_WINDOW = 5
-# Matches configs/train/_defaults.yaml's filters.min_season - the population
-# src.ml.datasets.splits.build_splits draws train/validation/test from.
-MIN_SEASON = "1980/81"
 
 
 def load_data() -> pd.DataFrame:
@@ -29,99 +21,24 @@ def load_data() -> pd.DataFrame:
     return df
 
 
-def compute_home_win_ratio(df: pd.DataFrame) -> pd.Series:
-    home_win = df["winner"] == df["hometeamId"]
-    return home_win.groupby(df["season"]).mean()
-
-
-def plot(win_ratio: pd.Series) -> None:
-    sns.set_style("whitegrid")
-    fig, ax = plt.subplots(figsize=(16, 6))
-
-    x = np.arange(len(win_ratio))
-    seasons = win_ratio.index.tolist()
-
-    bars = ax.bar(x, win_ratio.values, color="steelblue", alpha=0.7, width=0.6)
-
-    rolling = win_ratio.rolling(window=ROLLING_WINDOW, center=True).mean()
-    ax.plot(x, rolling.values, color="darkorange", linewidth=2, label=f"{ROLLING_WINDOW}-season rolling avg")
-
-    ax.axhline(0.5, color="crimson", linestyle="--", linewidth=1.2, label="Coin flip (0.50)")
-
-    for bar, val in zip(bars, win_ratio.values):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.004,
-            f"{val:.2f}",
-            ha="center",
-            va="bottom",
-            fontsize=6.5,
-            color="dimgray",
-        )
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(seasons, rotation=90, fontsize=8)
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
-    ax.set_ylim(0.3, 0.8)
-
-    ax.set_title("Home Team Win Ratio by NBA Season", fontsize=14, fontweight="bold", pad=12)
-    ax.set_xlabel("Season", fontsize=12)
-    ax.set_ylabel("Home Win Ratio", fontsize=12)
-    ax.legend(fontsize=10)
-
-    fig.tight_layout()
-    HOME_WIN_RATIO_BY_SEASON_PNG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(HOME_WIN_RATIO_BY_SEASON_PNG_PATH, dpi=300)
-    logger.info("Saved plot to %s", HOME_WIN_RATIO_BY_SEASON_PNG_PATH)
-
-
-def plot_home_win_ratio() -> None:
-    """Chart the home-team win ratio per season."""
-    df = load_data()
-    win_ratio = compute_home_win_ratio(df)
-    logger.info("Overall home win ratio: %.3f", win_ratio.mean())
-    plot(win_ratio)
-
-
-def plot_line(win_ratio: pd.Series) -> None:
-    sns.set_style("whitegrid")
-    fig, ax = plt.subplots(figsize=(16, 6))
-
-    x = np.arange(len(win_ratio))
-    seasons = win_ratio.index.tolist()
-
-    ax.plot(x, win_ratio.values, color="steelblue", marker="o", linewidth=1.5, label="Home win %")
-
-    rolling = win_ratio.rolling(window=ROLLING_WINDOW, center=True).mean()
-    ax.plot(x, rolling.values, color="darkorange", linewidth=2, label=f"{ROLLING_WINDOW}-season rolling avg")
-
-    ax.axhline(0.5, color="crimson", linestyle="--", linewidth=1.2, label="Coin flip (0.50)")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(seasons, rotation=90, fontsize=8)
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.0%}"))
-    ax.set_ylim(0.3, 0.8)
-
-    ax.set_title(
-        "Home Team Win % by NBA Season (train + validation + test seasons)",
-        fontsize=14,
-        fontweight="bold",
-        pad=12,
+def compute_home_win_ratio(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per season: ``season``, ``n_games``, ``home_wins``, ``home_win_ratio``."""
+    home_win = (df["winner"] == df["hometeamId"]).astype(int)
+    table = (
+        home_win.groupby(df["season"])
+        .agg(n_games="size", home_wins="sum")
+        .reset_index()
+        .sort_values("season")
     )
-    ax.set_xlabel("Season", fontsize=12)
-    ax.set_ylabel("Home Win %", fontsize=12)
-    ax.legend(fontsize=10)
-
-    fig.tight_layout()
-    HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH, dpi=300)
-    logger.info("Saved plot to %s", HOME_WIN_RATIO_LINE_BY_SEASON_PNG_PATH)
+    table["home_win_ratio"] = table["home_wins"] / table["n_games"]
+    return table
 
 
-def plot_home_win_ratio_line() -> None:
-    """Line-chart the home-team win ratio per season, scoped to the training population."""
-    df = load_data()
-    df = df[df["season"] >= MIN_SEASON]
-    win_ratio = compute_home_win_ratio(df)
-    logger.info("Overall home win ratio (season >= %s): %.3f", MIN_SEASON, win_ratio.mean())
-    plot_line(win_ratio)
+def write_home_win_ratio_table(path: Path = HOME_WIN_RATIO_BY_SEASON_CSV_PATH) -> Path:
+    """Compute the per-season home win ratio from the game table and save it."""
+    table = compute_home_win_ratio(load_data())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table.to_csv(path, index=False)
+    logger.info("Overall home win ratio: %.3f", table["home_win_ratio"].mean())
+    logger.info("Table saved to %s", path)
+    return path

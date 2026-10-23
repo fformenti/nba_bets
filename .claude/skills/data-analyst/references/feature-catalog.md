@@ -69,13 +69,18 @@ pipeline shipped a duplicated feature family.
 
 ### Where the Boruta artifacts live
 
+Runs since 2026-10-23 write `outputs/runs/<config>-<timestamp>/model/feature_selection.json`
+(layout: docs/OUTPUTS.md). The audit below read the pre-layout folders, now archived
+unchanged under `outputs/archive/`:
+
 | Path | Feature pool | Status |
 |------|--------------|--------|
-| `outputs/xgboost/feature_selection/` | current shipping set | authoritative for the deployed model |
-| `outputs/feature_audit/feature_selection/` | every group enabled, matched lags (pass B) | authoritative for "has Boruta ever seen X" |
-| `outputs/all_models/`, `outputs/all/` | byte-identical to `outputs/xgboost` at time of audit | redundant copies |
-| `outputs/same/`, `outputs/different/` | **stale** — conference-split era | ignore; they score `home_conference_vs_away_conference_record` and `games_played_at_home_conference`, columns that no longer exist |
-| `mlruns/*/*/artifacts/outputs/feature_selection/` | per-run copy | matches whatever config that run used |
+| `outputs/runs/xgboost-<timestamp>/model/feature_selection.json` | current shipping set | authoritative for the deployed model, once a run in the new layout exists |
+| `outputs/archive/2026-08-18_xgboost/feature_selection/` | shipping set as of the audit | what the audit read |
+| `outputs/archive/2026-08-12_feature_audit/feature_selection/` | every group enabled, matched lags (pass B) | authoritative for "has Boruta ever seen X" |
+| `outputs/archive/2026-10-17_all_models/` | all four families, Oct 17 | no longer byte-identical to the xgboost folder |
+| `outputs/same/`, `outputs/different/`, `outputs/all/` | **gone** — conference-split era | they scored `home_conference_vs_away_conference_record` and `games_played_at_home_conference`, columns that no longer exist |
+| `mlruns/*/*/artifacts/outputs/feature_selection/` (old runs), `.../artifacts/results/model/feature_selection.json` (new) | per-run copy | matches whatever config that run used |
 
 `configs/train/llm_features.yaml` has **no** Boruta artifact and by design never will:
 nothing trains from it. `build_llm_dataset` reads it for column selection and splits, then
@@ -622,7 +627,8 @@ readings, and this is Felipe's call:
   rolling point-differential windows by the time it shows up, so drop them;
 - *the test is unfair* — clinching only happens in the last few weeks, so the
   signal is confined to a slice of rows that a global mean-|SHAP| ranking
-  averages away. `outputs/xgboost/tables/season_phase_accuracy.csv` is where
+  averages away. `outputs/archive/2026-08-18_xgboost/tables/season_phase_accuracy.csv`
+  (or a new run's `report/tables/season_phase_accuracy.csv`) is where
   that would show: the 70-80 and 80-82 buckets are the only ones where a clinch
   flag can fire, and they hold 165 of 1,201 test rows.
 
@@ -716,15 +722,15 @@ from it raises `KeyError` in `last_season_record.py::_season_sos`, which hard-co
 ## 4. Column ledger
 
 `data/processed/regular_season/games_features.csv`, 228 columns as of the audit.
-Boruta status from `outputs/feature_audit` pass B (every group enabled, matched lags)
+Boruta status from `outputs/archive/2026-08-12_feature_audit` pass B (every group enabled, matched lags)
 unless noted.
 
 ### Active — offered to a model
 
 All 34 columns the shipping config offers Boruta. Two status columns, because a feature's
-status depends on what it competes against: **shipping** = `outputs/xgboost` (run
+status depends on what it competes against: **shipping** = `outputs/archive/2026-08-18_xgboost` (run
 `171c718d`, 34 offered, 11 confirmed + 4 tentative = 15 trained on); **audit** =
-`outputs/feature_audit` pass B (94 offered, every group on, coupled pairs included — read
+`outputs/archive/2026-08-12_feature_audit` pass B (94 offered, every group on, coupled pairs included — read
 §3 before drawing anything from that column).
 
 > **Re-measured 2026-08-15** after the playoff-group change (`games_behind_leader` out,

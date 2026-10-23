@@ -58,7 +58,7 @@ Do all of this from your laptop. Every minute spent fixing credentials on a runn
 | GPU | **RTX 4090 / A5000 (24 GB)** minimum, **L40S / A6000 (48 GB)** comfortable | 8-bit 8B weights are ~9 GB; the rest is activations, which scale with the longest record (~440 tokens, measured at launch) |
 | Architecture | Ampere or newer | `training.bf16: true` and `optim: paged_adamw_32bit` require it. **T4 and V100 will not work** — bf16 is unsupported |
 | Template | RunPod official **PyTorch 2.x / CUDA 12.x** | CUDA driver + build tools already present |
-| Container disk | ≥ 60 GB | 16 GB of base-model shards plus `outputs/llm/<run>/checkpoint-*` with `save_total_limit: 10` |
+| Container disk | ≥ 60 GB | 16 GB of base-model shards plus `outputs/checkpoints/<run>/checkpoint-*` with `save_total_limit: 10` |
 | Network volume | **Yes**, mounted at `/workspace` | See below |
 | Pricing | **Spot is fine** | See below |
 
@@ -243,7 +243,7 @@ make train-llm LLM_RUN=nba-bets-2026-07-30
 ```
 
 What happens: `find_resumable_checkpoint()` lists the files in `fformenti/nba-bets-2026-07-30`, picks
-the highest `checkpoint-N`, `snapshot_download`s it into `outputs/llm/<run>/checkpoint-N`, and hands
+the highest `checkpoint-N`, `snapshot_download`s it into `outputs/checkpoints/<run>/checkpoint-N`, and hands
 it to `trainer.train(resume_from_checkpoint=...)`. You'll see:
 
 ```
@@ -267,12 +267,14 @@ uv run python -m src.cli.train_llm \
 make evaluate-llm LLM_RUN=nba-bets-2026-07-30
 ```
 
-Runs on the `test` split with `evaluation.size: 200` rows. Charts are written as standalone HTML to
-`outputs/llm/eval/<run_name>/` so they can be pulled off a headless box:
+Runs on the `test` split with `evaluation.size: 200` rows. The per-game predictions are written to
+`outputs/runs/<run_name>/` (layout: docs/OUTPUTS.md) so they can be pulled off a headless box and
+drawn locally:
 
 ```bash
-# from your laptop
-scp -r -P <port> root@<pod-ip>:/workspace/nba_bets/outputs/llm/eval/nba-bets-2026-07-30 ./
+# from your laptop, in the repo
+scp -r -P <port> root@<pod-ip>:/workspace/nba_bets/outputs/runs/nba-bets-2026-07-30 outputs/runs/
+make plot RUN=nba-bets-2026-07-30
 ```
 
 **The adapter is already on the Hub** at `fformenti/<run-name>` — that's the deliverable. The only

@@ -43,6 +43,3 @@ data:
 evaluation:
   max_new_tokens: 5
   batch_size: 32
-
-paths:
-  output_dir: "outputs/llm/qlora/llama31_8b"

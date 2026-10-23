@@ -56,7 +56,6 @@ def test_v2_configs_share_one_training_recipe(model, base_model):
     assert (t.learning_rate, t.max_grad_norm) == (2e-4, 1.0)
     assert config.data.max_eval_samples == 1000
     assert config.tracking.wandb.log_model == "false"
-    assert config.paths.output_dir.endswith(model)
 
 
 @pytest.mark.parametrize(
