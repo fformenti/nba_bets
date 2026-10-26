@@ -22,6 +22,9 @@ old
 .vscode
 
 **/credentials/
+# Google OAuth files (src/gdrive/) belong in ~/.secrets/nba_bets_drive/
+client_secret*.json
+token.json
 src/__pycache__/*
 .vscode/*
 !.vscode/settings.json

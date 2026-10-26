@@ -38,6 +38,14 @@ WANDB_TOKEN_ENV_VAR = "WANDB_API_KEY"
 OPENAI_ENV_VAR = "OPENAI_API_KEY"
 SERPER_ENV_VAR = "SERPER_API_KEY"
 
+# Google Drive OAuth (src/gdrive/). Files, not values: the client secret is
+# downloaded from Google Cloud, the token is written by `make drive-auth`. Each
+# default can be overridden by pointing its env var at another path.
+DRIVE_CLIENT_SECRETS_FILE = "~/.secrets/nba_bets_drive/client_secret.json"
+DRIVE_TOKEN_FILE = "~/.secrets/nba_bets_drive/token.json"  # noqa: S105 — a path
+DRIVE_CLIENT_SECRETS_ENV_VAR = "NBA_BETS_DRIVE_CLIENT_SECRETS"
+DRIVE_TOKEN_ENV_VAR = "NBA_BETS_DRIVE_TOKEN"  # noqa: S105 — a variable name
+
 
 def load_env_file(secrets_file: str = SECRETS_FILE) -> None:
     """Explicitly load the secrets file, for kernels direnv never reaches

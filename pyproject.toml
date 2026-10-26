@@ -27,6 +27,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "plotly>=5.20.0",
     "tqdm>=4.66.0",
+    "google-api-python-client>=2.201.0",
+    "google-auth>=2.47.0",
+    "google-auth-oauthlib>=1.5.0",
 ]
 
 # Fine-tuning stack, needed to train and only useful on a CUDA box. It also
@@ -50,6 +53,13 @@ dev = [
     "jupyter>=1.1.1",
     "ruff>=0.14",
 ]
+
+# `pip install .` (Colab) is for the dependencies only: code always runs from the
+# checkout as `python -m src.cli...`. Left to auto-discovery, setuptools takes
+# src/ for a src-layout container and installs betting/, cli/, config/, ... as
+# top-level site-packages — a stale second copy under clash-prone names.
+[tool.setuptools]
+packages = []
 
 [tool.ruff]
 target-version = "py311"

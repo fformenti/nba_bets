@@ -92,7 +92,9 @@ def fix_upcoming_games_cols(
     # here rather than calling add_neutral_court keeps the prediction path free
     # of a dependency on teams_arena.csv and gives the identical answer: that
     # function falls back to the label flag whenever arenaId is null, and an
-    # upcoming game has no arenaId.
+    # upcoming game has no arenaId. Because the label flag is all there is here,
+    # it has to be right on its own. That is why add_neutral_court_game_flag
+    # checks gameSubLabel for NBA Cup games: the group stage is played at home.
     if "is_neutral_court_game" in df.columns:
         df["neutral_court"] = df["is_neutral_court_game"].fillna(False).astype(int)
     else:

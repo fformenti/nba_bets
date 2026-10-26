@@ -6,7 +6,7 @@
         reconcile-postponed retry-unresolved migrate-incremental \
         predict-upcoming score-predictions bet-polymarket \
         train build-llm-dataset train-llm evaluate-llm inspect-llm \
-        plot plot-compare migrate-outputs \
+        plot plot-compare migrate-outputs drive-auth drive-ls drive-sync \
         delete-experiment delete-model plot-home-win-ratio plot-home-win-ratio-line \
         historical-etl full-rebuild predict-upcoming-games \
         process-results-pipeline daily-cycle
@@ -186,6 +186,21 @@ plot-home-win-ratio:
 
 plot-home-win-ratio-line:
 	uv run python -m src.cli.plot_home_win_ratio_line
+
+# ─── Google Drive (Colab) ───────────────────────────────────────────────────
+#
+# Colab runs whatever sits in My Drive/nba_bets/. Code and config are pushed
+# (Drive-only files go to Drive's trash); outputs/ syncs both ways and never
+# deletes. Setup: README.md, "Google Drive sync".
+
+drive-auth:
+	uv run python -m src.cli.drive_sync auth
+
+drive-ls:
+	uv run python -m src.cli.drive_sync ls $(DRIVE_PATH) $(if $(RECURSIVE),--recursive,)
+
+drive-sync:
+	uv run python -m src.cli.drive_sync sync $(if $(DRY_RUN),--dry-run,) $(if $(ONLY),--only $(ONLY),)
 
 # ─── Composite pipelines ────────────────────────────────────────────────────
 

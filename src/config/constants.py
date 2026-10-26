@@ -154,12 +154,17 @@ INTERNATIONAL_GAMES = [
 ]
 
 LAS_VEGAS_GAMES = [
-    "Emirates NBA Cup",
     "NBA Las Vegas Summer League",
 ]
 
-# Combined list of all neutral court game labels
+# Labels that make a game neutral on their own, whatever its gameSubLabel
 NEUTRAL_COURT_GAME_LABELS = INTERNATIONAL_GAMES + LAS_VEGAS_GAMES
+
+# "Emirates NBA Cup" labels every Cup game, but the group stage and quarterfinals
+# are played in the home team's arena. Only the knockout rounds held in Las Vegas
+# are neutral, and gameSubLabel is what says which round a game is.
+NBA_CUP_GAME_LABEL = "Emirates NBA Cup"
+NBA_CUP_NEUTRAL_SUBLABELS = ["East Semifinal", "West Semifinal", "Championship"]
 
 
 # Teams cities map

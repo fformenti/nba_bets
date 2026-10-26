@@ -100,6 +100,7 @@ src/
 │   ├── build_polymarket_odds.py        # make build-polymarket-odds
 │   ├── delete_experiment.py            # make delete-experiment EXPERIMENT=...
 │   ├── delete_model.py                 # make delete-model ARGS=...
+│   ├── drive_sync.py                   # make drive-auth | drive-ls | drive-sync [DRY_RUN=1] [ONLY=code|outputs]
 │   ├── plot_home_win_ratio.py          # make plot-home-win-ratio (table, then bar chart)
 │   └── plot_home_win_ratio_line.py     # make plot-home-win-ratio-line (table, then line chart)
 │
@@ -108,6 +109,10 @@ src/
 │   ├── constants.py                    # Dates, team maps, neutral court labels
 │   ├── secrets.py                      # require_env(): the only way to read a key
 │   └── aws.py                          # AWS config
+│
+├── gdrive/                             # Google Drive sync for Colab (My Drive/nba_bets/)
+│   ├── drive.py                        # Drive API primitives: auth, list, upload, update, download, trash
+│   └── sync.py                         # Push code/config, two-way outputs/; md5 planning + apply
 │
 ├── etl/
 │   ├── make_features.py                # build_features(): the historical feature build

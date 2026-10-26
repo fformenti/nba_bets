@@ -10,6 +10,8 @@ import pandas as pd
 from src.config.constants import (
     CSV_FLOAT_FORMAT,
     GAME_ID_TYPE_PREFIX,
+    NBA_CUP_GAME_LABEL,
+    NBA_CUP_NEUTRAL_SUBLABELS,
     NEUTRAL_COURT_GAME_LABELS,
 )
 from src.config.paths import TEAMS_LOCATIONS_REFERENCE_PATH
@@ -392,12 +394,16 @@ def add_neutral_court_game_flag(
     df: pd.DataFrame,
     game_label_column: str = "gameLabel",
     drop_label_column: bool = True,
+    game_sublabel_column: str = "gameSubLabel",
 ) -> pd.DataFrame:
     """
     Add a boolean flag indicating if a game is played on a neutral court.
 
-    Neutral court games include international games and Las Vegas games
-    as defined in NEUTRAL_COURT_GAME_LABELS.
+    Neutral court games are those labelled in NEUTRAL_COURT_GAME_LABELS
+    (international and Las Vegas games), plus the NBA Cup rounds played in
+    Las Vegas. A Cup game counts only when its sub-label names one of
+    NBA_CUP_NEUTRAL_SUBLABELS. Group stage and quarterfinal games are hosted
+    in the home team's arena, and a Cup game with no sub-label is not flagged.
 
     Parameters
     ----------
@@ -407,6 +413,9 @@ def add_neutral_court_game_flag(
         Name of the column containing game labels
     drop_label_column : bool, default=True
         Whether to drop the game label column after processing
+    game_sublabel_column : str, default="gameSubLabel"
+        Name of the column containing game sub-labels. When it is absent, no
+        Cup game is flagged.
 
     Returns
     -------
@@ -416,7 +425,12 @@ def add_neutral_court_game_flag(
     """
     df = df.copy()
 
-    df["is_neutral_court_game"] = df[game_label_column].isin(NEUTRAL_COURT_GAME_LABELS)
+    is_neutral_label = df[game_label_column].isin(NEUTRAL_COURT_GAME_LABELS)
+    sublabels = df.get(game_sublabel_column, pd.Series(index=df.index, dtype=object))
+    is_cup_in_vegas = df[game_label_column].eq(NBA_CUP_GAME_LABEL) & sublabels.isin(
+        NBA_CUP_NEUTRAL_SUBLABELS
+    )
+    df["is_neutral_court_game"] = is_neutral_label | is_cup_in_vegas
 
     if drop_label_column:
         df = df.drop(columns=[game_label_column]).copy()
