@@ -18,7 +18,7 @@ from src.etl.features.point_differential import (
     calculate_margin,
 )
 from src.etl.utils.common import add_game_time
-from src.ml.llm.dataset import _format_completion
+from src.ml.llm.target import SPECS
 from src.ml.llm.testers import ground_truth, margin_scale
 
 HOME, AWAY = 1, 2
@@ -166,7 +166,7 @@ def test_margin_scaled_is_in_units_of_the_margin_std():
 def test_scaling_round_trips_through_evaluation():
     margin, season_std, reference = -9.0, 15.6, 13.0
     scale = season_std / reference
-    completion = _format_completion(margin / scale)
+    completion = SPECS["regression"].completion(margin, scale)
     row = {"completion": completion, "margin": margin, "margin_scale": scale}
 
     assert completion == "-8"

@@ -21,6 +21,7 @@ from typing import Literal, Optional
 import pandas as pd
 
 from src.config.constants import RESPONSE_VARIABLES
+from src.ml.llm.target import SPECS
 
 SerializationFormat = Literal["labeled", "json", "markdown", "per_team"]
 
@@ -314,7 +315,8 @@ PER_TEAM_HEADER = (
     "Scaled Margin = team's avg point differential in hundredths of the season's "
     "margin standard deviation, so 100 = one std (positive = outscored opponents)."
 )
-PER_TEAM_SUFFIX = "Home margin ="
+# The regression cue; target_mode picks the cue actually used (src/ml/llm/target.py).
+PER_TEAM_SUFFIX = SPECS["regression"].cue
 
 # layout: compact. The definitions above are identical in every row, so after a
 # few steps they teach nothing, and the aligned columns are a third of the
@@ -539,8 +541,8 @@ def _home_adv_line(raw: pd.Series) -> str:
     return f"League-wide home win rate (last 1000 games): {pct}%"
 
 
-def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
-    """The whole prompt, header to ``PER_TEAM_SUFFIX``."""
+def _as_per_team(raw: pd.Series, prompt_config: dict, cue: str = PER_TEAM_SUFFIX) -> str:
+    """The whole prompt, header to ``cue`` - the only line the target mode changes."""
     hidden = hidden_features(raw, prompt_config["thresholds"])
     shown = {k: m for k, m in prompt_config.get("features", {}).items() if k not in hidden}
     compact = prompt_config.get("layout", "aligned") == "compact"
@@ -556,7 +558,7 @@ def _as_per_team(raw: pd.Series, prompt_config: dict) -> str:
             blocks.append(line)
     if HOME_ADV in shown:
         blocks.append(_home_adv_line(raw))
-    blocks.append(PER_TEAM_SUFFIX)
+    blocks.append(cue)
     return "\n\n".join(blocks)
 
 
@@ -573,6 +575,7 @@ def serialize_row(
     fmt: SerializationFormat = "markdown",
     raw: Optional[pd.Series] = None,
     prompt_config: Optional[dict] = None,
+    cue: str = PER_TEAM_SUFFIX,
 ) -> str:
     """Render one feature row as the prompt text shown to the model.
 
@@ -594,17 +597,21 @@ def serialize_row(
         Required for ``per_team``.
     prompt_config : dict, optional
         Output of :func:`load_prompt_config`. Required for ``per_team``.
+    cue : str, optional
+        The ``per_team`` prompt's last line, from the target mode's
+        :class:`src.ml.llm.target.TargetSpec`. The other formats keep their
+        regression ``PROMPT_SUFFIX``.
 
     Returns
     -------
     str
-        Prompt text ending in ``PROMPT_SUFFIX`` (``PER_TEAM_SUFFIX`` for
-        ``per_team``), ready for a completion.
+        Prompt text ending in ``PROMPT_SUFFIX`` (``cue`` for ``per_team``),
+        ready for a completion.
     """
     if fmt == "per_team":
         if raw is None or prompt_config is None:
             raise ValueError("serialization_format 'per_team' needs both `raw` and `prompt_config`.")
-        return _as_per_team(raw, prompt_config)
+        return _as_per_team(raw, prompt_config, cue)
 
     if fmt not in _SERIALIZERS:
         raise ValueError(
@@ -622,6 +629,7 @@ def serialize_frame(
     fmt: SerializationFormat = "markdown",
     raw: Optional[pd.DataFrame] = None,
     prompt_config: Optional[dict] = None,
+    cue: str = PER_TEAM_SUFFIX,
 ) -> list[str]:
     """Serialize every row of ``features``, aligning ``metadata`` and ``raw`` by index."""
     if metadata is not None:
@@ -636,6 +644,7 @@ def serialize_frame(
             fmt=fmt,
             raw=raw.loc[idx] if raw is not None else None,
             prompt_config=prompt_config,
+            cue=cue,
         )
         for idx in features.index
     ]

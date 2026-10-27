@@ -250,3 +250,50 @@ def test_neutral_court_filter_needs_the_column(experiment_config):
 
     with pytest.raises(ValueError, match="neutral_court"):
         build_splits(config)
+
+
+def _stub_per_team(monkeypatch):
+    """per_team without its column set: one line per game, then the cue."""
+    import src.ml.llm.dataset as dataset_module
+
+    monkeypatch.setattr(dataset_module, "load_prompt_config", lambda path: {})
+    monkeypatch.setattr(
+        dataset_module,
+        "serialize_frame",
+        lambda features, metadata, fmt, raw, prompt_config, cue: [f"game {i}\n\n{cue}" for i in features.index],
+    )
+
+
+def test_both_target_modes_score_the_same_games(experiment_config, feature_table, monkeypatch):
+    """Classification vs regression is one change: same games, same prompts but the cue."""
+    _stub_per_team(monkeypatch)
+    _, source = feature_table
+    margins = source.set_index("gameId")["margin"].to_dict()
+    built = {
+        mode: build_llm_dataset(
+            LLMTrainingConfig(
+                data={"serialization_format": "per_team", "target_mode": mode, "dataset_name": f"x/nba-bets-{mode}"}
+            ),
+            experiment_config,
+        )
+        for mode in ("regression", "classification")
+    }
+
+    for name in SPLITS:
+        regression, classification = built["regression"][name], built["classification"][name]
+        assert regression["game_id"] == classification["game_id"]
+        assert [p.removesuffix("Home margin =") for p in regression["prompt"]] == [
+            p.removesuffix("Home team") for p in classification["prompt"]
+        ]
+        for game_id, completion in zip(classification["game_id"], classification["completion"], strict=True):
+            assert completion == (" won" if margins[game_id] > 0 else " lost")
+        # The real margin rides along in both, so truth never parses " won".
+        assert classification["margin"] == regression["margin"]
+
+
+def test_classification_needs_the_per_team_format(experiment_config):
+    config = LLMTrainingConfig(
+        data={"serialization_format": "markdown", "target_mode": "classification", "dataset_name": "x/d-classification"}
+    )
+    with pytest.raises(ValueError, match="per_team"):
+        build_llm_dataset(config, experiment_config)

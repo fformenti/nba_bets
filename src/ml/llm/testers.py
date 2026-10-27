@@ -10,6 +10,7 @@ from IPython.display import clear_output
 from sklearn.metrics import mean_squared_error, r2_score
 from tqdm.auto import tqdm
 
+from src.ml.llm.target import SPECS, TargetSpec
 from src.ml.plotting.llm import series_figures
 from src.ml.results import build_predictions
 
@@ -253,12 +254,14 @@ class ClassificationTester:
     """Evaluate a predictor as a binary classifier via sign agreement.
 
     A prediction is correct (1) when guess and truth share a sign
-    (both > 0 or both <= 0), and incorrect (0) otherwise.
+    (both > 0 or both <= 0), and incorrect (0) otherwise. ``spec`` parses the
+    answer: a margin, or ±1 for `` won``/`` lost`` (src/ml/llm/target.py).
     """
 
-    def __init__(self, predictor, data, title=None, size=DEFAULT_SIZE):
+    def __init__(self, predictor, data, title=None, size=DEFAULT_SIZE, spec: Optional[TargetSpec] = None):
         self.predictor = predictor
         self.data = data
+        self.spec = spec or SPECS["regression"]
         self.title = title or RegressionTester.make_title(predictor)
         self.size = size
         self.titles = []
@@ -283,7 +286,7 @@ class ClassificationTester:
     def run_datapoint(self, i):
         datapoint = self.data[i]
         value = self.predictor(datapoint)
-        guess = self.post_process(value) * margin_scale(datapoint)
+        guess = self.spec.parse(value) * margin_scale(datapoint)
         truth = ground_truth(datapoint)
         correct = self.is_correct(guess, truth)
         color = self.color_for(correct)
@@ -305,7 +308,8 @@ class ClassificationTester:
             game_ids=self.game_ids,
             y_true=[int(t > 0) for t in self.truths],
             y_pred=[int(g > 0) for g in self.guesses],
-            pred_margin=self.guesses,
+            # A won/lost answer parses to ±1, which is no margin.
+            pred_margin=self.guesses if self.spec.has_magnitude else None,
             true_margin=self.truths,
         )
 
@@ -345,8 +349,9 @@ class BatchedClassificationTester(ClassificationTester):
         title=None,
         size=DEFAULT_SIZE,
         batch_size=16,
+        spec: Optional[TargetSpec] = None,
     ):
-        super().__init__(batch_predictor, data, title=title, size=size)
+        super().__init__(batch_predictor, data, title=title, size=size, spec=spec)
         self.batch_size = batch_size
 
     def run_batch(self, start: int) -> None:
@@ -355,7 +360,7 @@ class BatchedClassificationTester(ClassificationTester):
         if len(values) != len(rows):
             raise ValueError(f"batch_predictor returned {len(values)} outputs for {len(rows)} rows")
         for datapoint, value in zip(rows, values):
-            guess = self.post_process(value) * margin_scale(datapoint)
+            guess = self.spec.parse(value) * margin_scale(datapoint)
             truth = ground_truth(datapoint)
             correct = self.is_correct(guess, truth)
             self.titles.append(f"game {datapoint['game_id']}")

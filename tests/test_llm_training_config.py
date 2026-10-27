@@ -157,7 +157,7 @@ def test_diagnostics_summary_separates_bias_from_no_signal():
 
     summary = summarize(frame)
 
-    assert summary["raw_starts_with_minus"] == 0
+    assert summary["raw_answered_away"] == 0
     assert summary["accuracy_greedy"] == 0.5
     assert summary["auc_p_home"] == 1.0
     assert summary["accuracy_at_median_threshold"] == 1.0

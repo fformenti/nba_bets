@@ -4,12 +4,15 @@
 parsed number, which hides *where* a wrong sign comes from. This module keeps
 each stage separate so they can be checked independently:
 
-- **tokenization** - does the first completion token really carry the sign,
-  and does training's joint prompt+completion tokenization split where the
-  prompt ends?
+- **tokenization** - does the first completion token really carry the
+  answer (the sign, or `` won``/`` lost``), and does training's joint
+  prompt+completion tokenization split where the prompt ends?
 - **the model** - the raw decoded text, plus the first-token probability of
-  ``+`` and ``-``, read straight off the logits.
-- **the parser** - the number the tester extracts from that raw text.
+  the home and away answer, read straight off the logits.
+- **the parser** - the number the target mode extracts from that raw text.
+
+The two target modes (src/ml/llm/target.py) differ only in which token pair
+is read and whether a magnitude follows; every metric here is shared.
 
 The probabilities are what separate a model that learned nothing beyond the
 home-win base rate (``p_home`` near-constant, AUC ~0.5) from one that ranks
@@ -22,12 +25,12 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 
-from src.ml.llm.testers import ClassificationTester, ground_truth
+from src.ml.llm.target import SPECS, TargetSpec, spec_of_completion
+from src.ml.llm.testers import ground_truth
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-SIGNS = ("+", "-")
 TOP_K = 5
 # Largest completion magnitude scored by expected_margins. The biggest real
 # margin since 1996 is 65 points; era scaling stretches it a little.
@@ -35,24 +38,26 @@ MAX_MAGNITUDE = 99
 CALIBRATION_BINS = 10
 
 
-def sign_token_ids(tokenizer) -> dict[str, int]:
-    """Token id of each sign as the first completion token.
+def label_token_ids(tokenizer, spec: TargetSpec = SPECS["regression"]) -> dict[str, int]:
+    """Token id of the home and the away answer as the first completion token.
 
-    Read from a tokenized completion rather than from the bare character, so
-    it matches what training graded even if a tokenizer merged the sign with
-    the digits (in which case this raises, because the first-token-is-the-sign
-    assumption the whole evaluation rests on would be false).
+    Home first: :func:`sign_and_margin` reads ``P(home)`` at index 0. Read from
+    a tokenized completion (``+7``, `` won``) rather than from the bare label,
+    so it matches what training graded. Raises if the tokenizer merged the
+    label with what follows, or split a word, because the evaluation rests on
+    the first token being the whole answer.
     """
     ids = {}
-    for sign in SIGNS:
-        first = tokenizer(f"{sign}7", add_special_tokens=False)["input_ids"][0]
+    for margin, label in ((7, spec.home_token), (-7, spec.away_token)):
+        completion = spec.completion(margin)
+        first = tokenizer(completion, add_special_tokens=False)["input_ids"][0]
         decoded = tokenizer.decode([first])
-        if decoded != sign:
+        if decoded != label:
             raise ValueError(
-                f"First token of '{sign}7' decodes to {decoded!r}, not {sign!r}: "
-                "the sign is not a token of its own under this tokenizer."
+                f"First token of {completion!r} decodes to {decoded!r}, not {label!r}: "
+                "the answer is not a token of its own under this tokenizer."
             )
-        ids[sign] = first
+        ids[label] = first
     return ids
 
 
@@ -134,6 +139,9 @@ def sign_and_margin(
 ) -> tuple[list[float], list[float]]:
     """Per row: fp32 ``P(home)`` and the expected completion ``P(+)·E[m|+] - P(-)·E[m|-]``.
 
+    ``sign_ids`` is :func:`label_token_ids`'s output, home answer first - the
+    signs, or `` won``/`` lost`` with ``magnitude_ids=None``.
+
     Greedy decoding returns the single likeliest magnitude, which for a wide,
     noisy margin is the mode (5 or 7 for test_run2), not the mean - the wrong
     estimate for RMSE. This reads the whole magnitude distribution instead: one
@@ -152,12 +160,11 @@ def sign_and_margin(
     mask = inputs["attention_mask"]
     if prompt is None:
         prompt = prompt_pass(model, inputs)
-    signs = list(sign_ids)
     sign_probs = torch.softmax(
         _restricted_logits(prompt.last_hidden_state[:, -1], head, model_config, list(sign_ids.values())),
         dim=-1,
     )
-    p_home = sign_probs[:, signs.index("+")]
+    p_home = sign_probs[:, 0]
     if magnitude_ids is None:
         return p_home.tolist(), [float("nan")] * len(p_home)
 
@@ -178,7 +185,8 @@ def sign_and_margin(
         )
         conditional[sign] = (probs * values).sum(-1)
 
-    expected = p_home * conditional["+"] - (1 - p_home) * conditional["-"]
+    home, away = sign_ids
+    expected = p_home * conditional[home] - (1 - p_home) * conditional[away]
     return p_home.tolist(), expected.tolist()
 
 
@@ -289,19 +297,27 @@ def predict_with_first_token_probs(
     prompt_field: str,
     max_new_tokens: int,
     magnitude_ids: Optional[dict[int, int]] = None,
+    spec: Optional[TargetSpec] = None,
 ) -> list[dict[str, Any]]:
-    """Greedy-decode a batch, keeping the first step's sign probabilities.
+    """Greedy-decode a batch, keeping the first step's answer probabilities.
 
     ``tokenizer`` must pad on the left, so every prompt ends at the same
     column and the first generated position is shared by all rows.
 
-    ``p_plus``/``p_minus`` are read off the model-dtype first-step logits, so
-    their sum shows whether the model opens with a sign at all; ``p_home`` and
-    ``expected_margin`` come from :func:`sign_and_margin` in fp32.
+    ``p_plus``/``p_minus`` are the home and away answer (the signs, or
+    `` won``/`` lost``), read off the model-dtype first-step logits, so their
+    sum shows whether the model opens with an answer at all; ``p_home`` and
+    ``expected_margin`` come from :func:`sign_and_margin` in fp32. ``spec``
+    defaults to the mode the rows' completions were built in; a mode without
+    a magnitude ignores ``magnitude_ids``.
     """
     import torch
 
-    sign_ids = sign_token_ids(tokenizer)
+    spec = spec or spec_of_completion(rows[0]["completion"])
+    sign_ids = label_token_ids(tokenizer, spec)
+    home, away = sign_ids
+    if not spec.has_magnitude:
+        magnitude_ids = None
     prompts = [row[prompt_field] for row in rows]
     inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
     with torch.inference_mode():
@@ -320,8 +336,8 @@ def predict_with_first_token_probs(
 
     results = []
     for i, row in enumerate(rows):
-        p_plus = first_probs[i, sign_ids["+"]].item()
-        p_minus = first_probs[i, sign_ids["-"]].item()
+        p_plus = first_probs[i, sign_ids[home]].item()
+        p_minus = first_probs[i, sign_ids[away]].item()
         raw = tokenizer.decode(generated[i], skip_special_tokens=True)
         results.append(
             {
@@ -334,13 +350,13 @@ def predict_with_first_token_probs(
                 "expected_margin": expected[i],
                 "raw_output": raw,
                 "raw_output_tokens": "|".join(tokenizer.decode([t]) for t in generated[i]),
-                "parsed": ClassificationTester.post_process(raw),
+                "parsed": spec.parse(raw),
                 "p_plus": p_plus,
                 "p_minus": p_minus,
-                # Mass on the two signs: near 1 means the model always opens
-                # with a sign, as trained; low means it opens with something else.
+                # Mass on the two answers: near 1 means the model always opens
+                # with one, as trained; low means it opens with something else.
                 "p_sign_mass": p_plus + p_minus,
-                # Home-win probability, renormalised over the two signs, in fp32.
+                # Home-win probability, renormalised over the two answers, in fp32.
                 "p_home": p_home[i],
                 "top_first_tokens": ", ".join(
                     f"{tokenizer.decode([t])!r}:{p:.3f}"
@@ -360,15 +376,20 @@ def summarize(frame: pd.DataFrame) -> dict[str, Any]:
     from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
 
     home_won = _home_won(frame)
-    first_char = frame["raw_output"].astype(str).str.lstrip().str[:1]
+    spec = spec_of_completion(frame["truth"].iloc[0])
+    raw = frame["raw_output"].astype(str).str.lstrip()
+    answered_home = raw.str.startswith(spec.home_token.strip())
+    answered_away = raw.str.startswith(spec.away_token.strip())
     p_home = frame["p_home"].clip(1e-6, 1 - 1e-6)
 
     summary: dict[str, Any] = {
         "n": len(frame),
         "truth_home_win_rate": home_won.mean(),
-        "raw_starts_with_plus": (first_char == "+").mean(),
-        "raw_starts_with_minus": (first_char == "-").mean(),
-        "raw_starts_with_other": (~first_char.isin(SIGNS)).mean(),
+        # Whether the greedy answer opens with the home or the away answer of
+        # the mode the dataset was built in, or with neither.
+        "raw_answered_home": answered_home.mean(),
+        "raw_answered_away": answered_away.mean(),
+        "raw_answered_other": (~answered_home & ~answered_away).mean(),
         "parsed_negative_rate": (frame["parsed"] < 0).mean(),
         # How often the model picks home, against truth_home_win_rate: the gap
         # is the home lean an era-shifted training prior leaves behind. Read
@@ -390,7 +411,8 @@ def summarize(frame: pd.DataFrame) -> dict[str, Any]:
         summary["accuracy_at_median_threshold"] = (
             (frame["p_home"] > frame["p_home"].median()) == home_won
         ).mean()
-    if "margin" in frame and frame["margin"].notna().all():
+    # A won/lost answer parses to ±1, which is no margin to take an RMSE of.
+    if spec.has_magnitude and "margin" in frame and frame["margin"].notna().all():
         scale = frame["margin_scale"]
         summary["rmse_points_greedy"] = _rmse(frame["parsed"] * scale - frame["margin"])
         summary["rmse_points_predict_mean"] = _rmse(frame["margin"] - frame["margin"].mean())
@@ -405,12 +427,18 @@ def read_inspection_csv(path) -> pd.DataFrame:
     """Load a saved inspection frame with its text columns kept as text.
 
     Left to infer, pandas reads a "+5" cell as the integer 5, and the summary's
-    raw_starts_with_* rates would see no signs at all.
+    raw_answered_* rates would see no signs at all.
     """
     return pd.read_csv(path, dtype={"truth": str, "raw_output": str, "raw_output_tokens": str})
 
 
 def _home_won(frame: pd.DataFrame) -> pd.Series:
+    """Truth from the real ``margin``; only CSVs older than that column parse ``truth``.
+
+    A won/lost completion carries no number, so it must never be parsed here.
+    """
+    if "margin" in frame and frame["margin"].notna().all():
+        return frame["margin"] > 0
     return frame["truth"].map(lambda c: ground_truth({"completion": c})) > 0
 
 
@@ -525,10 +553,11 @@ def inspect_adapter(
     hub_model_id = None if base_only else build_hub_model_id(config, run_name)
     tokenizer, model = _load_adapter_model(config, hub_model_id, revision=revision)
 
+    spec = SPECS[config.data.target_mode]
     first = data[0]
     tok_check = tokenization_check(tokenizer, first[field], first["completion"])
-    magnitude_ids = magnitude_token_ids(tokenizer)
-    if magnitude_ids is None:
+    magnitude_ids = magnitude_token_ids(tokenizer) if spec.has_magnitude else None
+    if spec.has_magnitude and magnitude_ids is None:
         logger.warning(
             "Magnitudes are not single tokens under this tokenizer; "
             "expected_margin (and its RMSE) is skipped."
@@ -546,6 +575,7 @@ def inspect_adapter(
                 prompt_field=field,
                 max_new_tokens=config.evaluation.max_new_tokens,
                 magnitude_ids=magnitude_ids,
+                spec=spec,
             )
         )
 

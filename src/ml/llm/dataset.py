@@ -8,8 +8,9 @@ So the splits are not recomputed here — they come from
 construction.
 
 Each row becomes ``{game_id, prompt, completion}``: ``prompt`` is the serialized
-feature row, ``completion`` the signed point differential. Grading is by sign
-(see :class:`src.ml.llm.testers.ClassificationTester`), which is what makes the
+feature row, ``completion`` the answer ``data.target_mode`` asks for - the
+signed point differential, or `` won``/`` lost`` (src/ml/llm/target.py). Either
+way it is scored by ``P(home)`` on its first token, which is what makes the
 result comparable to the sklearn models' binary home-win prediction.
 
 The column names are load-bearing, not stylistic. trl's SFT collator picks its
@@ -30,6 +31,7 @@ from src.ml.config.loader import load_experiment_config
 from src.ml.config.schema import ExperimentConfig, LLMTrainingConfig
 from src.ml.datasets.splits import Splits, build_splits
 from src.ml.llm.serialization import load_prompt_config, serialize_frame
+from src.ml.llm.target import SPECS, TargetSpec, check_dataset_matches
 from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -51,18 +53,6 @@ TARGET_COLUMN = "margin"
 # a raw-points target teaches an old era's magnitudes; scaling by this puts
 # every season on one spread, and evaluation multiplies the spread back in.
 ERA_SCALE_COLUMN = "margin_std"
-
-
-def _format_completion(point_diff: float) -> str:
-    """Signed point differential as an integer, e.g. ``+7`` / ``-3``.
-
-    Deliberately has no leading space and no decimal part: every token in the
-    completion is graded, so the only two things worth spending tokens on are
-    the sign and the magnitude. The sign matters more of the two — it is what
-    :class:`src.ml.llm.testers.ClassificationTester` scores.
-    """
-    value = int(round(point_diff))
-    return f"{'+' if value >= 0 else '-'}{abs(value)}"
 
 
 def era_scale(splits: Splits, index: pd.Index, reference_std: Optional[float]) -> pd.Series:
@@ -90,12 +80,15 @@ def build_split_dataset(
     serialization_format: str,
     prompt_config: Optional[dict] = None,
     reference_std: Optional[float] = None,
+    spec: TargetSpec = SPECS["regression"],
 ) -> "Dataset":
     """Serialize one split into a HuggingFace ``Dataset``.
 
-    With ``reference_std`` set, the completion is the margin rescaled to an era
-    whose margin std is ``reference_std``; ``margin`` and ``margin_scale``
-    ride along so evaluation can score in real points.
+    ``spec`` sets the prompt's cue and the completion's form. With
+    ``reference_std`` set, a regression completion is the margin rescaled to an
+    era whose margin std is ``reference_std``. ``margin`` and ``margin_scale``
+    ride along in every mode, so evaluation scores in real points and never
+    reads the truth back out of the completion text.
     """
     from datasets import Dataset
 
@@ -117,9 +110,10 @@ def build_split_dataset(
         fmt=serialization_format,
         raw=splits.games_enriched,
         prompt_config=prompt_config,
+        cue=spec.cue,
     )
     scale = era_scale(splits, features.index, reference_std)
-    completions = [_format_completion(v) for v in target / scale]
+    completions = [spec.completion(m, s) for m, s in zip(target, scale, strict=True)]
 
     logger.info(f"{split_name}: {len(prompts)} rows ({serialization_format})")
     return Dataset.from_dict(
@@ -158,9 +152,15 @@ def build_llm_dataset(
     if experiment_config is None:
         experiment_config = load_experiment_config(llm_config.data.source_experiment_config)
 
+    spec = SPECS[llm_config.data.target_mode]
+    if spec is not SPECS["regression"] and llm_config.data.serialization_format != "per_team":
+        raise ValueError(
+            f"target_mode '{llm_config.data.target_mode}' needs serialization_format "
+            "'per_team'; the other formats end in a fixed margin question."
+        )
     logger.info(
         f"Building LLM dataset from {llm_config.data.source_experiment_config} "
-        f"(format={llm_config.data.serialization_format})"
+        f"(format={llm_config.data.serialization_format}, target={llm_config.data.target_mode})"
     )
     splits = build_splits(experiment_config)
 
@@ -176,6 +176,7 @@ def build_llm_dataset(
                 llm_config.data.serialization_format,
                 prompt_config,
                 reference_std=llm_config.data.target_reference_std,
+                spec=spec,
             )
             for name in SPLIT_NAMES
         }
@@ -197,7 +198,8 @@ def load_hf_split(
 
     With ``shuffle_seed`` set, the cap takes a seeded random sample rather
     than the first N rows: splits are date-sorted, so the first N would all
-    come from one month.
+    come from one month. Training, in-training eval and inspection all load
+    here, so this is where a dataset built in the other target mode is caught.
     """
     from datasets import load_dataset
     from src.ml.llm.finetune import get_hf_token
@@ -209,6 +211,7 @@ def load_hf_split(
             f"Available: {sorted(dataset.keys())}"
         )
     data = dataset[split]
+    check_dataset_matches(data[0], SPECS[config.data.target_mode], config.data.prompt_field)
     if max_samples:
         n = min(max_samples, len(data))
         data = (

@@ -12,7 +12,7 @@ def _tokenizer():
     from tokenizers import Tokenizer, models, pre_tokenizers
     from transformers import PreTrainedTokenizerFast
 
-    words = ["</s>", "<unk>", "a", "b", "c", "=", "+", "-", *map(str, range(10))]
+    words = ["</s>", "<unk>", "a", "b", "c", "=", "+", "-", *map(str, range(10)), "team", "won", "lost"]
     vocab = {w: i for i, w in enumerate(words)}
     tokenizer = Tokenizer(models.WordLevel(vocab, unk_token="<unk>"))  # noqa: S106
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
@@ -24,7 +24,13 @@ def _tokenizer():
     )
 
 
-def _trainer(tmp_path):
+REGRESSION_ROWS = {
+    "prompt": ["a b =", "b c =", "c a =", "a a =", "b b =", "c c ="],
+    "completion": ["+7", "-3", "+1", "-9", "+4", "-2"],
+}
+
+
+def _trainer(tmp_path, rows=REGRESSION_ROWS):
     import torch
     from datasets import Dataset
     from peft import LoraConfig
@@ -50,12 +56,7 @@ def _trainer(tmp_path):
             eos_token_id=tokenizer.eos_token_id,
         )
     )
-    data = Dataset.from_dict(
-        {
-            "prompt": ["a b =", "b c =", "c a =", "a a =", "b b =", "c c ="],
-            "completion": ["+7", "-3", "+1", "-9", "+4", "-2"],
-        }
-    )
+    data = Dataset.from_dict(rows)
     args = SFTConfig(
         output_dir=str(tmp_path),
         max_steps=2,
@@ -100,3 +101,21 @@ def test_first_token_accuracy_is_logged_on_eval(tmp_path):
     trainer.evaluate(trainer.train_dataset)
 
     assert any("eval_first_token_accuracy" in h for h in trainer.state.log_history)
+
+
+def test_classification_trains_on_the_answer_word_and_eos_only(tmp_path):
+    """Completion-only loss masks everything up to the cue; the word is the first scored token."""
+    rows = {
+        "prompt": ["a b team", "b c team", "c a team", "a a team"],
+        "completion": [" won", " lost", " won", " lost"],
+    }
+    trainer = _trainer(tmp_path, rows)
+    tokenizer = trainer.processing_class
+
+    for row, expected in zip(trainer.train_dataset, rows["completion"], strict=True):
+        # trl 1.x masks the prompt as label -100.
+        scored = [label for label in row["labels"] if label != -100]
+        assert tokenizer.convert_ids_to_tokens(scored) == [expected.strip(), "</s>"]
+
+    trainer.train()
+    assert any("first_token_accuracy" in h for h in trainer.state.log_history)

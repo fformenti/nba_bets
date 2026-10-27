@@ -105,6 +105,7 @@ def main() -> None:
             config_path=str(args.config),
             extra={
                 "base_model": config.base_model,
+                "target_mode": config.data.target_mode,
                 "hub_model_id": None if args.base_only else build_hub_model_id(config, args.run_name),
                 "revision": args.revision,
                 "base_only": args.base_only,

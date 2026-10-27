@@ -64,7 +64,7 @@ def test_saved_csv_keeps_signs_as_text(tmp_path):
     frame = read_inspection_csv(path)
 
     assert frame["raw_output"].str[0].isin(["+", "-"]).all()
-    assert summarize(frame)["raw_starts_with_other"] == 0
+    assert summarize(frame)["raw_answered_other"] == 0
 
 
 def test_platt_removes_a_constant_home_lean():
@@ -163,6 +163,15 @@ def test_expected_margin_weights_both_signs_and_magnitudes():
 
     assert p_home == pytest.approx(0.75)
     assert expected == pytest.approx(0.75 * 7 - 0.25 * 4)
+
+
+def test_p_home_is_read_off_the_home_answer_whatever_its_text():
+    """The home answer is the label dict's first entry, sign or word."""
+    (as_signs,), _ = sign_and_margin(FakeModel(), _inputs(), {"+": 1, "-": 2}, None)
+    (as_words,), (expected,) = sign_and_margin(FakeModel(), _inputs(), {" won": 1, " lost": 2}, None)
+
+    assert as_words == pytest.approx(as_signs) == pytest.approx(0.75)
+    assert np.isnan(expected)
 
 
 def test_sign_probability_is_resolved_beyond_bf16():

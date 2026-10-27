@@ -20,6 +20,7 @@ from src.ml.llm.finetune import (
     build_tokenizer,
     get_hf_token,
 )
+from src.ml.llm.target import SPECS
 from src.ml.llm.testers import BatchedClassificationTester
 from src.ml.results import RunInfo, git_commit, read_run_info, write_predictions, write_run_info
 
@@ -120,6 +121,7 @@ def run_evaluation(
         title=run_name,
         size=size,
         batch_size=config.evaluation.batch_size,
+        spec=SPECS[config.data.target_mode],
     )
     metrics = tester.run()
     write_predictions(tester.predictions(run_name, split), run_name, split)
@@ -134,7 +136,9 @@ def run_evaluation(
             git_commit=git_commit(),
         )
     info.splits.setdefault(split, {"n_games": metrics["size"]})
-    info.extra.update({"base_model": config.base_model, "hub_model_id": hub_model_id})
+    info.extra.update(
+        {"base_model": config.base_model, "hub_model_id": hub_model_id, "target_mode": config.data.target_mode}
+    )
     write_run_info(info)
 
     logger.info(f"Accuracy: {metrics['accuracy']:.1%} ({metrics['n_correct']}/{metrics['size']})")

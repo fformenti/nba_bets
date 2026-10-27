@@ -50,6 +50,7 @@ configs/
 │       ├── llama32_1b/
 │       │   ├── v2.yaml                 # Current recipe on an L4
 │       │   ├── compact.yaml            # v2 + compact prompt layout, own Hub dataset
+│       │   ├── compact_classification.yaml # compact + target_mode classification (" won"/" lost"), own -classification Hub dataset
 │       │   ├── seed43.yaml             # v2 with training.seed 43 (E7 seed repeat, the noise floor)
 │       │   └── venue20.yaml            # v2 + last-season venue line to 20 venue games, own Hub dataset
 │       ├── llama32_3b/v2.yaml          # Current recipe on an L4
@@ -195,6 +196,7 @@ src/
 │   ├── llm/                            # The LLM is a second ENCODING of the same experiment
 │   │   ├── serialization.py            # serialize_row(): the ONLY table→text boundary (incl. per_team format)
 │   │   ├── dataset.py                  # build_llm_dataset() from build_splits()
+│   │   ├── target.py                   # TargetSpec per target_mode: the prompt's cue + completion (+7 vs " won")
 │   │   ├── finetune.py                 # QLoRA SFT: preflight, Hub resume, SFTTrainer
 │   │   ├── train.py                    # Run orchestration + tracking
 │   │   ├── diagnostics.py              # Raw outputs, sign probabilities, expected margin, calibration, Platt

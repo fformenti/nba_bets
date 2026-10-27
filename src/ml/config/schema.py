@@ -477,12 +477,37 @@ class LLMDataConfig(BaseModel):
         "rescales predictions back to real points per game. None trains on raw "
         "points.",
     )
+    target_mode: Literal["regression", "classification"] = Field(
+        default="regression",
+        description="What the completion is: the signed (era-scaled) home margin "
+        "after 'Home margin =', or ' won'/' lost' after 'Home team' "
+        "(src/ml/llm/target.py). Each mode needs its own dataset: a "
+        "classification dataset_name must end in '-classification' and a "
+        "regression one must not, and loading fails if the dataset was built in "
+        "the other mode. target_reference_std has no effect in classification "
+        "mode. Classification needs 'per_team'.",
+    )
     prompt_config: str = Field(
         default="configs/llm_prompt/per_team.yaml",
         description="Prompt config for the 'per_team' format: which features "
         "appear, team rows vs home − away delta, and the games-played "
         "thresholds. Ignored by the other formats.",
     )
+
+    @model_validator(mode="after")
+    def _dataset_name_says_its_mode(self):
+        """Checked at config load, offline, before any build or push can overwrite the other mode's dataset."""
+        from src.ml.llm.target import CLASSIFICATION_DATASET_SUFFIX as suffix
+
+        is_classification = self.target_mode == "classification"
+        if is_classification != self.dataset_name.endswith(suffix):
+            need = "end with" if is_classification else "not end with"
+            raise ValueError(
+                f"data.target_mode is '{self.target_mode}', so data.dataset_name must "
+                f"{need} '{suffix}' (got '{self.dataset_name}'). Regression and "
+                "classification datasets never share a Hub repo."
+            )
+        return self
 
 
 class QuantizationConfig(BaseModel):

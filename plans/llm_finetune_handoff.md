@@ -42,7 +42,7 @@
   - For pure s/step, take the median `_timestamp` delta between `train/loss` rows. `train_runtime` includes evals.
 - **HF API:** connect with `HfApi(token=require_env("HF_llm_training_token", ""))`. The Hub user is `fformenti`.
 - **Compare two runs, paired:** align both CSVs on `game_id` and run `diagnostics.py::recalibrate` on each. Then bootstrap the per-game log-loss difference. `seed_noise.md` describes the method; the script was a throwaway, so N2 should add it as a library function.
-- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 544 pass.
+- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 626 pass.
 
 ## 1. Goals and setup
 
@@ -116,6 +116,16 @@
 - **LLM side:** use E11 (`e11-llama32-1b-compact`, the working config) and E4 as a cross-check. Their `p_home` correlate at 0.994.
 - **Success:** the blend passes the §2 win rule against E4.
 - **For contrast:** two LLM seeds correlate at 0.993, and averaging them gained nothing (E7). A blend helps only if XGBoost's correlation with the LLM is clearly lower.
+
+### E16. Classification target (user, Colab, about 21 min; code ready 2026-10-27)
+- **Question:** does the margin's magnitude token help as an auxiliary signal, or does it dilute the gradient on the sign? The prompt ends `Home team` and the model completes ` won` / ` lost`; every line before it is byte-identical to compact's.
+- **Code:** `data.target_mode: regression | classification` (`src/ml/llm/target.py`). `p_home` is still the two-way softmax over the first completion token, so the scoreboard, Platt and `plot-compare` need no change. The mode is recorded in the W&B config and `run.json`. A config pointed at the other mode's dataset fails at load. Dataset names keep the modes apart: a classification `dataset_name` must end in `-classification` and a regression one must not (`LLMDataConfig` checks this when the config loads, so a push can't overwrite the other mode's dataset). Regression keeps its original names.
+- **Steps:**
+  1. Push the dataset (ask first): `make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact_classification ARGS=--push` → `fformenti/nba-bets-compact-classification`.
+  2. Colab: `LLM_CONFIG=qlora/llama32_1b/compact_classification`, `RUN_NAME=e16-llama32-1b-compact-classification`, `INSPECT_SPLITS=["validation"]`.
+  3. Compare with E11 using `make plot-compare` and the paired bootstrap, under the §2 win rule.
+- **Caveat, the game set has changed:** today's build has 23,108 / 2,938 / 1,008 games against the Hub's 23,247 / 2,949 / 1,018. All 160 missing games are absent from the current build, and every shared row is byte-identical to the Hub's. That points to the HEAD commit (`03b77a0`, neutral-court fix and filters). So E16 trains on 139 fewer games than E11; `plot-compare` scores both on the 2,938 shared validation games. For a strict one-change test, rebuild `nba-bets-compact` as well and rerun E11.
+- **Don't compare** `eval_loss` or `mean_token_accuracy` across modes, because regression's loss includes the magnitude token. Read `first_token_accuracy` instead.
 
 ### N5. E8, learning curve (user, Colab, about 15 min in total)
 - **Why:** eval loss and first-token accuracy plateau by about step 200–300 of 727 (E4, E5, E11). This tests whether more data helps, which decides whether gathering more seasons is worth it.
@@ -213,6 +223,13 @@ The best config, trained on the full train split. **Score test once.** Report it
 Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
 
 ## 7. Code change log (uncommitted unless the user has committed since)
+
+**Target modes (2026-10-27):**
+- `src/ml/llm/target.py`: `TargetSpec` (cue, home/away first token, `has_magnitude`, `completion`, `parse`) and `SPECS` for regression and classification. `LLMDataConfig.target_mode` selects one; the default `regression` leaves every existing config and dataset unchanged. A validator requires classification dataset names to end in `-classification` and forbids it for regression.
+- The cue is threaded through `serialize_frame` → `_as_per_team`. `dataset.py` writes `spec.completion` (`_format_completion` is gone; the regression spec reproduces it, which a test pins). `load_hf_split` refuses a dataset built in the other mode.
+- `diagnostics.py`: `label_token_ids` replaces `sign_token_ids`; `p_home` is read at index 0 (the home answer). `_home_won` reads `margin` when present. The summary keys `raw_starts_with_*` became `raw_answered_{home,away,other}`. Classification reports no RMSE.
+- The greedy tester parses via `spec.parse`; a won/lost answer reports no `pred_margin`.
+- Tests: `tests/test_llm_target.py` (it uses the cached Llama tokenizer when present), plus additions to the split-parity, per_team, diagnostics and trl tests.
 
 **Outputs restructure (2026-10-23):**
 - `outputs/` is now `runs/<run_id>/`, `comparisons/`, `eda/`, `checkpoints/`, `archive/`; every path lives in `src/config/paths.py`. Full layout and schema: `docs/OUTPUTS.md`.

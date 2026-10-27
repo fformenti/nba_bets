@@ -151,6 +151,18 @@ def test_prompt_ends_with_suffix():
     assert render(make_raw(), make_config()).endswith(PER_TEAM_SUFFIX)
 
 
+def test_target_mode_changes_only_the_cue():
+    """Classification's prompt is regression's with the last line swapped."""
+    from src.ml.llm.target import SPECS
+
+    raw, config = make_raw(), make_config()
+    regression = render(raw, config)
+    classification = serialize_row(raw, raw=raw, fmt="per_team", prompt_config=config, cue=SPECS["classification"].cue)
+
+    assert regression.endswith(PER_TEAM_SUFFIX)
+    assert classification == regression.removesuffix(PER_TEAM_SUFFIX) + "Home team"
+
+
 def test_per_team_requires_raw_and_config():
     with pytest.raises(ValueError, match="per_team"):
         serialize_row(make_raw(), fmt="per_team")
