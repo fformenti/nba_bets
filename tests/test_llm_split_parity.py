@@ -206,3 +206,47 @@ def test_prompts_do_not_contain_the_completion(experiment_config, llm_config):
         assert "| margin |" not in prompt_body
         assert "| winner |" not in prompt_body
         assert "| homeScore |" not in prompt_body
+
+
+def _with_neutral_games(feature_table, experiment_config):
+    """Rewrite the table with every 10th game neutral and turn the filter on."""
+    path, df = feature_table
+    df = df.assign(neutral_court=(np.arange(len(df)) % 10 == 0).astype(int))
+    df.to_csv(path, index=False)
+    config = experiment_config.model_copy(
+        update={
+            "filters": experiment_config.filters.model_copy(
+                update={"exclude_neutral_court": True}
+            )
+        }
+    )
+    return config, set(df.loc[df["neutral_court"] == 1, "gameId"])
+
+
+def test_neutral_court_games_are_excluded_from_every_split(
+    feature_table, experiment_config, llm_config
+):
+    config, neutral_ids = _with_neutral_games(feature_table, experiment_config)
+
+    splits = build_splits(config)
+    dataset = build_llm_dataset(llm_config, config)
+
+    for name in SPLITS:
+        ml_ids = set(splits.game_ids(name).astype(int))
+        llm_ids = {int(g) for g in dataset[name]["game_id"]}
+        assert ml_ids, f"{name} split is empty"
+        assert not ml_ids & neutral_ids, f"{name} kept a neutral game"
+        assert llm_ids == ml_ids, f"{name} split diverged"
+
+
+def test_neutral_court_filter_needs_the_column(experiment_config):
+    config = experiment_config.model_copy(
+        update={
+            "filters": experiment_config.filters.model_copy(
+                update={"exclude_neutral_court": True}
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="neutral_court"):
+        build_splits(config)

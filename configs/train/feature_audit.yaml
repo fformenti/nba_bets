@@ -43,6 +43,11 @@ description: "Diagnostic: every feature group enabled, for Boruta-SHAP coverage"
 tags:
   variation: "feature_audit"
 
+# The audit enables neutral_court to measure it, which it cannot do on a table
+# with every neutral game removed.
+filters:
+  exclude_neutral_court: false
+
 feature_engineering:
   features:
     record:

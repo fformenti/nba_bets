@@ -57,6 +57,8 @@ class FiltersConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     min_season: str | None = None
+    # Drop every game with neutral_court == 1 from all three splits.
+    exclude_neutral_court: bool = False
     minimum_games_train: int = 15
     minimum_games_test: int = 15
 

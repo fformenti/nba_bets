@@ -87,8 +87,9 @@ class Splits:
 def build_splits(config: ExperimentConfig) -> Splits:
     """Load the feature table and split it according to ``config``.
 
-    Steps, in order: load and validate → filter by ``min_season`` → drop NA and
-    peel off metadata → build baseline test frames → engineer delta and
+    Steps, in order: load and validate → filter by ``min_season`` → drop
+    neutral-court games if ``exclude_neutral_court`` → drop NA and peel off
+    metadata → build baseline test frames → engineer delta and
     conference features → select feature columns → split on season boundaries →
     apply the minimum-games-played masks.
 
@@ -130,6 +131,22 @@ def build_splits(config: ExperimentConfig) -> Splits:
             raise ValueError("DataFrame must contain 'season' column for min_season filtering")
         games_enriched = games_enriched[games_enriched["season"] >= min_season].copy()
         logger.info(f"Filtered to {len(games_enriched)} games (min_season: {min_season})")
+
+    # Before prepare_data, so metadata, the baseline frame and all three splits
+    # lose the same rows. Features are built in the ETL over the full history, so
+    # dropping games here changes no other game's features.
+    if filters_config.exclude_neutral_court:
+        if "neutral_court" not in games_enriched.columns:
+            raise ValueError(
+                "DataFrame must contain 'neutral_court' column for exclude_neutral_court"
+            )
+        if feat_eng_config.features.neutral_court.enabled:
+            logger.warning(
+                "exclude_neutral_court is on and the neutral_court feature group is "
+                "enabled: the feature will be a constant 0."
+            )
+        games_enriched = games_enriched[games_enriched["neutral_court"] != 1].copy()
+        logger.info(f"Filtered to {len(games_enriched)} games (neutral court excluded)")
 
     date_range_name = None
     if date_column and date_column in games_enriched.columns:

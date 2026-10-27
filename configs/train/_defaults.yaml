@@ -24,6 +24,9 @@ data:
 
 filters:
   min_season: "1996/97"
+  # Neutral-court games (bubble, international, NBA Cup in Vegas, alternate
+  # sites) carry no home advantage; keep them out of train, validation and test.
+  exclude_neutral_court: true
   minimum_games_train: 15
   minimum_games_test: 15
 
