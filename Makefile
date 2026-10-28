@@ -190,8 +190,8 @@ plot-home-win-ratio-line:
 # ─── Google Drive (Colab) ───────────────────────────────────────────────────
 #
 # Colab runs whatever sits in My Drive/nba_bets/. Code and config are pushed
-# (Drive-only files go to Drive's trash); outputs/ syncs both ways and never
-# deletes. Setup: README.md, "Google Drive sync".
+# (Drive-only files go to Drive's trash); outputs/ is pulled from Drive, never
+# uploaded or deleted. Setup: README.md, "Google Drive sync".
 
 drive-auth:
 	uv run python -m src.cli.drive_sync auth

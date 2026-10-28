@@ -28,6 +28,7 @@ configs/
 │   ├── all_models.yaml                 # Overrides: sweep all four sklearn model families
 │   ├── feature_audit.yaml              # Diagnostic: every feature group on, for Boruta-SHAP coverage
 │   ├── llm_features.yaml               # Overrides: LLM feature set (adds win % and streak)
+│   ├── llm_features_min4.yaml          # llm_features + minimum games played 4 instead of 15
 │   ├── xgboost.yaml                    # The deployed model: all games, xgboost
 │   └── xgboost_margin.yaml             # xgboost regressor on the home margin (not deployable)
 ├── train_llm/                          # LLM fine-tuning: <type>/<base model>/<experiment>.yaml
@@ -51,6 +52,7 @@ configs/
 │       │   ├── v2.yaml                 # Current recipe on an L4
 │       │   ├── compact.yaml            # v2 + compact prompt layout, own Hub dataset
 │       │   ├── compact_classification.yaml # compact + target_mode classification (" won"/" lost"), own -classification Hub dataset
+│       │   ├── compact_min4.yaml       # compact + splits from llm_features_min4 (games from 5 played), own Hub dataset
 │       │   ├── seed43.yaml             # v2 with training.seed 43 (E7 seed repeat, the noise floor)
 │       │   └── venue20.yaml            # v2 + last-season venue line to 20 venue games, own Hub dataset
 │       ├── llama32_3b/v2.yaml          # Current recipe on an L4
@@ -113,7 +115,7 @@ src/
 │
 ├── gdrive/                             # Google Drive sync for Colab (My Drive/nba_bets/)
 │   ├── drive.py                        # Drive API primitives: auth, list, upload, update, download, trash
-│   └── sync.py                         # Push code/config, two-way outputs/; md5 planning + apply
+│   └── sync.py                         # Push code/config, pull outputs/; md5 planning + apply
 │
 ├── etl/
 │   ├── make_features.py                # build_features(): the historical feature build

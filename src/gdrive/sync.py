@@ -7,15 +7,17 @@ Two directions, because the paths have two owners:
   Drive's trash. The trash is not optional — Colab ``rsync --delete``s the Drive
   copy onto its local disk, so a module deleted here but left on Drive would
   come back to life there.
-- **Results** (``BIDIRECTIONAL_PATHS``) are written by Colab *and* locally.
-  They sync both ways and never delete; when both sides changed a file, the
-  newer ``modifiedTime`` wins. Transfers carry the mtime across, which is what
-  keeps that comparison meaningful on the next run.
+- **Results** (``PULL_PATHS``) land on Drive from Colab and are forwarded
+  here. Pull only downloads: nothing is uploaded or deleted on either side, and
+  figures and images are skipped (they are redrawn locally from the tables).
+  When both sides changed a file, a newer Drive copy overwrites the local one; a
+  newer local copy is left alone. Downloads carry the mtime across, which is
+  what keeps that comparison meaningful on the next run.
 
 Change detection is md5: Drive reports ``md5Checksum`` for every binary file,
 so an unchanged file costs one listing entry and no transfer.
 
-Planning (:func:`plan_push`, :func:`plan_bidirectional`) is pure and is what the
+Planning (:func:`plan_push`, :func:`plan_pull`) is pure and is what the
 tests exercise; :func:`apply_actions` is the only part that writes. The planner
 only ever receives paths under the scopes, so nothing else in ``nba_bets/`` on
 Drive can be touched.
@@ -37,11 +39,14 @@ DRIVE_ROOT_NAME = "nba_bets"
 PUSH_PATHS = ("src", "configs", "colab_notebooks", "pyproject.toml")
 # Listed one by one rather than as outputs/: outputs/checkpoints/ can hold
 # multi-GB adapters, and a new outputs/ subfolder should be a decision.
-BIDIRECTIONAL_PATHS = ("outputs/runs", "outputs/comparisons", "outputs/eda", "outputs/archive")
-SCOPE_GROUPS = {"code": PUSH_PATHS, "outputs": BIDIRECTIONAL_PATHS}
+# outputs/eda and outputs/archive are produced locally only, so they are not pulled.
+PULL_PATHS = ("outputs/runs", "outputs/comparisons")
+SCOPE_GROUPS = {"code": PUSH_PATHS, "outputs": PULL_PATHS}
 
 IGNORED_NAMES = frozenset({".DS_Store", "__pycache__", ".ipynb_checkpoints", "Icon\r"})
 IGNORED_SUFFIXES = frozenset({".pyc"})
+# Pull skips plots: they live in */figures/ (png and plotly html) and are redrawn locally.
+IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp"})
 # Drive keeps ms, the local filesystem keeps ns; closer than this is "same time".
 TIE_TOLERANCE_SECONDS = 2.0
 
@@ -51,7 +56,6 @@ Kind = Literal[
     "trash",
     "download",
     "overwrite_local",
-    "overwrite_drive",
     "skip",
     "unchanged",
 ]
@@ -59,7 +63,6 @@ Kind = Literal[
 KIND_LABELS: dict[str, str] = {
     "upload": "UPLOAD          (new on Drive)",
     "update": "UPDATE          (Drive copy overwritten)",
-    "overwrite_drive": "OVERWRITE DRIVE (local is newer)",
     "download": "DOWNLOAD        (new locally)",
     "overwrite_local": "OVERWRITE LOCAL (Drive is newer)",
     "trash": "TRASH ON DRIVE  (recoverable 30 days)",
@@ -86,6 +89,13 @@ def is_ignored(rel_path: str) -> bool:
     parts = PurePosixPath(rel_path).parts
     return any(part in IGNORED_NAMES for part in parts) or PurePosixPath(rel_path).suffix in (
         IGNORED_SUFFIXES
+    )
+
+
+def is_figure(rel_path: str) -> bool:
+    path = PurePosixPath(rel_path)
+    return any(part.endswith("figures") for part in path.parent.parts) or (
+        path.suffix.lower() in IMAGE_SUFFIXES
     )
 
 
@@ -205,19 +215,16 @@ def plan_push(local: dict[str, LocalFile], remote: dict[str, list[DriveFile]]) -
     return actions
 
 
-def plan_bidirectional(
-    local: dict[str, LocalFile], remote: dict[str, list[DriveFile]]
-) -> list[Action]:
-    """Additive two-way sync. Never deletes; on a content clash the newer side wins."""
-    remote = {rel: items for rel, items in remote.items() if not is_ignored(rel)}
+def plan_pull(local: dict[str, LocalFile], remote: dict[str, list[DriveFile]]) -> list[Action]:
+    """Bring Drive's files down. Never uploads or deletes; a newer local copy is kept."""
+    remote = {
+        rel: items for rel, items in remote.items() if not (is_ignored(rel) or is_figure(rel))
+    }
     actions, clashed = _shape_clashes(local, remote)
-    for rel in sorted(set(local) | set(remote)):
+    for rel in sorted(remote):
         if rel in clashed:
             continue
-        items = remote.get(rel)
-        if items is None:
-            actions.append(Action("upload", rel, "only local"))
-            continue
+        items = remote[rel]
         problem = _unusable(rel, items)
         if problem is not None:
             actions.append(problem)
@@ -235,7 +242,7 @@ def plan_bidirectional(
         elif delta > 0:
             actions.append(Action("overwrite_local", rel, f"Drive newer by {_human(delta)}", item))
         else:
-            actions.append(Action("overwrite_drive", rel, f"local newer by {_human(-delta)}", item))
+            actions.append(Action("skip", rel, f"local newer by {_human(-delta)}; never uploaded"))
     return actions
 
 
@@ -263,7 +270,7 @@ def plan_sync(
     groups = [only] if only else list(SCOPE_GROUPS)
     actions: list[Action] = []
     for group in groups:
-        planner = plan_push if group == "code" else plan_bidirectional
+        planner = plan_push if group == "code" else plan_pull
         for scope in SCOPE_GROUPS[group]:
             logger.info(f"Indexing {scope}")
             actions += planner(
@@ -289,7 +296,7 @@ def apply_actions(service, actions: list[Action], repo_root: Path, drive_root_id
         logger.info(f"[{n}/{len(todo)}] {action.kind} {action.rel_path}")
         if action.kind == "upload":
             drive.upload_file(service, local_path, parent_id(action.rel_path))
-        elif action.kind in ("update", "overwrite_drive"):
+        elif action.kind == "update":
             drive.update_file(service, action.remote.id, local_path)
         elif action.kind in ("download", "overwrite_local"):
             drive.download_file(service, action.remote.id, local_path, action.remote.modified_time)

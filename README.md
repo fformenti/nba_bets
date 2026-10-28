@@ -12,11 +12,13 @@ repo through the Drive API (`src/gdrive/`).
 | Repo path | Direction | Deletes? |
 |---|---|---|
 | `src/`, `configs/`, `colab_notebooks/`, `pyproject.toml` | push (repo is the truth) | Drive-only files go to Drive's trash (recoverable 30 days) |
-| `outputs/runs/`, `comparisons/`, `eda/`, `archive/` | both ways; on a content clash the newer modified time wins | never, on either side |
+| `outputs/runs/`, `comparisons/` | pull (Drive → repo); on a content clash a newer Drive copy wins, a newer local copy is kept | never, on either side |
 
 Nothing else under `My Drive/nba_bets/` (`data/`, `mlruns/`, `wandb/`, …) is read or written. Files are
 compared by md5, so unchanged files cost nothing. `.DS_Store`, `__pycache__`, `*.pyc` and
-`.ipynb_checkpoints` are ignored.
+`.ipynb_checkpoints` are ignored. Pull also skips figures and images (`*/figures/`,
+`*.png`, …): they are redrawn locally from the tables. `outputs/eda/` and
+`outputs/archive/` are local-only and never synced.
 
 ### One-time setup
 
@@ -45,7 +47,7 @@ paths can be overridden with `NBA_BETS_DRIVE_CLIENT_SECRETS` and `NBA_BETS_DRIVE
 make drive-sync DRY_RUN=1          # print what would be uploaded, downloaded, trashed
 make drive-sync                    # do it
 make drive-sync ONLY=code          # push src/, configs/, colab_notebooks/, pyproject.toml
-make drive-sync ONLY=outputs       # sync outputs/ only, e.g. after a Colab run
+make drive-sync ONLY=outputs       # pull outputs/ only, e.g. after a Colab run
 make drive-ls DRIVE_PATH=outputs/runs RECURSIVE=1   # inspect Drive
 ```
 

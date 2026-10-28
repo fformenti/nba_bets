@@ -3,10 +3,10 @@
     make drive-auth                       # once: browser consent, stores the token
     make drive-ls DRIVE_PATH=build        # inspect a Drive folder
     make drive-sync DRY_RUN=1             # show what would change
-    make drive-sync ONLY=outputs          # outputs/ (runs, comparisons, eda, archive) only
+    make drive-sync ONLY=outputs          # pull outputs/runs and outputs/comparisons only
 
-Code and config are push-only mirrors; outputs/ syncs both ways and never
-deletes. See src/gdrive/sync.py and README.md ("Google Drive sync").
+Code and config are push-only mirrors; outputs/ is pulled from Drive, never
+uploaded or deleted, figures skipped. See src/gdrive/sync.py and README.md ("Google Drive sync").
 """
 
 import argparse
@@ -23,7 +23,7 @@ def main() -> None:
     ls = commands.add_parser("ls", help="List a folder under the Drive root")
     ls.add_argument("path", nargs="?", default="", help="Path under My Drive/nba_bets/")
     ls.add_argument("--recursive", "-r", action="store_true")
-    run = commands.add_parser("sync", help="Push code/config, sync outputs/ both ways")
+    run = commands.add_parser("sync", help="Push code/config, pull outputs/")
     run.add_argument("--dry-run", action="store_true", help="Print the plan, change nothing")
     run.add_argument("--only", choices=sorted(sync.SCOPE_GROUPS), help="Sync one group")
     args = parser.parse_args()

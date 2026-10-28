@@ -2,13 +2,13 @@
 
 The planner is pure, so these run without credentials or network. The rules
 that matter most are the destructive ones: push trashes only inside its scope,
-and outputs/runs/ never deletes on either side.
+and outputs/ only ever downloads.
 """
 
 from datetime import UTC, datetime, timedelta
 
 from src.gdrive.drive import FOLDER_MIME, DriveFile
-from src.gdrive.sync import LocalFile, is_ignored, local_index, plan_bidirectional, plan_push
+from src.gdrive.sync import LocalFile, is_figure, is_ignored, local_index, plan_pull, plan_push
 
 T0 = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
@@ -65,45 +65,55 @@ def test_file_versus_folder_clash_is_skipped_not_trashed():
     assert {a.kind for a in actions} == {"skip"}
 
 
-def test_runs_only_on_drive_downloads_and_only_local_uploads():
-    actions = plan_bidirectional(
+def test_pull_downloads_drive_only_and_never_uploads_local_only():
+    actions = plan_pull(
         {"outputs/runs/local/run.json": local("a")},
         {"outputs/runs/colab/run.json": remote("b")},
     )
-    assert kinds(actions) == {
-        "outputs/runs/local/run.json": "upload",
-        "outputs/runs/colab/run.json": "download",
-    }
+    assert kinds(actions) == {"outputs/runs/colab/run.json": "download"}
 
 
-def test_runs_never_delete_on_either_side():
-    actions = plan_bidirectional(
-        {"outputs/runs/a/x.csv": local("a")},
-        {"outputs/runs/b/y.csv": remote("b"), "outputs/runs/b/.DS_Store": remote("j")},
+def test_pull_never_writes_to_drive():
+    actions = plan_pull(
+        {"outputs/runs/a/x.csv": local("a"), "outputs/runs/b/z.csv": local("new", T0)},
+        {
+            "outputs/runs/b/y.csv": remote("b"),
+            "outputs/runs/b/z.csv": remote("old", T0 - timedelta(hours=1)),
+            "outputs/runs/b/.DS_Store": remote("j"),
+        },
     )
-    assert "trash" not in {a.kind for a in actions}
+    assert {a.kind for a in actions}.isdisjoint({"upload", "update", "trash"})
     assert "outputs/runs/b/.DS_Store" not in kinds(actions)
 
 
-def test_runs_conflict_newer_side_wins():
-    later = T0 + timedelta(hours=1)
-    drive_newer = plan_bidirectional({"r/x": local("a", T0)}, {"r/x": remote("b", later)})
-    local_newer = plan_bidirectional({"r/x": local("a", later)}, {"r/x": remote("b", T0)})
-    assert kinds(drive_newer) == {"r/x": "overwrite_local"}
-    assert kinds(local_newer) == {"r/x": "overwrite_drive"}
-
-
-def test_runs_conflict_with_equal_times_is_skipped():
-    actions = plan_bidirectional(
-        {"r/x": local("a", T0)}, {"r/x": remote("b", T0 + timedelta(seconds=1))}
+def test_pull_skips_figures_and_images():
+    actions = plan_pull(
+        {},
+        {
+            "outputs/runs/r/report/figures/roc.png": remote("a"),
+            "outputs/comparisons/c/figures/calibration.html": remote("b"),
+            "outputs/runs/r/stray.png": remote("c"),
+            "outputs/runs/r/predictions/validation.csv": remote("d"),
+        },
     )
+    assert kinds(actions) == {"outputs/runs/r/predictions/validation.csv": "download"}
+
+
+def test_pull_conflict_drive_newer_overwrites_local_newer_is_kept():
+    later = T0 + timedelta(hours=1)
+    drive_newer = plan_pull({"r/x": local("a", T0)}, {"r/x": remote("b", later)})
+    local_newer = plan_pull({"r/x": local("a", later)}, {"r/x": remote("b", T0)})
+    assert kinds(drive_newer) == {"r/x": "overwrite_local"}
+    assert kinds(local_newer) == {"r/x": "skip"}
+
+
+def test_pull_conflict_with_equal_times_is_skipped():
+    actions = plan_pull({"r/x": local("a", T0)}, {"r/x": remote("b", T0 + timedelta(seconds=1))})
     assert kinds(actions) == {"r/x": "skip"}
 
 
-def test_runs_same_md5_is_unchanged_whatever_the_times():
-    actions = plan_bidirectional(
-        {"r/x": local("a", T0)}, {"r/x": remote("a", T0 + timedelta(days=3))}
-    )
+def test_pull_same_md5_is_unchanged_whatever_the_times():
+    actions = plan_pull({"r/x": local("a", T0)}, {"r/x": remote("a", T0 + timedelta(days=3))})
     assert kinds(actions) == {"r/x": "unchanged"}
 
 
@@ -112,4 +122,7 @@ def test_ignore_rules():
     assert is_ignored("src/ml/__pycache__/x.py")
     assert is_ignored("colab_notebooks/.ipynb_checkpoints/a.ipynb")
     assert not is_ignored("src/ml/x.py")
+    assert is_figure("outputs/eda/home_win_ratio/figures/by_season.png")
+    assert is_figure("outputs/runs/r/report/figures/roc.html")
+    assert not is_figure("outputs/runs/r/report/tables/metrics.csv")
     assert FOLDER_MIME.endswith("folder")

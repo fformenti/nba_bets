@@ -127,6 +127,15 @@
 - **Caveat, the game set has changed:** today's build has 23,108 / 2,938 / 1,008 games against the Hub's 23,247 / 2,949 / 1,018. All 160 missing games are absent from the current build, and every shared row is byte-identical to the Hub's. That points to the HEAD commit (`03b77a0`, neutral-court fix and filters). So E16 trains on 139 fewer games than E11; `plot-compare` scores both on the 2,938 shared validation games. For a strict one-change test, rebuild `nba-bets-compact` as well and rerun E11.
 - **Don't compare** `eval_loss` or `mean_token_accuracy` across modes, because regression's loss includes the magnitude token. Read `first_token_accuracy` instead.
 
+### E17. Early-season games, minimum games played 4 (user, Colab, about 25 min; config ready 2026-10-28)
+- **Question:** does training on games 5–15 of each season help? At 15, "Adj Last-season win%" (hidden from 13 games on) never reached any split.
+- **Checked first:** the season split puts every gated prompt line in all three splits at near-equal rates (last-season win% 11/11/12%, Playoffs 37/40/37%), so early-only and late-only lines can't pile up in one split.
+- **Config:** `configs/train_llm/qlora/llama32_1b/compact_min4.yaml` → `configs/train/llm_features_min4.yaml`. Scoped to the LLM: `_defaults.yaml` stays at 15, so XGBoost, E11 and E16 keep their game set. Splits are 27,268 / 3,440 / 1,210 games (current build at 15: 23,108 / 2,938 / 1,008).
+- **Steps:**
+  1. Push the dataset (ask first): `make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact_min4 ARGS=--push` → `fformenti/nba-bets-compact-min4`.
+  2. Colab: `LLM_CONFIG=qlora/llama32_1b/compact_min4`, `RUN_NAME=e17-llama32-1b-compact-min4`, `INSPECT_SPLITS=["validation"]`.
+  3. Compare with E11 on the validation games they share (`make plot-compare`, paired bootstrap). The new early-season games are harder, so the full 3,440-game log-loss is not comparable with §2. Score them separately as well.
+
 ### N5. E8, learning curve (user, Colab, about 15 min in total)
 - **Why:** eval loss and first-token accuracy plateau by about step 200–300 of 727 (E4, E5, E11). This tests whether more data helps, which decides whether gathering more seasons is worth it.
 - **Runs:** 10 / 25 / 50% of train with `data.train_sample_strategy: random` and `data.max_train_samples` set accordingly.
