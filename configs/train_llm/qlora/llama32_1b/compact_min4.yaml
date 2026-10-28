@@ -1,0 +1,14 @@
+description: "Llama-3.2-1B compact, games from 5 games played instead of 16"
+
+# compact.yaml with one change: the splits come from llm_features_min4.yaml,
+# which admits games once both teams have played more than 4 games instead of
+# 15. Every split gains its early-season games. It trains on its own Hub
+# dataset, built from this file:
+#   make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact_min4 ARGS=--push
+
+_include:
+  - "compact.yaml"
+
+data:
+  dataset_name: "fformenti/nba-bets-compact-min4"
+  source_experiment_config: "configs/train/llm_features_min4.yaml"

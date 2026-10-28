@@ -1,0 +1,16 @@
+# llm_features.yaml with one change: games count once both teams have played
+# more than 4 games, not 15. That admits roughly games 5-15 of every season,
+# the only rows where the prompt shows "Adj Last-season win%" (hidden from 13
+# games on), so at 15 that line never reached any split. Scoped to the LLM so
+# XGBoost and the other LLM datasets keep the 15-game game set.
+
+_include:
+  - "llm_features.yaml"
+
+description: "LLM feature set, minimum games played 4 instead of 15"
+tags:
+  variation: "llm_features_min4"
+
+filters:
+  minimum_games_train: 4
+  minimum_games_test: 4
