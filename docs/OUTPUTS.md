@@ -139,6 +139,7 @@ make plot RUN=latest                   # most recent run.json by created_at, any
 make plot-compare NAME=llm_vs_xgb SERIES="xgboost-20261023-165536 e11-llama32-1b-compact"
 make plot-compare NAME=cal SPLIT=test SERIES="xgboost-20261023-165536:xgboost:none xgboost-20261023-165536:xgboost:sigmoid"
 make plot-compare NAME=vs_market SPLIT=test MARKET=1 SERIES="xgboost-20261023-165536"
+make plot-compare NAME=e17_vs_record RECORD=1 SERIES="e17-llama32-1b-compact-min4"
 make plot-home-win-ratio               # writes eda/home_win_ratio/tables/home_win_ratio_by_season.csv, then the bar chart
 make plot-home-win-ratio-line          # same table, then the line chart (seasons >= 1980/81)
 ```
@@ -147,6 +148,10 @@ A series is `run_id[:model[:calibration]]`. Omitted parts default to the run's
 `selected_model` and `selected_calibration`. Every series in a comparison is
 restricted to the gameIds all of them scored, and to the games Polymarket
 priced when `MARKET=1` (Polymarket only covers the test seasons, 2024/25 on).
+`RECORD=1` adds the record baseline on those same games: the team with the better
+season-to-date record (`record_L82`), ties to home, read from the game table. It
+is a hard call, so its scoreboard row has accuracy only. Comparing each run with
+the benchmarks on its own games is how runs with different game sets are compared.
 Titles carry the game count. When a raw series and its calibrated twin are both
 given, the calibration figure draws the raw one dashed.
 

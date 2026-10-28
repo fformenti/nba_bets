@@ -201,3 +201,35 @@ def test_comparison_scores_every_series_on_the_shared_games_only(tmp_path, monke
     assert scoreboard["n_games"].tolist() == [4, 4]
     assert scoreboard["n_games_own"].tolist() == [6, 6]
     assert (tmp_path / "cmp" / "ab" / "figures" / "roc_curve.png").exists()
+
+
+def test_record_baseline_picks_the_better_record_and_ties_go_home():
+    from src.ml.plotting.report import record_baseline_calls
+
+    metadata = pd.DataFrame({"record_L82_HT": [0.6, 0.4, 0.5], "record_L82_VT": [0.4, 0.6, 0.5]})
+
+    assert record_baseline_calls(metadata).tolist() == [1, 0, 1]
+
+
+def test_comparison_adds_the_record_baseline_on_the_shared_games(tmp_path, monkeypatch):
+    from src.ml.plotting import report
+
+    def game_table(ids):
+        # Home has the better record in every game but the last.
+        records = [0.6] * (len(ids) - 1) + [0.3]
+        return pd.DataFrame({"gameId": ids, "record_L82_HT": records, "record_L82_VT": 0.5})
+
+    monkeypatch.setattr(report, "load_game_metadata", game_table)
+    write_predictions(_series(run_id="a", model="a", game_ids=np.arange(100, 106)), "a", "validation", tmp_path)
+    write_run_info(RunInfo(run_id="a", family="sklearn", task="classification", selected_model="a"), tmp_path)
+
+    report.build_comparison(
+        ["a"], "rec", include_record=True, runs_dir=tmp_path, comparisons_dir=tmp_path / "cmp"
+    )
+
+    scoreboard = pd.read_csv(tmp_path / "cmp" / "rec" / "tables" / "scoreboard.csv")
+    record = scoreboard.set_index("series").loc["Record baseline"]
+    assert record["n_games"] == 6
+    assert record["home_pick_rate"] == pytest.approx(5 / 6)
+    # A hard call carries no probability, so no probability metric is scored.
+    assert pd.isna(record["log_loss"])

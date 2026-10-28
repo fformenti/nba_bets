@@ -30,6 +30,7 @@ from src.ml.evaluation.polymarket_baseline import (
     build_scored_frame,
     compare_to_market,
 )
+from src.ml.models.baseline import RecordDifferenceBaseline
 from src.ml.plotting import breakdowns, charts
 from src.ml.plotting.llm import series_figures
 from src.ml.results import (
@@ -59,6 +60,10 @@ METADATA_COLUMNS = [
     "awayScore",
     "games_played_HT",
     "games_played_VT",
+    # Season-to-date win% (L82 never reaches past the current season's games),
+    # read by the record baseline in build_comparison.
+    "record_L82_HT",
+    "record_L82_VT",
 ]
 
 
@@ -427,11 +432,26 @@ def parse_series_spec(spec: str, runs_dir: Path = RUNS_DIR) -> tuple[RunInfo, st
     return info, model, calibration
 
 
+def record_baseline_calls(metadata: pd.DataFrame) -> np.ndarray:
+    """Pick the team with the better season-to-date record; a tie goes home.
+
+    The same rule as the sklearn runs' ``record_baseline`` series, but computed
+    from the game table for any gameIds, so it covers games no sklearn run
+    scored (an LLM built with a different games-played filter, say).
+    """
+    delta = metadata["record_L82_HT"] - metadata["record_L82_VT"]
+    if delta.isna().any():
+        raise ValueError(f"{int(delta.isna().sum())} game(s) have no season record in the game table")
+    X = pd.DataFrame({"record_L82_delta": delta.to_numpy()})
+    return RecordDifferenceBaseline().fit(X).predict(X)
+
+
 def build_comparison(
     specs: list[str],
     name: str,
     split: str = "validation",
     include_market: bool = False,
+    include_record: bool = False,
     runs_dir: Path = RUNS_DIR,
     comparisons_dir: Path = COMPARISONS_DIR,
 ) -> list[Path]:
@@ -441,6 +461,8 @@ def build_comparison(
     difference on the figures comes from the predictions and never from two
     slates of games. ``include_market`` adds Polymarket as one more series,
     which narrows the slate to the games it priced (test seasons only).
+    ``include_record`` adds the record baseline, a hard call with no
+    probability, so it scores accuracy only.
     """
     series: list[Series] = []
     # (run, model) pairs that also appear calibrated: their raw curve is drawn
@@ -479,6 +501,13 @@ def build_comparison(
         if not (s.y_true.to_numpy() == y_true.to_numpy()).all():
             raise ValueError(f"{s.label} disagrees with {aligned[0].label} on outcomes")
 
+    metadata = _metadata_or_none(ids)
+    record_calls = None
+    if include_record:
+        if metadata is None:
+            raise ValueError("The record baseline needs the game table, and there is none here.")
+        record_calls = record_baseline_calls(metadata)
+
     folder = comparisons_dir / name
     out = _Writer(folder / "figures", folder / "tables")
     suffix = f" ({split}, n={len(ids)} shared games)"
@@ -496,6 +525,14 @@ def build_comparison(
             }
         )
         rows.append({"series": "Polymarket", "spec": "market", "n_games_own": len(ids), **score_series(market)})
+    if record_calls is not None:
+        record = pd.DataFrame(
+            {
+                "y_true": y_true, "y_pred": record_calls,
+                "p_home": np.nan, "pred_margin": np.nan, "true_margin": np.nan,
+            }
+        )
+        rows.append({"series": "Record baseline", "spec": "record", "n_games_own": len(ids), **score_series(record)})
     out.table("scoreboard", pd.DataFrame(rows))
 
     probabilistic = {s.label: s.p_home for s in aligned if s.p_home is not None}
@@ -523,10 +560,11 @@ def build_comparison(
             ),
         )
 
-    metadata = _metadata_or_none(ids)
     hard_calls = {s.label: s.y_pred for s in aligned}
     if market_proba is not None:
         hard_calls["Polymarket"] = (market_proba >= 0.5).astype(int)
+    if record_calls is not None:
+        hard_calls["Record baseline"] = record_calls
     (first_label, first_pred), *other_calls = hard_calls.items()
 
     def season_phase():

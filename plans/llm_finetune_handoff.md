@@ -135,6 +135,11 @@
   1. Push the dataset (ask first): `make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact_min4 ARGS=--push` → `fformenti/nba-bets-compact-min4`.
   2. Colab: `LLM_CONFIG=qlora/llama32_1b/compact_min4`, `RUN_NAME=e17-llama32-1b-compact-min4`, `INSPECT_SPLITS=["validation"]`.
   3. Compare with E11 on the validation games they share (`make plot-compare`, paired bootstrap). The new early-season games are harder, so the full 3,440-game log-loss is not comparable with §2. Score them separately as well.
+- **Result (2026-10-28, validation, Platt):**
+  - All 3,440 games: 64.9% accuracy, log-loss 0.6283. The record baseline gets 62.0% (`RECORD=1`, `outputs/comparisons/e17_vs_record/`).
+  - On the 2,938 games shared with E11: E17 scores 65.1% / 0.6271 against E11's 64.5% / 0.6288, a 0.0017 gap. That's just under the 0.002 win bar, and no paired bootstrap has been run (`outputs/comparisons/e17_vs_e11_record/`).
+  - Games 5–10 (231 games): 63.6% against the record baseline's 62.3%.
+  - Polymarket covers only 2024/25 on, so it can't be compared on validation.
 
 ### N5. E8, learning curve (user, Colab, about 15 min in total)
 - **Why:** eval loss and first-token accuracy plateau by about step 200–300 of 727 (E4, E5, E11). This tests whether more data helps, which decides whether gathering more seasons is worth it.

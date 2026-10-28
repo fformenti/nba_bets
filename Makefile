@@ -133,9 +133,10 @@ plot:
 
 # Several runs on shared games and axes:
 #   make plot-compare NAME=llm_vs_xgb SERIES="e11-llama32-1b-compact xgboost-20261023-141500"
-# Each series is run_id[:model[:calibration]]. Pass MARKET=1 to add Polymarket.
+# Each series is run_id[:model[:calibration]]. Pass MARKET=1 to add Polymarket,
+# RECORD=1 to add the record baseline (better season-to-date record wins).
 plot-compare:
-	uv run python -m src.cli.plot_compare --name $(NAME) --series $(SERIES) $(if $(SPLIT),--split $(SPLIT),) $(if $(MARKET),--market,)
+	uv run python -m src.cli.plot_compare --name $(NAME) --series $(SERIES) $(if $(SPLIT),--split $(SPLIT),) $(if $(MARKET),--market,) $(if $(RECORD),--record,)
 
 # One-time: move the pre-run-layout outputs/ into runs/, archive/, eda/.
 migrate-outputs:

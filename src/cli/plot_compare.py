@@ -30,10 +30,18 @@ def main() -> None:
         action="store_true",
         help="Add Polymarket as a series (narrows to the games it priced: test seasons).",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Add the record baseline: the better season-to-date record wins, ties go home.",
+    )
     args = parser.parse_args()
 
     setup_logging(level="INFO")
-    build_comparison(args.series, args.name, split=args.split, include_market=args.market)
+    build_comparison(
+        args.series, args.name, split=args.split,
+        include_market=args.market, include_record=args.record,
+    )
 
 
 if __name__ == "__main__":
