@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recipe Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<nav class="crumbs">LLM fine-tuning · Reference · <a href="../lessons/0001-three-kinds-of-knobs.html">Lesson 1</a></nav>
+<h1>Recipe cheat sheet</h1>
+<p class="subtitle">Every knob in the working config (E11, Llama-3.2-1B compact), grouped by the job it does.</p>
+
+<div class="key"><p><strong>Rule of thumb:</strong> cost knobs change seconds and GB. Learning knobs change how well the model fits the inputs. Only information knobs can raise a ceiling that every model shares. AUC moves only when the model's ranking of games changes, and Platt never changes that ranking.</p></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Knob</th><th>Your value</th><th>What it is</th><th>Evidence in this repo</th></tr></thead>
+<tbody>
+<tr class="group"><td colspan="4">Cost: speed and memory</td></tr>
+<tr><td><code>quantization.mode</code></td><td>4bit, NF4, double quant</td><td>Stores the frozen base weights in 4 bits. Gradients flow through them into the LoRA adapters only (QLoRA).</td><td>E3: barely affects speed. 8-bit is the slowest mode. A bf16 run of the 1B is untested.</td></tr>
+<tr><td><code>gradient_checkpointing</code></td><td>off</td><td>On, it recomputes activations instead of storing them: less memory, more compute.</td><td>Off is 25% faster and fits with 4-bit.</td></tr>
+<tr><td>micro-batch × accumulation</td><td>8 × 4</td><td>How the effective batch is split across forward passes. The math is the same either way.</td><td>E3.</td></tr>
+<tr><td><code>bf16</code>, <code>adamw_torch_fused</code></td><td>on</td><td>The numeric format and a faster implementation of the same optimizer.</td><td>n/a</td></tr>
+
+<tr class="group"><td colspan="4">Learning: how the weights move</td></tr>
+<tr><td><code>lora.r</code></td><td>16</td><td>Rank of the low-rank update ΔW = B·A added to each targeted matrix. Higher rank means more trainable capacity.</td><td>r=32 tied XGBoost too. Capacity isn't the limit.</td></tr>
+<tr><td><code>lora.alpha</code></td><td>32</td><td>Scales the update by α/r. With this 1/r scaling, the best learning rate barely depends on rank.</td><td>α=32 is also what <em>LoRA Without Regret</em> used.</td></tr>
+<tr><td><code>lora.target_modules</code></td><td>q, k, v, o</td><td>The weight matrices that get adapters. Yours are attention only. The MLP matrices (gate/up/down) hold most of the parameters.</td><td><strong>Untested here.</strong> TM: attention-only underperforms LoRA that includes the MLP layers.</td></tr>
+<tr><td><code>lora.dropout</code></td><td>0.05</td><td>Randomly zeroes adapter inputs during training, as regularization.</td><td>n/a</td></tr>
+<tr><td><code>learning_rate</code></td><td>2e-4</td><td>Step size. TM finds the best LoRA rate is about 10× the full fine-tuning rate.</td><td>E9 (1e-4 / 4e-4) deprioritized.</td></tr>
+<tr><td>schedule, warmup</td><td>cosine, 5%</td><td>The rate ramps up over the first 5% of steps, then decays along a cosine curve.</td><td>n/a</td></tr>
+<tr><td><code>epochs</code></td><td>1 (727 steps)</td><td>Passes over the training set.</td><td>test_run2: the 2nd epoch bought nothing. Eval plateaus by about step 200–300.</td></tr>
+<tr><td>effective batch</td><td>32</td><td>Games averaged per update. Each outcome is close to a coin flip, so larger batches average away noise.</td><td>At 8, 78% of steps hit the clip.</td></tr>
+<tr><td><code>max_grad_norm</code></td><td>1.0</td><td>Clips the gradient so no single update is too large.</td><td>0.3 clipped most steps.</td></tr>
+<tr><td><code>train_on_completion_only</code></td><td>true</td><td>The loss counts only the answer tokens.</td><td>Essential: the sign is ~1 of ~280 tokens.</td></tr>
+<tr><td><code>base_model</code></td><td>Llama-3.2-1B</td><td>The pretrained network that gets adapted.</td><td>1B = 3B = 8B (E4, E5, test_run2).</td></tr>
+<tr><td><code>seed</code></td><td>42</td><td>Sets the random initialization and data order.</td><td>E7: ±0.0004 log-loss. This is the noise floor.</td></tr>
+
+<tr class="group"><td colspan="4">Information: what the model can know</td></tr>
+<tr><td>prompt config</td><td>per_team compact</td><td>Which stats are written out, and in what layout.</td><td>Compact and venue20 tied (E11, E12).</td></tr>
+<tr><td>target mode</td><td>regression (<code>+7</code>)</td><td>Whether the answer is the signed margin or the words won/lost.</td><td>E16 pending.</td></tr>
+<tr><td>min games played</td><td>15 (E17: 4)</td><td>Which games become training rows.</td><td>E17: not worse, not a win.</td></tr>
+<tr><td>new data sources</td><td>none</td><td>Injuries, availability, lineups.</td><td><strong>Untested. This is the main lever.</strong></td></tr>
+</tbody>
+</table></div>
+
+<h2>Scoring</h2>
+<ul>
+  <li><code>p_home</code> = P(<code>+</code>) / (P(<code>+</code>) + P(<code>-</code>)) at the first answer token.</li>
+  <li><strong>Platt:</strong> a logistic fit on validation, cross-fitted. It fixes the home lean (raw picks are ~70% home against 55% actual). It's monotonic, so AUC stays put.</li>
+  <li><strong>Win rule:</strong> a run wins if it beats E4's 0.6286 by at least 0.002 <em>and</em> the paired bootstrap 95% interval excludes zero.</li>
+  <li><strong>Bars:</strong> always-home 0.688 · 5-shot base 0.659 · all fine-tunes and XGBoost about 0.628. Polymarket on <em>test</em> scores 0.579 / 70.0%.</li>
+</ul>
+
+<h2>Sources</h2>
+<ul>
+  <li><a href="https://thinkingmachines.ai/blog/lora/">LoRA Without Regret</a> (Thinking Machines, 2025): target modules, learning rate, α/r scaling.</li>
+  <li><a href="https://arxiv.org/abs/2305.14314">QLoRA</a> (Dettmers et al., 2023): NF4 and double quantization.</li>
+  <li><a href="https://huggingface.co/docs/peft/package_reference/lora">PEFT LoraConfig</a>: what each config field means.</li>
+  <li><a href="https://scikit-learn.org/stable/modules/calibration.html">scikit-learn: probability calibration</a>: Platt (sigmoid) scaling.</li>
+  <li>Repo: <code>plans/llm_finetune_handoff.md</code>, <code>project_knowledge/llm_training/</code>.</li>
+</ul>
+</main>
+</body>
+</html>

@@ -53,6 +53,7 @@ configs/
 │       │   ├── compact.yaml            # v2 + compact prompt layout, own Hub dataset
 │       │   ├── compact_classification.yaml # compact + target_mode classification (" won"/" lost"), own -classification Hub dataset
 │       │   ├── compact_min4.yaml       # compact + splits from llm_features_min4 (games from 5 played), own Hub dataset
+│       │   ├── lr{1e4,4e4}.yaml        # compact with learning_rate 1e-4 / 4e-4 (E9 learning-rate sweep)
 │       │   ├── seed43.yaml             # v2 with training.seed 43 (E7 seed repeat, the noise floor)
 │       │   └── venue20.yaml            # v2 + last-season venue line to 20 venue games, own Hub dataset
 │       ├── llama32_3b/v2.yaml          # Current recipe on an L4

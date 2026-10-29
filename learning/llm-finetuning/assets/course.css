@@ -1,0 +1,97 @@
+/* Shared stylesheet for every lesson and reference doc in this workspace. */
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap");
+
+:root {
+  --bg: #fffdf8;
+  --fg: #1d1b18;
+  --muted: #6b655c;
+  --rule: #e4ddd0;
+  --accent: #9c3d1c;
+  --code-bg: #f3eee4;
+  --good: #2f6b3a;
+  --good-bg: #e6f1e6;
+  --bad: #9a2a2a;
+  --bad-bg: #f6e4e2;
+  --note-bg: #f7f1e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171614;
+    --fg: #ebe6dc;
+    --muted: #a39b8d;
+    --rule: #353128;
+    --accent: #e08a62;
+    --code-bg: #24211c;
+    --good: #8fd19a;
+    --good-bg: #1f3022;
+    --bad: #f0a09a;
+    --bad-bg: #3a2120;
+    --note-bg: #221f19;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171614; --fg: #ebe6dc; --muted: #a39b8d; --rule: #353128; --accent: #e08a62;
+  --code-bg: #24211c; --good: #8fd19a; --good-bg: #1f3022; --bad: #f0a09a; --bad-bg: #3a2120;
+  --note-bg: #221f19;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 19px/1.6 "Source Serif 4", Georgia, serif;
+}
+main { max-width: 42rem; margin: 0 auto; padding: 3rem 16px 5rem; }
+
+nav.crumbs { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+nav.crumbs a { color: var(--muted); }
+h1 { font-weight: 600; font-size: 2.1rem; line-height: 1.15; margin: 0.4rem 0 0.3rem; }
+.subtitle { font-style: italic; color: var(--muted); margin: 0 0 2rem; }
+h2 { font-weight: 600; font-size: 1.3rem; margin: 2.6rem 0 0.6rem; border-top: 1px solid var(--rule); padding-top: 1.4rem; }
+h3 { font-size: 1.05rem; margin: 1.6rem 0 0.4rem; }
+a { color: var(--accent); text-underline-offset: 2px; }
+p, li { hyphens: auto; }
+code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.78em; }
+code { background: var(--code-bg); padding: 0.08em 0.3em; border-radius: 3px; }
+pre { background: var(--code-bg); padding: 0.9rem 1rem; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; font-size: 1em; }
+.cite { font-size: 0.75em; vertical-align: super; line-height: 0; }
+.muted { color: var(--muted); }
+
+/* A short callout for the one idea a section must not lose. */
+.key { background: var(--note-bg); border-left: 3px solid var(--accent); padding: 0.8rem 1rem; margin: 1.4rem 0; }
+.key p { margin: 0; }
+
+/* Tables: knob maps, scoreboards. Wrapper scrolls on phones. */
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.82rem; line-height: 1.4; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; border-bottom: 2px solid var(--fg); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.group td { font-weight: 600; color: var(--accent); padding-top: 1rem; border-bottom: none; }
+
+/* Predict-then-reveal blocks (retrieval before reading). */
+details.predict { border: 1px dashed var(--rule); border-radius: 6px; padding: 0.7rem 1rem; margin: 1.2rem 0; }
+details.predict summary { cursor: pointer; font-weight: 600; }
+details.predict[open] summary { margin-bottom: 0.5rem; }
+
+/* Pipeline strip used to show the data path through the model. */
+.flow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 1rem 0; font-size: 0.8rem; }
+.flow span.step { border: 1px solid var(--rule); border-radius: 4px; padding: 0.3rem 0.55rem; background: var(--code-bg); }
+.flow span.arrow { color: var(--muted); }
+
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted); }
+.ask { background: var(--note-bg); padding: 0.8rem 1rem; border-radius: 6px; margin-top: 2rem; }
+
+@media print {
+  body { background: #fff; color: #000; font-size: 11pt; }
+  main { padding: 0; max-width: none; }
+  a { color: #000; }
+  details.predict { display: block; }
+  details.predict > *:not(summary) { display: block; }
+  .quiz button { border: 1px solid #999; }
+  h2 { break-after: avoid; }
+  tr, .quiz-q { break-inside: avoid; }
+}

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three Kinds of Knobs</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<nav class="crumbs">LLM fine-tuning · Lesson 1 · <a href="../reference/recipe-knobs.html">Recipe cheat sheet</a></nav>
+<h1>Three kinds of knobs</h1>
+<p class="subtitle">What your fine-tune actually does, and which settings can move AUC at all.</p>
+
+<p><strong>The win for this lesson:</strong> you can take any line of your training config and say which of three jobs it does. That tells you whether changing it could raise AUC.</p>
+
+<details class="predict">
+  <summary>Predict first (10 seconds, no peeking)</summary>
+  <p>You have run more than a dozen experiments: three model sizes, two prompt formats, a new seed, two LoRA ranks, early-season games. How many of them moved validation log-loss by more than your 0.002 win threshold?</p>
+  <p><em>Answer:</em> none. Every LLM run and XGBoost land between 0.628 and 0.630 (<code>plans/llm_finetune_handoff.md</code> §2). Keep that in mind while you read the rest.</p>
+</details>
+
+<h2>1. What your model is really doing</h2>
+<p>Each game becomes a ~280-token text table (streaks, rest days, adjusted win% over the last 3–21 games, travel), ending with the line <code>Home margin =</code>. The model is trained to write the margin, e.g. <code>+3</code>.</p>
+
+<div class="flow">
+  <span class="step">stats prompt</span><span class="arrow">→</span>
+  <span class="step">Llama-3.2-1B + LoRA</span><span class="arrow">→</span>
+  <span class="step">P(<code>+</code>) vs P(<code>-</code>)</span><span class="arrow">→</span>
+  <span class="step">p_home</span><span class="arrow">→</span>
+  <span class="step">Platt</span><span class="arrow">→</span>
+  <span class="step">log-loss · AUC</span>
+</div>
+
+<p>The number of points barely matters for scoring. What gets scored is the <strong>first token</strong>. For game <code>22100230</code>, E11 gave <code>+</code> a probability of 0.622 and <code>-</code> 0.377, so <code>p_home</code> = 0.622 / (0.622 + 0.377) = 0.625. The home team won by 3.</p>
+
+<p>Because of that, your LLM is a <em>binary classifier dressed as a text generator</em>. Two settings make it work like one:</p>
+<ul>
+  <li><code>train_on_completion_only: true</code>: the loss counts only the answer tokens, not the 280-token prompt. Otherwise the sign would carry almost none of the gradient.</li>
+  <li><strong>Platt recalibration</strong>: before it, your fine-tunes pick home about 70% of the time, against a true rate of 55%. Platt fits a logistic curve on validation to correct that lean<a class="cite" href="https://scikit-learn.org/stable/modules/calibration.html">[sklearn]</a>.</li>
+</ul>
+
+<div class="key"><p><strong>AUC measures ranking, not calibration.</strong> AUC asks one thing: when you compare a game the home team won with one it lost, does the winner get the higher <code>p_home</code>? Platt is a monotonic rescaling, so it keeps that order, and AUC stays where it was. Platt improves log-loss and accuracy. <em>To raise AUC, the model has to rank games better.</em></p></div>
+
+<h2>2. Every knob does one of three jobs</h2>
+<p>Each line in <code>configs/train_llm/qlora/_defaults.yaml</code> and the model files does one of three things:</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Job</th><th>Your knobs</th><th>Can it raise AUC?</th></tr></thead>
+<tbody>
+<tr><td><strong>Cost</strong><br><span class="muted">How much speed and memory the same training uses</span></td>
+<td>4-bit NF4 quantization, gradient checkpointing, micro-batch 8 × accumulation 4, bf16, fused AdamW</td>
+<td>Barely. E3 showed these mostly change seconds per step and GB used. (4-bit adds a small rounding error to the frozen weights. A bf16 run of the 1B is untested.)</td></tr>
+<tr><td><strong>Learning</strong><br><span class="muted">How the weights move toward the answer</span></td>
+<td>LoRA <code>r</code>/<code>alpha</code>/<code>target_modules</code>/dropout, learning rate, cosine schedule, warmup, epochs, effective batch 32, gradient clip, completion-only loss, seed, model size</td>
+<td>Only when learning is the bottleneck. Your 1B, 3B and 8B tie, r=32 tied r=16, and a second epoch bought nothing. Learning is not your bottleneck.</td></tr>
+<tr><td><strong>Information</strong><br><span class="muted">What the model can know about the game</span></td>
+<td>Which stats go in the prompt, how many games you train on, which games count (min-4 vs min-15)</td>
+<td>Yes, and it is the only job that can lift a ceiling all your models share. So far you have only rearranged the stats you already had (compact, venue20), and those tied.</td></tr>
+</tbody>
+</table></div>
+
+<p>About “boilerplate defaults”: your recipe already moved away from the library defaults wherever you had evidence. PEFT's defaults are <code>r=8</code>, <code>alpha=8</code><a class="cite" href="https://huggingface.co/docs/peft/package_reference/lora">[PEFT]</a>. You raised the effective batch from 8 to 32 because 78% of steps were hitting the gradient clip, and you cut training to one epoch because the second one added nothing. The line-by-line reasons are in the <a href="../reference/recipe-knobs.html">recipe cheat sheet</a>.</p>
+
+<h2>3. The test that tells the jobs apart</h2>
+<p>If 1B, 3B and 8B LLMs, plus a gradient-boosted tree that works nothing like an LLM, all reach the <em>same</em> log-loss on the <em>same</em> inputs, then model capacity and the training method are not what limits them. The inputs are. TabLLM, the main study on fine-tuning LLMs on rows of a table written out as text, found the same pattern. LLMs help most when labeled data is scarce. With plenty of rows, gradient-boosted trees catch up<a class="cite" href="https://proceedings.mlr.press/v206/hegselmann23a.html">[TabLLM]</a>. You have 23,000 games, which is plenty.</p>
+
+<h2>4. What else you can do, ranked</h2>
+<ol>
+  <li><strong>Add new information (an information job).</strong> Injuries and player availability are allowed, and none of your current features cover them. A team missing its star can look identical to a full-strength team in every stat you have. This is the only lever your evidence points to. It is a data project, not a training change.</li>
+  <li><strong>Blend the LLM with XGBoost (N2, CPU only, free).</strong> Averaging helps only when two models make <em>different</em> mistakes. Your two LLM seeds correlate at 0.993, and averaging them gained nothing. Check the LLM–XGBoost correlation first.</li>
+  <li><strong>One cheap learning-job check: LoRA on all layers.</strong> Your <code>target_modules</code> list only the attention projections (<code>q/k/v/o</code>). The current best evidence, <em>LoRA Without Regret</em>, found that attention-only LoRA underperforms LoRA that includes the MLP layers, even when both train the same number of parameters<a class="cite" href="https://thinkingmachines.ai/blog/lora/">[TM]</a>. It takes 21 minutes on Colab. Given section 3, expect a tie, but it is the one learning knob where outside evidence goes against your current setting.</li>
+  <li><strong>E8, the learning curve.</strong> Train on 10%, 25% and 50% of the data. If 25% already scores like 100%, more seasons of the <em>same</em> stats won't help, and that strengthens the case for item 1.</li>
+</ol>
+
+<h2>5. Practice</h2>
+<p>Answer from memory. Scroll up only after you have committed to an answer.</p>
+<section class="quiz">
+  <div class="quiz-q" data-answer="1">
+    <p class="q">Your E3 benchmark switched the 8B between 4-bit, 8-bit and bf16. Which job does that knob do?</p>
+    <ol class="opts"><li>Changes what the model learns</li><li>Changes speed and memory use</li><li>Changes information the model sees</li><li>Changes how Platt rescales outputs</li></ol>
+    <p class="why">A cost job. E3 measured 18.3–19.4 s/step across precisions on the L4, with memory as the main difference. In principle quantization can cost a little accuracy, but it adds nothing the model can know.</p>
+  </div>
+  <div class="quiz-q" data-answer="2">
+    <p class="q">A 1B, a 3B, an 8B and XGBoost all score 0.628–0.630 on the same features. Where is the ceiling most likely?</p>
+    <ol class="opts"><li>In the model's parameter count</li><li>In the chosen learning rate</li><li>In the input information itself</li><li>In the LoRA rank setting</li></ol>
+    <p class="why">If very different models tie on the same inputs, the inputs set the limit. Size, rank and learning rate are all learning knobs, and size already varied 8× with no change.</p>
+  </div>
+  <div class="quiz-q" data-answer="0">
+    <p class="q">E17 beats E11 by 0.0017 log-loss, paired 95% interval [−0.0041, +0.0006]. What is the verdict under your win rule?</p>
+    <ol class="opts"><li>Not worse, but not win</li><li>A clear win, adopt it</li><li>A clear loss, revert it</li><li>Score test set to decide</li></ol>
+    <p class="why">A win needs a gap of at least 0.002 <em>and</em> an interval that excludes zero. This one fails both tests. Test gets scored once, in E15, and never to settle a tie.</p>
+  </div>
+  <div class="quiz-q" data-answer="3">
+    <p class="q">Your <code>target_modules</code> are q/k/v/o only. What does <em>LoRA Without Regret</em> report about that choice?</p>
+    <ol class="opts"><li>Attention-only is the best choice</li><li>Attention-only needs a lower rate</li><li>Attention-only removes quantization error</li><li>Attention-only underperforms adding MLP</li></ol>
+    <p class="why">It reports that attention-only LoRA underperformed even when its rank was raised to match the parameter count, and that adding attention on top of MLP-only gave no extra benefit.</p>
+  </div>
+  <div class="quiz-q" data-answer="1">
+    <p class="q">Which change gives the model something new to know about a game?</p>
+    <ol class="opts"><li>Raising the LoRA rank to 64</li><li>Adding injury and availability data</li><li>Training for a second full epoch</li><li>Using a cosine restarts schedule</li></ol>
+    <p class="why">This is the only information job in the list. The other three are learning jobs, and your size ladder and test_run2's second epoch already showed that learning knobs leave the ceiling where it is.</p>
+  </div>
+  <div class="quiz-q" data-answer="2">
+    <p class="q">Platt recalibration raised your accuracy. What did it do to AUC?</p>
+    <ol class="opts"><li>Raised it by several points</li><li>Lowered it by several points</li><li>Left it essentially the same</li><li>Doubled the area under curve</li></ol>
+    <p class="why">Platt is monotonic, so every game keeps its rank and AUC stays put. It shifts the threshold, which corrects the home lean and helps accuracy. The ≤0.003 differences in your §2 table come from cross-fitting, where each fold gets slightly different Platt parameters.</p>
+  </div>
+</section>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://thinkingmachines.ai/blog/lora/">John Schulman et al., “LoRA Without Regret,” Thinking Machines (Sept 2025)</a>. Read the sections on which layers to target and on learning rates. It is the most careful public study of the LoRA knobs in your config, and it uses α = 32 like you do.</p>
+
+<div class="ask"><strong>Ask me anything that is unclear,</strong> right in the terminal. For example: “why does completion-only loss matter so much?”, “what does LoRA's <code>r</code> physically mean?”, or “walk me through how N2's blend would work.” I'm your teacher for this; follow-up questions are the point.</div>
+
+<footer>Lesson 1 · <a href="../reference/recipe-knobs.html">Recipe cheat sheet →</a></footer>
+</main>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
