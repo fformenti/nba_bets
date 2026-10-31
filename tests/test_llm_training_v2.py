@@ -114,6 +114,17 @@ def test_seed_repeat_changes_only_the_seed():
     assert repeat == v2
 
 
+@pytest.mark.parametrize("name, learning_rate", [("lr1e4.yaml", 1e-4), ("lr4e4.yaml", 4e-4)])
+def test_lr_sweep_changes_only_the_learning_rate(name, learning_rate):
+    compact = load_llm_training_config(CONFIGS / "llama32_1b" / "compact.yaml").model_dump()
+    sweep = load_llm_training_config(CONFIGS / "llama32_1b" / name).model_dump()
+
+    assert (compact["training"]["learning_rate"], sweep["training"]["learning_rate"]) == (2e-4, learning_rate)
+    sweep["training"]["learning_rate"] = 2e-4
+    sweep.pop("description"), compact.pop("description")
+    assert sweep == compact
+
+
 def test_early_stopping_requires_best_model_tracking():
     with pytest.raises(ValidationError, match="load_best_model_at_end"):
         LLMTrainerConfig(early_stopping_patience=3)

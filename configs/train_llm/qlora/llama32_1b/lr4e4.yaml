@@ -1,0 +1,11 @@
+description: "E9 learning-rate sweep: Llama-3.2-1B compact with learning_rate 4.0e-4"
+
+# The only change from compact.yaml (E11, 2e-4). After warmup E11 never hits
+# the grad-norm clip, so this changes the step size itself, not how often the
+# clip fires. Trains on E11's Hub dataset (nba-bets-compact) unchanged.
+
+_include:
+  - "compact.yaml"
+
+training:
+  learning_rate: 4.0e-4
