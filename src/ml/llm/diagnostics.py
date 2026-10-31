@@ -514,6 +514,44 @@ def recalibrate(
     return out
 
 
+def paired_log_loss_gap(
+    a: pd.DataFrame, b: pd.DataFrame, n_boot: int = 5000, seed: int = 0
+) -> dict[str, float]:
+    """Log-loss of ``a`` minus ``b`` on the games both scored, with a bootstrap interval.
+
+    Each frame holds one calibrated series (``game_id``, ``p_home``,
+    ``y_true``), e.g. a run's ``platt`` rows from ``read_predictions``. Pairing
+    on ``game_id`` cancels the game-to-game difficulty both models share, so the
+    interval is several times tighter than either model's own. Negative means
+    ``a`` is better. ``boot_sd`` is the SD of the resampled gap, the "paired SD"
+    of docs/findings/llm/2026-10-21-seed-noise.md; ``game_sd`` is the per-game SD,
+    which sets how the interval shrinks with more games (as 1/√n).
+    """
+    joined = (
+        a[["game_id", "p_home", "y_true"]]
+        .merge(b[["game_id", "p_home"]], on="game_id", suffixes=("_a", "_b"))
+        .sort_values("game_id")
+    )
+    y = joined["y_true"].to_numpy()
+
+    def per_game(p: pd.Series) -> np.ndarray:
+        p = p.clip(1e-6, 1 - 1e-6).to_numpy()
+        return -(y * np.log(p) + (1 - y) * np.log(1 - p))
+
+    diff = per_game(joined["p_home_a"]) - per_game(joined["p_home_b"])
+    rng = np.random.default_rng(seed)
+    boot = diff[rng.integers(0, len(diff), size=(n_boot, len(diff)))].mean(axis=1)
+    low, high = np.percentile(boot, [2.5, 97.5])
+    return {
+        "n": len(diff),
+        "gap": float(diff.mean()),
+        "ci_low": float(low),
+        "ci_high": float(high),
+        "boot_sd": float(boot.std()),
+        "game_sd": float(diff.std()),
+    }
+
+
 def inspect_adapter(
     config,
     run_name: str,

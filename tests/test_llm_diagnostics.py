@@ -11,6 +11,7 @@ from src.ml.llm.diagnostics import (
     few_shot_prefix,
     fit_platt,
     magnitude_token_ids,
+    paired_log_loss_gap,
     read_inspection_csv,
     recalibrate,
     sign_and_margin,
@@ -91,6 +92,39 @@ def test_platt_fit_from_another_split_is_applied_unchanged():
     assert np.allclose(out["p_home"], apply_platt(apply_to["p_home"], a, b))
     # One monotone rescaling never reorders games.
     assert summarize(out)["auc_p_home"] == pytest.approx(summarize(apply_to)["auc_p_home"])
+
+
+def _series(p_home, y_true, game_ids=None):
+    game_ids = range(len(p_home)) if game_ids is None else game_ids
+    return pd.DataFrame({"game_id": list(game_ids), "p_home": p_home, "y_true": y_true})
+
+
+def test_paired_gap_of_a_model_with_itself_is_exactly_zero():
+    rng = np.random.default_rng(0)
+    frame = _series(rng.uniform(0.2, 0.8, 500), rng.integers(0, 2, 500))
+
+    gap = paired_log_loss_gap(frame, frame, n_boot=200)
+
+    assert gap["gap"] == gap["ci_low"] == gap["ci_high"] == 0.0
+
+
+def test_paired_gap_is_negative_when_the_first_model_is_better():
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 2000)
+    informed = _series(np.where(y == 1, 0.65, 0.35) + rng.uniform(-0.1, 0.1, 2000), y)
+    coin = _series(np.full(2000, 0.5), y)
+
+    gap = paired_log_loss_gap(informed, coin, n_boot=500)
+
+    assert gap["ci_high"] < 0
+    assert gap["ci_low"] < gap["gap"] < gap["ci_high"]
+
+
+def test_paired_gap_scores_only_the_shared_games():
+    a = _series([0.6] * 5, [1] * 5, game_ids=[1, 2, 3, 4, 5])
+    b = _series([0.4] * 4, [1] * 4, game_ids=[3, 4, 5, 6])
+
+    assert paired_log_loss_gap(a, b, n_boot=10)["n"] == 3
 
 
 class FakeTokenizer:
