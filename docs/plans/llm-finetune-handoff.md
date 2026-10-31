@@ -1,4 +1,4 @@
-# LLM fine-tuning handoff (updated 2026-10-23)
+# LLM fine-tuning handoff (updated 2026-10-30)
 
 ## 0. Start here
 
@@ -7,7 +7,7 @@
 2. **Every model lands at 0.628–0.630:** Llama-3.2-1B, Llama-3.2-3B, the first 8B run (test_run2) and XGBoost on the same features. The features set the ceiling, not model size.
 3. **The working config is Llama-3.2-1B with the compact prompt** (`configs/train_llm/qlora/llama32_1b/compact.yaml`, E11). One run takes 21 min on a Colab L4. New 1B experiments `_include` it.
 4. **The noise floor is known (E7):** a different seed moves log-loss by 0.0004. A change wins only if it beats E4 by ≥ 0.002 *and* a paired bootstrap excludes zero (§2).
-5. **Prompt tweaks don't move it either (E11, E12, 2026-10-23).** **Next, Claude does N2**, a CPU-only blend of the LLM and XGBoost. Then the user decides between E8 (learning curve) and scoping new data (injuries).
+5. **Prompt tweaks (E11, E12), the learning rate (E9, 1e-4 to 4e-4) and the target (E16, won/lost instead of the margin, 2026-10-30) don't move it either.** **Next, Claude does N2**, a CPU-only blend of the LLM and XGBoost. Then the user decides between E8 (learning curve) and scoping new data (injuries).
 
 **Read in this order:** this section, then §3 (next steps), §2 (scoreboard), then whatever §4 or `docs/findings/llm/` the step needs. `docs/findings/llm/2026-10-23-e7-e11-e12-session-summary.md` summarizes the latest session (E7, E11, E12).
 
@@ -41,8 +41,8 @@
   - Summary keys: `train_runtime`, `train_samples_per_second`, `train/peak_gpu_reserved_gb`.
   - For pure s/step, take the median `_timestamp` delta between `train/loss` rows. `train_runtime` includes evals.
 - **HF API:** connect with `HfApi(token=require_env("HF_llm_training_token", ""))`. The Hub user is `fformenti`.
-- **Compare two runs, paired:** align both CSVs on `game_id` and run `diagnostics.py::recalibrate` on each. Then bootstrap the per-game log-loss difference. `docs/findings/llm/2026-10-21-seed-noise.md` describes the method; the script was a throwaway, so N2 should add it as a library function.
-- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 626 pass.
+- **Compare two runs, paired:** `diagnostics.py::paired_log_loss_gap(a, b)` (added 2026-10-28). Pass each run's calibrated rows from `read_predictions(run, ["validation"])`: `platt` for an LLM, `sigmoid` for XGBoost. It joins on `game_id` and bootstraps 5,000 times with `default_rng(0)`. It returns `gap` (a − b; negative means a is better), `ci_low`/`ci_high`, `boot_sd` and `game_sd`. It reproduces the E7 throwaway's interval.
+- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 637 pass.
 
 ## 1. Goals and setup
 
@@ -80,6 +80,9 @@
 | e7-llama32-1b-seed43 | 64.3% | 0.628 | 0.694 | 60% | E4 with seed 43 |
 | e12-llama32-1b-venue20 | 64.4% | 0.628 | 0.694 | 61% | venue line in 40% of prompts; a tie, not adopted |
 | **e11-llama32-1b-compact (working config)** | 64.5% | 0.629 | 0.694 | 61% | prompt −34% tokens; a tie; 21 min, 5.8 GB |
+| e9-llama32-1b-lr1e4 | 64.6% | 0.630 | 0.692 | 61% | lr 1e-4; +0.0015 vs E11, not significant |
+| e9-llama32-1b-lr4e4 | 64.4% | 0.628 | 0.695 | 61% | lr 4e-4; a tie (−0.0004); 2e-4 kept |
+| e16-llama32-1b-compact-classification | 64.1% | 0.630 | 0.692 | 61% | won/lost target; on the 2,938 shared games E11 scores 64.5% / 0.629; +0.0011 vs E11, a tie; E11 kept; 20 min, 5.7 GB |
 | XGBoost (E0) | — | 0.628 | — | — | same features; learning curve nearly flat |
 
 - **Noise floor (E7):**
@@ -88,7 +91,7 @@
   - "Not worse" means the interval includes zero and the point estimate is within 0.002.
   - → `docs/findings/llm/2026-10-21-seed-noise.md`
 - **Raw outputs lean home.** Before calibration the fine-tunes pick home 70–71% of the time against a true rate of 55%. Platt removes the lean without changing the ranking.
-- Write-ups: `docs/findings/llm/2026-10-21-size-ladder.md` (E4–E6), `docs/findings/llm/2026-10-21-seed-noise.md` (E7), `docs/findings/llm/2026-10-23-prompt-variants.md` (E11, E12), `docs/findings/llm/2026-10-20-e3-speed-benchmark.md` and `docs/findings/llm/2026-10-20-quantization-8bit.md`.
+- Write-ups: `docs/findings/llm/2026-10-21-size-ladder.md` (E4–E6), `docs/findings/llm/2026-10-21-seed-noise.md` (E7), `docs/findings/llm/2026-10-23-prompt-variants.md` (E11, E12), `docs/findings/llm/2026-10-29-learning-rate.md` (E9), `docs/findings/llm/2026-10-30-target-mode.md` (E16), `docs/findings/llm/2026-10-20-e3-speed-benchmark.md` and `docs/findings/llm/2026-10-20-quantization-8bit.md`.
 
 ## 3. Next steps, in priority order
 
@@ -96,6 +99,8 @@
 - *N1, E7 (the seed repeat).*
 - *N3, both datasets on the Hub (2026-10-23).*
 - *N4, E12 venue20 (a tie, not adopted) and E11 compact (a tie, 33% faster, adopted).*
+- *E9, learning-rate sweep (2026-10-29): both sides tie, 2e-4 kept. See below and `docs/findings/llm/2026-10-29-learning-rate.md`.*
+- *E16, classification target (2026-10-30): a tie, E11 kept. See below and `docs/findings/llm/2026-10-30-target-mode.md`.*
 
 *See §2, `docs/findings/llm/2026-10-21-seed-noise.md` and `docs/findings/llm/2026-10-23-prompt-variants.md`. Before any Colab run, set a new `LLM_CONFIG` and `RUN_NAME`: reusing a `RUN_NAME` resumes that run and overwrites its CSVs.*
 
@@ -112,20 +117,28 @@
   1. ~~Find out how the classifier pipeline trains on `build_splits`.~~
   2. ~~Add a library function that returns validation `p_home` by gameId.~~ Done: `src.ml.results.read_predictions(run_id, ["validation"])`.
   3. Report the correlation, each model's calibrated log-loss on the same games, and the log-loss of the average and of a logistic stack. Cross-fit the stack the way the Platt step does.
-  4. Add the paired comparison as a library function, for example `diagnostics.py::paired_log_loss_gap`: align on `game_id`, recalibrate each model, then bootstrap. Later experiments reuse it. The throwaway scripts used for E7/E11/E12 sorted by `game_id`, recalibrated each run and bootstrapped 5,000 times with `default_rng(0)`.
+  4. ~~Add the paired comparison as a library function.~~ Done (2026-10-28): `diagnostics.py::paired_log_loss_gap`. E11 − XGBoost = +0.0018 [−0.0019, +0.0057]: XGBoost is a tie, not a winner.
 - **LLM side:** use E11 (`e11-llama32-1b-compact`, the working config) and E4 as a cross-check. Their `p_home` correlate at 0.994.
 - **Success:** the blend passes the §2 win rule against E4.
 - **For contrast:** two LLM seeds correlate at 0.993, and averaging them gained nothing (E7). A blend helps only if XGBoost's correlation with the LLM is clearly lower.
+  - E16 and E11 correlate at 0.978, and their logit average still gains nothing: −0.0002 [−0.0016, +0.0012] vs E11. XGBoost is at 0.958 against E16.
 
-### E16. Classification target (user, Colab, about 21 min; code ready 2026-10-27)
+### E16. Classification target (done 2026-10-30: a tie, E11 stays the working config)
 - **Question:** does the margin's magnitude token help as an auxiliary signal, or does it dilute the gradient on the sign? The prompt ends `Home team` and the model completes ` won` / ` lost`; every line before it is byte-identical to compact's.
 - **Code:** `data.target_mode: regression | classification` (`src/ml/llm/target.py`). `p_home` is still the two-way softmax over the first completion token, so the scoreboard, Platt and `plot-compare` need no change. The mode is recorded in the W&B config and `run.json`. A config pointed at the other mode's dataset fails at load. Dataset names keep the modes apart: a classification `dataset_name` must end in `-classification` and a regression one must not (`LLMDataConfig` checks this when the config loads, so a push can't overwrite the other mode's dataset). Regression keeps its original names.
 - **Steps:**
-  1. Push the dataset (ask first): `make build-llm-dataset LLM_CONFIG=qlora/llama32_1b/compact_classification ARGS=--push` → `fformenti/nba-bets-compact-classification`.
+  1. ~~Push the dataset.~~ Done: `fformenti/nba-bets-compact-classification`, pushed 2026-10-27. Verified 2026-10-30: 23,108 / 2,938 / 1,008 games, prompts byte-identical to `nba-bets-compact` before the cue on all 27,054 shared games, labels agree 100% with E11's sign, and ` won` (2834) and ` lost` (5675) are one token each.
   2. Colab: `LLM_CONFIG=qlora/llama32_1b/compact_classification`, `RUN_NAME=e16-llama32-1b-compact-classification`, `INSPECT_SPLITS=["validation"]`.
   3. Compare with E11 using `make plot-compare` and the paired bootstrap, under the §2 win rule.
-- **Caveat, the game set has changed:** today's build has 23,108 / 2,938 / 1,008 games against the Hub's 23,247 / 2,949 / 1,018. All 160 missing games are absent from the current build, and every shared row is byte-identical to the Hub's. That points to the HEAD commit (`03b77a0`, neutral-court fix and filters). So E16 trains on 139 fewer games than E11; `plot-compare` scores both on the 2,938 shared validation games. For a strict one-change test, rebuild `nba-bets-compact` as well and rerun E11.
-- **Don't compare** `eval_loss` or `mean_token_accuracy` across modes, because regression's loss includes the magnitude token. Read `first_token_accuracy` instead.
+- **Caveat, the game set has changed:** today's build has 23,108 / 2,938 / 1,008 games against the Hub's 23,247 / 2,949 / 1,018. All 160 missing games are absent from the current build, and every shared row is byte-identical to the Hub's. That points to the HEAD commit (`03b77a0`, neutral-court fix and filters). So E16 trains on 139 fewer games than E11; `plot-compare` scores both on the 2,938 shared validation games. **Decision (2026-10-30): don't rerun E11 first.** 139 games is 0.6% of train, and validation is paired on shared games. Rerun on identical games only if E16 looks like a win, before adopting it.
+- **Don't compare `eval_loss`, `mean_token_accuracy` or the W&B `first_token_accuracy` across modes.** Regression's loss includes the magnitude token. The W&B accuracy runs on a 1,000-row sample that changes with the dataset's size: E11's and E16's share only 628 rows. Compare from the inspection CSVs on shared games instead.
+- **Result (2026-10-30, validation, Platt, 2,938 shared games):** E16 64.1% / 0.6300 against E11's 64.5% / 0.6288.
+  - **Paired bootstrap:** E16 − E11 = +0.0011 [−0.0017, +0.0039]: "not worse" under §2, and not a win. The interval's best case falls short of the 0.002 bar, so the identical-games rerun isn't needed. `outputs/comparisons/e16_vs_e11/`.
+  - **First-token accuracy:** W&B shows 64.9% vs 67.2%, but most of that is the sample. On all shared games the greedy gap is −0.7 points [−1.6, +0.1].
+  - **Eval loss 0.3138 vs 1.2787 is expected.** E16's is an average over two tokens (total 0.63 nats, nearly all the answer) and E11's over three (total 3.84). With E11's sign also near 0.63, about 3.2 nats sit on its magnitude.
+  - **Raw outputs lean home less:** 67.6% vs 71.2%. Platt still fixes both; it gains 0.0008 here against 0.0032 on E11.
+  - **Kept E11:** regression gives the same probability plus a margin estimate.
+  - → `docs/findings/llm/2026-10-30-target-mode.md`
 
 ### E17. Early-season games, minimum games played 4 (user, Colab, about 25 min; config ready 2026-10-28)
 - **Question:** does training on games 5–15 of each season help? At 15, "Adj Last-season win%" (hidden from 13 games on) never reached any split.
@@ -137,9 +150,23 @@
   3. Compare with E11 on the validation games they share (`make plot-compare`, paired bootstrap). The new early-season games are harder, so the full 3,440-game log-loss is not comparable with §2. Score them separately as well.
 - **Result (2026-10-28, validation, Platt):**
   - All 3,440 games: 64.9% accuracy, log-loss 0.6283. The record baseline gets 62.0% (`RECORD=1`, `outputs/comparisons/e17_vs_record/`).
-  - On the 2,938 games shared with E11: E17 scores 65.1% / 0.6271 against E11's 64.5% / 0.6288, a 0.0017 gap. That's just under the 0.002 win bar, and no paired bootstrap has been run (`outputs/comparisons/e17_vs_e11_record/`).
+  - On the 2,938 games shared with E11: E17 scores 65.1% / 0.6271 against E11's 64.5% / 0.6288, a 0.0017 gap (`outputs/comparisons/e17_vs_e11_record/`).
+  - **Paired bootstrap (2026-10-28):** E17 − E11 = −0.0017 [−0.0041, +0.0006]. The interval includes zero and the gap is under 0.002, so E17 is "not worse" but **not a win**. E17 − XGBoost = −0.0000 [−0.0037, +0.0036].
   - Games 5–10 (231 games): 63.6% against the record baseline's 62.3%.
   - Polymarket covers only 2024/25 on, so it can't be compared on validation.
+
+### E9. Learning-rate sweep (user, Colab, about 21 min each; configs ready 2026-10-29)
+- **Question:** is 2e-4 the right step size? Every v2 run has used it; no run has varied only the learning rate (test_run2's 1e-4 came with four other changes).
+- **Checked first (W&B, E11 and E4):** the grad-norm clip at 1.0 fires on 80% of steps 0–50 (format learning), 13% of steps 50–200 and none after. So 4e-4 tests the step size itself, not the clip. Eval loss still slips 1.2832 → 1.2788 between steps 400 and 600 as cosine anneals: a weak hint that a smaller learning rate helps.
+- **Configs:** `llama32_1b/lr1e4.yaml` and `lr4e4.yaml`, each `compact.yaml` with one change (pinned by `test_lr_sweep_changes_only_the_learning_rate`). They train on the Hub's `nba-bets-compact` unchanged: no rebuild, no push, the same games as E11.
+- **Steps:** (both configs pushed to Drive 2026-10-29)
+  1. Colab: `LLM_CONFIG=qlora/llama32_1b/lr1e4`, `RUN_NAME=e9-llama32-1b-lr1e4`, `INSPECT_SPLITS=["validation"]`. The first attempt (2026-10-29) died before training with `No module named src.cli.train_llm` (see §5 gotchas), so the run name is still unused.
+  2. Colab: `LLM_CONFIG=qlora/llama32_1b/lr4e4`, `RUN_NAME=e9-llama32-1b-lr4e4`, the same.
+  3. `make plot-compare NAME=e9_lr SERIES="e11-llama32-1b-compact e9-llama32-1b-lr1e4 e9-llama32-1b-lr4e4"`, the paired bootstrap of each against E11, and the three W&B eval-loss curves overlaid.
+- **Result (2026-10-29, done):** neither side wins, so 2e-4 stays and no follow-up step (5e-5 / 8e-4) is run.
+  - lr1e4: 0.6301, E11 gap +0.0015 [−0.0005, +0.0036]. lr4e4: 0.6282, gap −0.0004 [−0.0018, +0.0011]. `outputs/comparisons/e9_lr/`.
+  - All three end at eval loss 1.278–1.279. 1e-4 learns the format slowest and ends with a higher grad norm (0.62 vs 0.39); 4e-4 fastest, with one recovered wobble at step 300.
+  - → `docs/findings/llm/2026-10-29-learning-rate.md`
 
 ### N5. E8, learning curve (user, Colab, about 15 min in total)
 - **Why:** eval loss and first-token accuracy plateau by about step 200–300 of 727 (E4, E5, E11). This tests whether more data helps, which decides whether gathering more seasons is worth it.
@@ -150,7 +177,7 @@
 - **Rank against the data project:** if the curve is already flat at 25%, more seasons won't help, and only new kinds of information will.
 
 ### Deprioritized, with reasons
-- **E9 (learning rate 1e-4/4e-4) and E10 (LoRA r64, all-linear targets):** model size didn't move the ceiling, so capacity tweaks are unlikely to.
+- **E10 (LoRA r64, all-linear targets):** model size didn't move the ceiling, so capacity tweaks are unlikely to. E9 (the learning rate) then tied as well (2026-10-29), which makes a capacity knob even less likely to matter.
 - **E13/E14 (Qwen3, Gemma, Phi):** the same argument. Qwen3 also tokenizes digit by digit, so it has no expected-margin RMSE.
 - **E6 (the 8B on v2):** skipped by the user's decision (2026-10-21), about 3 h for a likely tie. Its config `qlora/llama31_8b/v2.yaml` is ready. Revisit only if new features change the picture.
 - **1B in bf16 instead of 4-bit:** an optional quality check. It removes NF4 quantization error, and the 1B fits easily. If tried, it's one change: `quantization.mode: none`.
@@ -167,6 +194,22 @@ N1–N4 are done, and E12 showed that one more view of existing stats adds nothi
 The best config, trained on the full train split. **Score test once.** Report it against XGBoost (67.2%) and Polymarket (69.9% / 0.579). Scoring test needs `SCORE_TEST=True` in `colab_notebooks/test_llm.ipynb`.
 
 ## 4. Findings, condensed
+
+- **Target (E16, 2026-10-30): keep the margin.**
+  - Dropping the magnitude token ties E11 (+0.0011 [−0.0017, +0.0039]), though that token carries about 84% of E11's loss. It neither helps nor dilutes the sign measurably.
+  - The W&B first-token accuracy isn't comparable when two runs use different datasets. About 5.5% of games tie exactly in 16-bit logits, and greedy always sends those home, so `p_home` (fp32) is the number to trust.
+  - → `docs/findings/llm/2026-10-30-target-mode.md`
+
+- **Learning rate (E9, 2026-10-29): keep 2e-4.**
+  - 1e-4 and 4e-4 both tie E11 under the §2 rule; a 4× range moves log-loss about as much as a seed.
+  - The rate changes how fast the format is learned, not where training ends.
+  - → `docs/findings/llm/2026-10-29-learning-rate.md`
+
+- **Validation size (2026-10-28): keep 3 seasons.**
+  - Validation doesn't steer training: no best-model loading and no early stopping.
+  - Growing it would move 2019/20–2020/21, the most recent and most relevant training seasons, out of train. It would narrow the paired intervals by only about 19%, which still wouldn't settle E17.
+  - Revisit only if E8 shows a flat learning curve.
+  - → `docs/findings/llm/2026-10-28-validation-size.md`
 
 - **Prompt variants (E11/E12, 2026-10-23):**
   - **venue20:** keeping last-season venue win% in 40% of prompts changed nothing (−0.0002 [−0.0009, +0.0004]), even on the games that show it. Its `p_home` correlate with E4's at 0.9987. Not adopted.
@@ -207,7 +250,8 @@ The best config, trained on the full train split. **Score test once.** Report it
    - **Train and inspect:** set `LLM_CONFIG`, a new `RUN_NAME`, `TRAIN=True` and `INSPECT_SPLITS=["validation"]`.
    - **Benchmark, train only:** the same with `INSPECT_SPLITS=[]`.
    - **Untuned baseline:** `TRAIN=False` with `INSPECT_ARGS="--base-only [--few-shot 5 --batch-size 8]"`.
-3. **Run all.** For a second run in the same session, rerun only the config cell and the run cell.
+3. **Run all.** For a second run in the same session, rerun only the config cell and the run cell,
+   but only while the runtime is alive (`RELEASE_RUNTIME_WHEN_DONE=False`). After a release, reconnect or session restart, Run all again.
 4. **Download** `MyDrive/nba_bets/outputs/runs/<RUN_NAME>/` into the repo's `outputs/runs/<RUN_NAME>/`.
    - That's the only run location; code reads and writes nothing else. `make plot RUN=<RUN_NAME>` draws it.
    - **Drive still holds the old layout** (`outputs/llm/eval/`) until someone runs `uv run python -m src.cli.migrate_outputs_layout --outputs-dir <Drive mount>/nba_bets/outputs` once. Until then the notebooks' reuse cell finds nothing and rescores.
@@ -217,6 +261,7 @@ The best config, trained on the full train split. **Score test once.** Report it
    - It has a playground cell. Scoring test is guarded by `SCORE_TEST`.
 
 **Gotchas:**
+- **`No module named src.cli.<tool>`:** the run cell isn't in `/content/nba_bets`. A fresh or restarted runtime starts in `/content`, and only the setup cell copies the repo and `%cd`s there. The run cell now asserts this (and that `CFG` exists on Drive) before training. Fix: Run all. New configs must reach Drive first: `make drive-sync ONLY=code`.
 - **`RUN_NAME`:** it names the Hub repo, the W&B run and the eval folder. Reusing a name *resumes* training and overwrites its CSVs.
 - **Releasing the runtime:** Colab Pro has no background execution. Use `RELEASE_RUNTIME_WHEN_DONE=True` for single runs; the call is `google.colab.runtime.unassign()`.
 - **Drive:** never unmount it mid-session; a second run in the same session couldn't remount it. The run cell flushes and unmounts only when releasing. With release off, run the "End of session" cell before disconnecting.
@@ -228,11 +273,11 @@ The best config, trained on the full train split. **Score test once.** Report it
 
 | Where | Keep | Delete / done |
 |---|---|---|
-| **HF models** | `test_run2` (the reference), `e4-llama32-1b` (the comparison base), `e11-llama32-1b-compact` (working config) | deleted: all `e3-*`. **To delete:** `e5-llama32-3b`, `e7-llama32-1b-seed43` (its job was the noise number), `e12-llama32-1b-venue20` (not adopted), `resume-drill-1`, `resume-drill-2`, `test_run`; and `nba-bets-2026-07-16_18.03.32` / `nba-bets-2026-07-23_11.34.23` if the user confirms they're the July notebook experiments |
-| **HF datasets** | `nba-bets`, `nba-bets-compact` (working config); `games` until the user says it's obsolete | optional: `nba-bets-venue20` (rebuildable with one command) |
+| **HF models** | `test_run2` (the reference), `e4-llama32-1b` (the comparison base), `e11-llama32-1b-compact` (working config) | deleted: all `e3-*`. **To delete:** `e5-llama32-3b`, `e7-llama32-1b-seed43` (its job was the noise number), `e12-llama32-1b-venue20` (not adopted), `e9-llama32-1b-lr1e4` and `e9-llama32-1b-lr4e4` (their job was the number), `e16-llama32-1b-compact-classification` (a tie, not adopted), `resume-drill-1`, `resume-drill-2`, `test_run`; and `nba-bets-2026-07-16_18.03.32` / `nba-bets-2026-07-23_11.34.23` if the user confirms they're the July notebook experiments |
+| **HF datasets** | `nba-bets`, `nba-bets-compact` (working config); `games` until the user says it's obsolete | optional: `nba-bets-venue20`, `nba-bets-compact-min4`, `nba-bets-compact-classification` (each rebuildable with one command) |
 | **W&B** | everything: small, free, and cited by the write-ups | optional: `e3-nogc` (OOM, empty) |
 | **Drive `outputs/llm/eval/`** (old layout; migrate to `outputs/runs/`, see §5) | `base-8b-0shot`, `base-8b-5shot`, `test_run2`, `resume-drill-2`, `e4-llama32-1b`, `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e11-llama32-1b-compact`, `e12-llama32-1b-venue20` | the `e3-*` folders (each holds only a session `mlflow.db`) |
-| **Repo `outputs/runs/`** | the same nine runs, migrated 2026-10-23 from `outputs/llm/eval/` (docs/reference/outputs.md) | — |
+| **Repo `outputs/runs/`** | the same nine runs, migrated 2026-10-23 from `outputs/llm/eval/` (docs/reference/outputs.md); since then `e17-llama32-1b-compact-min4`, `e9-llama32-1b-lr1e4`, `e9-llama32-1b-lr4e4`, `e16-llama32-1b-compact-classification` | — |
 
 Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
 

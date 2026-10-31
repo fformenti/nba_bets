@@ -44,6 +44,10 @@ root. Architecture and layering rules live in [CLAUDE.md](../CLAUDE.md), and the
   session summary, including how the three Hub datasets relate.
 - [2026-10-28-validation-size.md](findings/llm/2026-10-28-validation-size.md): should validation
   grow beyond three seasons?
+- [2026-10-29-learning-rate.md](findings/llm/2026-10-29-learning-rate.md): E9, is 2e-4 the right
+  learning rate?
+- [2026-10-30-target-mode.md](findings/llm/2026-10-30-target-mode.md): E16, does the margin's
+  magnitude help the sign?
 
 ## Findings: pipeline
 
