@@ -11,7 +11,7 @@ Felipe fine-tunes Llama with LoRA to predict NBA winners in this repo, starting 
 
 ## Constraints
 - Compute: Colab L4, about 21 min per 1B run. Experiments change one thing at a time, cheapest first.
-- Learning comes before winning (from `plans/llm_finetune_handoff.md`).
+- Learning comes before winning (from `docs/plans/llm-finetune-handoff.md`).
 - Polymarket prices are a benchmark only, never a model input.
 
 ## Out of scope

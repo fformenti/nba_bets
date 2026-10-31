@@ -1,6 +1,6 @@
 """Move outputs/ into the run layout and convert the LLM evaluations. Run once.
 
-See src/ml/results/migrate.py for what moves where, and docs/OUTPUTS.md for the
+See src/ml/results/migrate.py for what moves where, and docs/reference/outputs.md for the
 layout it produces. Pass --outputs-dir to migrate another copy, e.g. the
 Drive mirror the Colab notebooks read.
 """

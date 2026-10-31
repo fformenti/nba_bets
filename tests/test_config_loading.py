@@ -17,7 +17,7 @@ from src.ml.config.loader import (
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 FEATURES_YAML = CONFIGS_DIR / "features.yaml"
 # The deployed model. The same/different conference pair it replaced lost a
-# paired backtest — see docs/CONFERENCE_SPLIT.md.
+# paired backtest — see docs/findings/pipeline/2026-08-12-conference-split.md.
 XGBOOST = CONFIGS_TRAIN_DIR / "xgboost.yaml"
 # Same features and splits as XGBOOST, four model families instead of one.
 ALL_MODELS = CONFIGS_TRAIN_DIR / "all_models.yaml"

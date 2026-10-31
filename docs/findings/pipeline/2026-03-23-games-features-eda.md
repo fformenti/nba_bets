@@ -4,6 +4,10 @@
 
 **Generated**: 2026-03-23 | Pre-training audit of `data/processed/regular_season/games_features.csv`
 
+> Merged from two copies of this report. The revision of 2026-03-30 removed the [CRITICAL]
+> section (C1, C2), the C1 checklist line and the critical-issues sentence of the conclusion, and
+> changed nothing else. All of that is kept below, and both conclusions are labelled by date.
+
 ---
 
 ## [CRITICAL] — Action required before training
@@ -175,4 +179,6 @@
 
 **Ready for training**: Yes, with caveats.
 
-The dataset is clean, well-structured, and temporally sound. The two critical issues (adjusted records exceeding bounds, preseason games) should be fixed before model deployment, but the data quality is high overall. The feature set is free of leakage and multicollinearity is minimal. The temporal drift in home win rate is a **domain reality** (not a data quality issue) that should be addressed via recalibration or weighting, both of which are already partially in place.
+*2026-03-23:* The dataset is clean, well-structured, and temporally sound. The two critical issues (adjusted records exceeding bounds, preseason games) should be fixed before model deployment, but the data quality is high overall. The feature set is free of leakage and multicollinearity is minimal. The temporal drift in home win rate is a **domain reality** (not a data quality issue) that should be addressed via recalibration or weighting, both of which are already partially in place.
+
+*2026-03-30:* The dataset is clean, well-structured, and temporally sound. The feature set is free of leakage and multicollinearity is minimal. The temporal drift in home win rate is a **domain reality** (not a data quality issue) that should be addressed via recalibration or weighting, both of which are already partially in place.

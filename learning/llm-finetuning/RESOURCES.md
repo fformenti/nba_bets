@@ -16,7 +16,7 @@
   Authoritative field definitions and defaults (r=8, alpha=8).
 - [Docs: scikit-learn probability calibration](https://scikit-learn.org/stable/modules/calibration.html)
   Platt/sigmoid calibration and reliability curves. Use for: log-loss vs AUC, recalibration.
-- In-repo: `plans/llm_finetune_handoff.md`, `project_knowledge/llm_training/*.md`
+- In-repo: `docs/plans/llm-finetune-handoff.md`, `docs/findings/llm/*.md`
   The user's own experiment results. Ground every lesson in these numbers.
 
 ## Wisdom (Communities)

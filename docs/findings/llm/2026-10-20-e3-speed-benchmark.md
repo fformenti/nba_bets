@@ -55,7 +55,7 @@ Configs: `configs/train_llm/qlora/llama31_8b/bench*.yaml`.*
   - A 200-row eval went from **27 to 12.5 s** (−54%).
   - The loss and `first_token_accuracy` curves match within noise.
 - **Cause:** asking trl 1.16 for `return_outputs=True` re-ran a full-logits forward pass on
-  every step. See `plans/llm_finetune_handoff.md` §3.
+  every step. See `docs/plans/llm-finetune-handoff.md` §3.
 
 ## Decision for E6 (the 8B with `v2.yaml`)
 - **The rule set in advance:** if 4-bit with gradient checkpointing off fits and is at least 15%
@@ -75,4 +75,4 @@ Configs: `configs/train_llm/qlora/llama31_8b/bench*.yaml`.*
     memory, the estimate is around 8 GB.
   - `llama32_3b/v2` turns it off at 4×8, estimated around 10 GB.
   - E4 and E5 report their real peaks (`train/peak_gpu_reserved_gb`).
-- The 8-bit details are in `quantization_8bit.md`.
+- The 8-bit details are in `2026-10-20-quantization-8bit.md`.

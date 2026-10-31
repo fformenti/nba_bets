@@ -70,7 +70,7 @@ pipeline shipped a duplicated feature family.
 ### Where the Boruta artifacts live
 
 Runs since 2026-10-23 write `outputs/runs/<config>-<timestamp>/model/feature_selection.json`
-(layout: docs/OUTPUTS.md). The audit below read the pre-layout folders, now archived
+(layout: docs/reference/outputs.md). The audit below read the pre-layout folders, now archived
 unchanged under `outputs/archive/`:
 
 | Path | Feature pool | Status |
@@ -443,7 +443,7 @@ the clinch flags are read as an integer triple by `create_winning_incentive_feat
 ### `create_conference_features()`
 
 Two features, built for every game. There is no conference filter — the same/cross-conference
-model split measured worse and was removed (see `docs/CONFERENCE_SPLIT.md`).
+model split measured worse and was removed (see `docs/findings/pipeline/2026-08-12-conference-split.md`).
 
 | Column | Meaning | Same-conference value |
 |--------|---------|----------------------|

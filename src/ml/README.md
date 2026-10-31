@@ -15,7 +15,7 @@ src/ml/
 ├── llm/         Same experiment, text encoding
 ├── prediction/  Inference on upcoming games
 ├── evaluation/  Metrics and breakdown tables (compute only)
-├── results/     Result-file schema every family writes (docs/OUTPUTS.md)
+├── results/     Result-file schema every family writes (docs/reference/outputs.md)
 ├── plotting/    Figures drawn from result files; nothing here imports it
 ├── tracking/    MLflow wrapper + ops tools
 └── utils/       Validation, SHAP compatibility
@@ -98,7 +98,7 @@ make predict-upcoming
 model's training config back from its MLflow run so the inference feature set
 matches the training one. Games used to be routed to a same-conference or
 cross-conference model as well; that split scored worse and was removed — see
-docs/CONFERENCE_SPLIT.md.
+docs/findings/pipeline/2026-08-12-conference-split.md.
 
 Output goes to `data/predictions/upcoming_games_predictions.csv` via
 `upsert_predictions`, keyed on `gameId`. Re-running a slate replaces rows rather

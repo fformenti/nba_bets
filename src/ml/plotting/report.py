@@ -5,7 +5,7 @@ Nothing here trains or loads a model. Inputs are a run's ``predictions/``,
 conference, games played, score) and the Polymarket odds table. Everything
 written lands in ``outputs/runs/<run_id>/report/`` or
 ``outputs/comparisons/<name>/`` and can be deleted and redrawn at will.
-Layout and schema: docs/OUTPUTS.md.
+Layout and schema: docs/reference/outputs.md.
 """
 
 from __future__ import annotations

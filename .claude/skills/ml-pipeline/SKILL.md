@@ -15,7 +15,7 @@ description: >
 
 - **Python runner**: Always use `uv run python -m ...` (never `python` or `pip`)
 - **Config-driven**: All experiments use Pydantic-validated YAML configs (`ExperimentConfig`, `PredictionConfig`)
-- **One model, every game**: training produces a single model. The same/cross-conference split it replaced measured worse (+0.0047 log loss) — see docs/CONFERENCE_SPLIT.md. The conference *signal* is kept as two features, both 0.0 for same-conference games.
+- **One model, every game**: training produces a single model. The same/cross-conference split it replaced measured worse (+0.0047 log loss) — see docs/findings/pipeline/2026-08-12-conference-split.md. The conference *signal* is kept as two features, both 0.0 for same-conference games.
 - **Temporal split**: Default and preferred split. Test set must always be chronologically after training data
 - **MLflow**: All experiments tracked via `MLflowTracker` context manager → see mlflow skill for details
 
@@ -59,7 +59,7 @@ Scikit-learn API required: `fit()`, `predict()`, `predict_proba()`, `score()`.
 3. Temporal/stratified/random split → preprocessor fit on train only
 4. Train `RecordDifferenceBaseline`, `PointDifferentialBaseline`, `random_forest`, `gradient_boosting`
 5. Best model selected by `test_accuracy` from `test_metrics`
-6. Writes result files to `outputs/runs/<config>-<timestamp>/` (no figures; `make plot` draws them — docs/OUTPUTS.md), optionally registers model (→ mlflow skill for registry details)
+6. Writes result files to `outputs/runs/<config>-<timestamp>/` (no figures; `make plot` draws them — docs/reference/outputs.md), optionally registers model (→ mlflow skill for registry details)
 7. Metrics stored as `{model_name}_test_accuracy`, `{model_name}_test_f1`, etc.
 
 ## Prediction flow summary

@@ -9,13 +9,13 @@
 4. **The noise floor is known (E7):** a different seed moves log-loss by 0.0004. A change wins only if it beats E4 by ≥ 0.002 *and* a paired bootstrap excludes zero (§2).
 5. **Prompt tweaks don't move it either (E11, E12, 2026-10-23).** **Next, Claude does N2**, a CPU-only blend of the LLM and XGBoost. Then the user decides between E8 (learning curve) and scoping new data (injuries).
 
-**Read in this order:** this section, then §3 (next steps), §2 (scoreboard), then whatever §4 or `project_knowledge/llm_training/` the step needs. `plans/llm_findings_2026-10-23.md` summarizes the latest session (E7, E11, E12).
+**Read in this order:** this section, then §3 (next steps), §2 (scoreboard), then whatever §4 or `docs/findings/llm/` the step needs. `docs/findings/llm/2026-10-23-e7-e11-e12-session-summary.md` summarizes the latest session (E7, E11, E12).
 
 **How to work with this user:**
 - **Explaining:** the user is learning fine-tuning. Explain the reasoning behind each choice, and give a recommendation rather than a menu.
 - **Experiments:** change one thing per experiment, cheapest first. Judge every result against the noise floor E7 measured (§2).
 - **Actions for the user:** when a step needs them (Colab runs, Hub deletions, syncing Drive), write the exact steps, the values to set and *why* the step matters.
-- **End of session:** update this file. Write finished findings up durably in `project_knowledge/llm_training/` (one topic per file); the user asked for that folder.
+- **End of session:** update this file. Write finished findings up durably in `docs/findings/llm/`, one topic per file, named `YYYY-MM-DD-<topic>.md`, and add a line to `docs/README.md`.
 - **Ask first:**
   - before pushing anything to the Hugging Face Hub;
   - before committing (nothing is committed unless the user asks);
@@ -34,14 +34,14 @@
 - **Score a run:**
   `uv run python -m src.cli.inspect_llm --config <any llm config> --run-name <run> --split validation --summarize-only --calibrate-with validation`.
   - It reads `outputs/runs/<run>/llm/inspection_validation.csv` and writes nothing.
-- **Scoreboard without a GPU:** `make plot-compare NAME=<name> SERIES="<run> <run> ..."` scores each run's Platt series on the games they share (`outputs/comparisons/<name>/tables/scoreboard.csv`). Its numbers equal the second summary above. Layout: `docs/OUTPUTS.md`.
+- **Scoreboard without a GPU:** `make plot-compare NAME=<name> SERIES="<run> <run> ..."` scores each run's Platt series on the games they share (`outputs/comparisons/<name>/tables/scoreboard.csv`). Its numbers equal the second summary above. Layout: `docs/reference/outputs.md`.
   - Read `log_loss`, `accuracy_p_home` and `auc_p_home` from the *second* summary, the one after Platt recalibration.
 - **W&B API** (entity `felipeformenti`, project `nba-bets`):
   - Connect with `wandb.Api()`, after setting `WANDB_API_KEY` from `require_env("WANDB_API_KEY", "", secrets_file=GLOBAL_SECRETS_FILE)`.
   - Summary keys: `train_runtime`, `train_samples_per_second`, `train/peak_gpu_reserved_gb`.
   - For pure s/step, take the median `_timestamp` delta between `train/loss` rows. `train_runtime` includes evals.
 - **HF API:** connect with `HfApi(token=require_env("HF_llm_training_token", ""))`. The Hub user is `fformenti`.
-- **Compare two runs, paired:** align both CSVs on `game_id` and run `diagnostics.py::recalibrate` on each. Then bootstrap the per-game log-loss difference. `seed_noise.md` describes the method; the script was a throwaway, so N2 should add it as a library function.
+- **Compare two runs, paired:** align both CSVs on `game_id` and run `diagnostics.py::recalibrate` on each. Then bootstrap the per-game log-loss difference. `docs/findings/llm/2026-10-21-seed-noise.md` describes the method; the script was a throwaway, so N2 should add it as a library function.
 - **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 626 pass.
 
 ## 1. Goals and setup
@@ -86,9 +86,9 @@
   - E4 and E7 differ by 0.0004 log-loss. The paired SD is 0.0008, and their `p_home` correlate at 0.993.
   - **A change wins only if** it beats E4's 0.6286 by ≥ 0.002 **and** a paired bootstrap of the per-game difference has a 95% interval excluding zero.
   - "Not worse" means the interval includes zero and the point estimate is within 0.002.
-  - → `project_knowledge/llm_training/seed_noise.md`
+  - → `docs/findings/llm/2026-10-21-seed-noise.md`
 - **Raw outputs lean home.** Before calibration the fine-tunes pick home 70–71% of the time against a true rate of 55%. Platt removes the lean without changing the ranking.
-- Write-ups: `project_knowledge/llm_training/size_ladder.md` (E4–E6), `seed_noise.md` (E7), `prompt_variants.md` (E11, E12), `e3_speed_benchmark.md` and `quantization_8bit.md`.
+- Write-ups: `docs/findings/llm/2026-10-21-size-ladder.md` (E4–E6), `docs/findings/llm/2026-10-21-seed-noise.md` (E7), `docs/findings/llm/2026-10-23-prompt-variants.md` (E11, E12), `docs/findings/llm/2026-10-20-e3-speed-benchmark.md` and `docs/findings/llm/2026-10-20-quantization-8bit.md`.
 
 ## 3. Next steps, in priority order
 
@@ -97,7 +97,7 @@
 - *N3, both datasets on the Hub (2026-10-23).*
 - *N4, E12 venue20 (a tie, not adopted) and E11 compact (a tie, 33% faster, adopted).*
 
-*See §2, `seed_noise.md` and `prompt_variants.md`. Before any Colab run, set a new `LLM_CONFIG` and `RUN_NAME`: reusing a `RUN_NAME` resumes that run and overwrites its CSVs.*
+*See §2, `docs/findings/llm/2026-10-21-seed-noise.md` and `docs/findings/llm/2026-10-23-prompt-variants.md`. Before any Colab run, set a new `LLM_CONFIG` and `RUN_NAME`: reusing a `RUN_NAME` resumes that run and overwrites its CSVs.*
 
 ### N2. Blend the LLM and XGBoost (Claude, CPU only)
 - **Question:** do the two models carry different information? If their validation `p_home` correlate well below 1, an average can beat both. It costs no GPU time.
@@ -171,17 +171,17 @@ The best config, trained on the full train split. **Score test once.** Report it
 - **Prompt variants (E11/E12, 2026-10-23):**
   - **venue20:** keeping last-season venue win% in 40% of prompts changed nothing (−0.0002 [−0.0009, +0.0004]), even on the games that show it. Its `p_home` correlate with E4's at 0.9987. Not adopted.
   - **compact:** a tie (+0.0001 [−0.0013, +0.0015]) at 1.48 s/step against 2.21, and 5.8 GB against 7.9. Adopted.
-  - → `project_knowledge/llm_training/prompt_variants.md`
+  - → `docs/findings/llm/2026-10-23-prompt-variants.md`
 - **Seed noise (E7, 2026-10-21):**
   - A new seed moves log-loss by 0.0004 (paired SD 0.0008). Picks agree in 96% of games, and averaging seeds gains nothing.
   - The in-training eval sample used to follow `training.seed`; it now follows `evaluation.seed`.
-  - → `project_knowledge/llm_training/seed_noise.md`
-- **Size ladder (E4/E5, 2026-10-21):** the 1B ties test_run2 in 1/19th of the time, and the 3B is no better. The features set the ceiling. → `project_knowledge/llm_training/size_ladder.md`
+  - → `docs/findings/llm/2026-10-21-seed-noise.md`
+- **Size ladder (E4/E5, 2026-10-21):** the 1B ties test_run2 in 1/19th of the time, and the 3B is no better. The features set the ceiling. → `docs/findings/llm/2026-10-21-size-ladder.md`
 - **Speed on an L4 (E3, 2026-10-20):**
   - Precision (4-bit, 8-bit, bf16) and micro-batch size barely change the 8B's speed (18.3–19.4 s/step); the card is compute-bound.
   - Turning gradient checkpointing off is 25% faster (13.8 s/step at 2×16, 12.3 GB). It needs 4-bit's memory headroom.
   - 8-bit is the slowest mode and uses bf16's memory.
-  - → `project_knowledge/llm_training/e3_speed_benchmark.md`, `quantization_8bit.md`
+  - → `docs/findings/llm/2026-10-20-e3-speed-benchmark.md`, `docs/findings/llm/2026-10-20-quantization-8bit.md`
 - **A double forward pass (fixed, 2026-10-20):**
   - Our `compute_loss` override asked trl 1.16 for `return_outputs=True`, which silently ran a second full-logits forward pass on every step.
   - Fixed with a forward hook. Training is 24% faster and eval 54% faster.
@@ -232,7 +232,7 @@ The best config, trained on the full train split. **Score test once.** Report it
 | **HF datasets** | `nba-bets`, `nba-bets-compact` (working config); `games` until the user says it's obsolete | optional: `nba-bets-venue20` (rebuildable with one command) |
 | **W&B** | everything: small, free, and cited by the write-ups | optional: `e3-nogc` (OOM, empty) |
 | **Drive `outputs/llm/eval/`** (old layout; migrate to `outputs/runs/`, see §5) | `base-8b-0shot`, `base-8b-5shot`, `test_run2`, `resume-drill-2`, `e4-llama32-1b`, `e5-llama32-3b`, `e7-llama32-1b-seed43`, `e11-llama32-1b-compact`, `e12-llama32-1b-venue20` | the `e3-*` folders (each holds only a session `mlflow.db`) |
-| **Repo `outputs/runs/`** | the same nine runs, migrated 2026-10-23 from `outputs/llm/eval/` (docs/OUTPUTS.md) | — |
+| **Repo `outputs/runs/`** | the same nine runs, migrated 2026-10-23 from `outputs/llm/eval/` (docs/reference/outputs.md) | — |
 
 Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole MLflow database. It isn't needed for scoring.
 
@@ -246,7 +246,7 @@ Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole M
 - Tests: `tests/test_llm_target.py` (it uses the cached Llama tokenizer when present), plus additions to the split-parity, per_team, diagnostics and trl tests.
 
 **Outputs restructure (2026-10-23):**
-- `outputs/` is now `runs/<run_id>/`, `comparisons/`, `eda/`, `checkpoints/`, `archive/`; every path lives in `src/config/paths.py`. Full layout and schema: `docs/OUTPUTS.md`.
+- `outputs/` is now `runs/<run_id>/`, `comparisons/`, `eda/`, `checkpoints/`, `archive/`; every path lives in `src/config/paths.py`. Full layout and schema: `docs/reference/outputs.md`.
 - Training and evaluation write result files only (`predictions/<split>.csv`, `metrics/<split>.json`, `run.json`); figures come from `make plot` / `make plot-compare` (`src/ml/plotting/`).
 - `inspect_llm` writes the shared predictions (raw + Platt) beside the inspection CSV; LLM checkpoints moved to `outputs/checkpoints/<run>/` (`paths.output_dir` removed from every LLM config).
 - Both Colab notebooks read and write `outputs/runs/`; the scoreboard cell calls `build_comparison`.

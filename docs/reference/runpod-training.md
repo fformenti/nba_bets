@@ -268,7 +268,7 @@ make evaluate-llm LLM_RUN=nba-bets-2026-07-30
 ```
 
 Runs on the `test` split with `evaluation.size: 200` rows. The per-game predictions are written to
-`outputs/runs/<run_name>/` (layout: docs/OUTPUTS.md) so they can be pulled off a headless box and
+`outputs/runs/<run_name>/` (layout: docs/reference/outputs.md) so they can be pulled off a headless box and
 drawn locally:
 
 ```bash

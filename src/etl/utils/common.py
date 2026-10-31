@@ -30,7 +30,8 @@ def require_reference_file(path: Path, make_target: str) -> None:
             f"Reference input not found: {path}\n"
             f"It is an input, not a build artifact — nothing in the pipeline can "
             f"regenerate it offline. Restore it from a backup, or rebuild it with "
-            f"`make {make_target}` (needs API credentials; see docs/PIPELINE_AUDIT.md)."
+            f"`make {make_target}` (needs API credentials; see "
+            f"docs/findings/pipeline/2026-08-11-pipeline-audit.md)."
         )
 
 

@@ -120,7 +120,7 @@ score-predictions:
 #   make train TRAIN_CONFIG=all_models
 #
 # Training writes result files only (outputs/runs/<config>-<timestamp>/); the
-# second line draws them, as its own process. See docs/OUTPUTS.md.
+# second line draws them, as its own process. See docs/reference/outputs.md.
 train:
 	uv run python -m src.cli.train_classifier --config configs/train/$(TRAIN_CONFIG).yaml $(if $(PROMOTE),--promote,)
 	uv run python -m src.cli.plot_run --run latest

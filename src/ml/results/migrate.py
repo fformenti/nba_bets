@@ -1,4 +1,4 @@
-"""One-time move of ``outputs/`` into the run layout (docs/OUTPUTS.md).
+"""One-time move of ``outputs/`` into the run layout (docs/reference/outputs.md).
 
 Nothing is deleted except macOS ``.DS_Store`` files, which would otherwise keep
 emptied folders alive. Every output file is moved, and the LLM inspection CSVs
@@ -29,7 +29,8 @@ ARCHIVED_FOLDERS = {
     "feature_audit": "2026-08-12_feature_audit",
     # configs/train/opus_search.yaml no longer exists.
     "opus_search": "2026-08-13_opus_search",
-    # The season-decay backtest harness was deleted (docs/CONFERENCE_SPLIT.md).
+    # The season-decay backtest harness was deleted
+    # (docs/findings/pipeline/2026-08-12-conference-split.md).
     "tuning": "2026-08-12_season_decay_tuning",
 }
 

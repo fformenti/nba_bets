@@ -1,7 +1,7 @@
 # data/ is not versioned, with three exceptions below. Those are *inputs*, not
 # build artifacts: nothing in the pipeline regenerates them offline, so without
 # them a fresh clone cannot run `make historical-etl` at all. Everything else
-# under data/ is derived and stays out. See docs/PIPELINE_AUDIT.md.
+# under data/ is derived and stays out. See docs/findings/pipeline/2026-08-11-pipeline-audit.md.
 /data/*
 !/data/raw/
 /data/raw/*
@@ -12,7 +12,6 @@
 # Typed by hand: team → conference history, Polymarket ticker map.
 !/data/raw/historical/handmade/
 
-explanations/
 scratchpad
 # notebooks
 sandbox

@@ -6,7 +6,7 @@
 
 Each series is ``run_id[:model[:calibration]]``; omitted parts default to what
 the run's run.json selected. Writes outputs/comparisons/<NAME>/. See
-docs/OUTPUTS.md.
+docs/reference/outputs.md.
 """
 
 import argparse

@@ -2,7 +2,7 @@
 
 *Each run changes one thing from E4 (`qlora/llama32_1b/v2`, seed 42). They were scored on all
 2,949 validation games, Platt cross-fit, and compared with E4 game by game, using a paired bootstrap
-with 5,000 resamples. The win rule comes from `seed_noise.md`: at least 0.002 better, with a 95%
+with 5,000 resamples. The win rule comes from `2026-10-21-seed-noise.md`: at least 0.002 better, with a 95%
 interval that excludes zero.*
 
 | Run | Change | Log-loss | vs E4 (95% CI) | Accuracy | AUC | s/step | Peak | Wall |

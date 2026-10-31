@@ -213,7 +213,7 @@ at their new paths.
 | `llm/qlora/<model>/<run>/` (checkpoints; none existed locally) | `checkpoints/<run>/` |
 
 **Converted LLM runs reproduce the handoff scoreboard.** Validation accuracy and
-log-loss after Platt match `plans/llm_finetune_handoff.md` §2 for all nine runs.
+log-loss after Platt match `docs/plans/llm-finetune-handoff.md` §2 for all nine runs.
 That table's AUC column mixes raw and Platt-cross-fitted AUC, so it differs from
 `metrics/validation.json` (raw `none` AUC = `diagnostics.summarize`'s
 `auc_p_home`) by up to 0.003.

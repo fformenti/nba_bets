@@ -17,7 +17,7 @@ gap means the first model is better.
 | E11 − XGBoost | 2,949 | +0.0018 | [−0.0019, +0.0057] | 0.108 |
 | E17 − XGBoost | 2,938 | −0.0000 | [−0.0037, +0.0036] | 0.101 |
 
-The E7 − E4 row reproduces `seed_noise.md`'s throwaway script ([−0.0019, +0.0011]).
+The E7 − E4 row reproduces `2026-10-21-seed-noise.md`'s throwaway script ([−0.0019, +0.0011]).
 
 ## Findings
 - **Validation doesn't steer training.** `load_best_model_at_end` is off and no config sets early

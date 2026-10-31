@@ -390,7 +390,8 @@ class PredictionConfig(BaseModel):
         ...,
         description="MLflow URI of the deployed model, e.g. "
         "'runs:/<run_id>/nba_xgboost_all'. One model predicts every game — the "
-        "per-conference split it replaced scored worse; see docs/CONFERENCE_SPLIT.md.",
+        "per-conference split it replaced scored worse; see "
+        "docs/findings/pipeline/2026-08-12-conference-split.md.",
     )
 
     mlflow: MLflowConfig = MLflowConfig(experiment_name="nba_bets_predictions")

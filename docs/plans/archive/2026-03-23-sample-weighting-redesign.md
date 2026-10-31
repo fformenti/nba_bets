@@ -1,3 +1,5 @@
+> **Superseded.** The cross-season decay this plan proposes was removed on 2026-08-12 (commit `a309344`).
+
  Plan: Redesign Sample Weighting Strategy
 
  Context

@@ -5,7 +5,7 @@
     make plot RUN=e4-llama32-1b SPLIT=validation
 
 Writes outputs/runs/<run_id>/report/{figures,tables}/ and, when the run has an
-MLflow run, attaches that folder to it. See docs/OUTPUTS.md.
+MLflow run, attaches that folder to it. See docs/reference/outputs.md.
 """
 
 import argparse

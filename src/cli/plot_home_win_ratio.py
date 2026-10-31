@@ -1,7 +1,7 @@
 """Chart the home-team win ratio per season.
 
 Writes the per-season table first, then draws the bar chart from it
-(outputs/eda/home_win_ratio/; see docs/OUTPUTS.md).
+(outputs/eda/home_win_ratio/; see docs/reference/outputs.md).
 """
 
 import matplotlib

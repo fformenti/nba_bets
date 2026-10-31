@@ -1,7 +1,8 @@
 """Build the city-to-city distance table used by travel features.
 
 Calls Serper and OpenAI once per city pair. The result is a reference *input*
-under data/raw/reference/, not a build artifact — see docs/PIPELINE_AUDIT.md.
+under data/raw/reference/, not a build artifact — see
+docs/findings/pipeline/2026-08-11-pipeline-audit.md.
 """
 
 import argparse

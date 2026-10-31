@@ -1,11 +1,11 @@
 # E4–E6: does model size help? (v2 recipe, 1 epoch, full train split, Colab L4)
 
 *Scored on all 2,949 validation games, Platt cross-fit. The command is in
-`plans/llm_finetune_handoff.md` §4.*
+`docs/plans/llm-finetune-handoff.md` §4.*
 
 **v2 recipe:** LoRA r16 on q/k/v/o, 4-bit NF4, effective batch 32, lr 2e-4 cosine, loss on the
 completion only, 1 epoch = 727 steps. Gradient checkpointing is off (see
-`e3_speed_benchmark.md`).
+`2026-10-20-e3-speed-benchmark.md`).
 
 | Run | Model | Calibrated log-loss | Accuracy | AUC | s/step | Peak memory | Wall time |
 |---|---|---|---|---|---|---|---|

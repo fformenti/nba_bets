@@ -57,4 +57,4 @@ bitsandbytes.autograd._functions - WARNING - MatMul8bitLt: inputs will be cast f
 - **Reproducing test_run2.** `qlora/llama31_8b/baseline.yaml` pins 8-bit for that reason.
 - **Otherwise prefer bf16 when it fits, and 4-bit when it doesn't.** On an L4 all three train at
   the same speed, so memory headroom decides. 4-bit's headroom is what allows turning
-  gradient checkpointing off; see `e3_speed_benchmark.md`.
+  gradient checkpointing off; see `2026-10-20-e3-speed-benchmark.md`.

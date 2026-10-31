@@ -65,7 +65,7 @@ paths:
 
 No config chooses where results go. Every run writes `outputs/runs/<config>-<timestamp>/`,
 declared once in `src/config/paths.py` (`RunPaths`); figures come from `make plot`, never
-from training. See docs/OUTPUTS.md.
+from training. See docs/reference/outputs.md.
 
 > **Pydantic gotcha**: `ExperimentConfig` uses `extra="ignore"` — typos in YAML keys are silently dropped. Always verify key names against `src/ml/config/schema.py`.
 

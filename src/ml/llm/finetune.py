@@ -136,7 +136,7 @@ def _drop_int8_cast_notice(record: logging.LogRecord) -> bool:
     LLM.int8's matmul only runs in fp16, so with bf16 compute every quantized
     layer casts its input on every call and logs it each time. The cast is
     expected and harmless (test_run2 did the same); see
-    project_knowledge/llm_training/quantization_8bit.md.
+    docs/findings/llm/2026-10-20-quantization-8bit.md.
     """
     return not str(record.msg).startswith("MatMul8bitLt: inputs will be cast")
 

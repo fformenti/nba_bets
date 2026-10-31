@@ -4,7 +4,7 @@
 # one — with the first two routed per game at prediction time. Backtested over
 # eight seasons the split lost: +0.0047 log loss and -0.64pp accuracy against
 # this config, on the identical 8,762 games. The cross-conference model, trained
-# on a third of the rows, carried the loss. See docs/CONFERENCE_SPLIT.md.
+# on a third of the rows, carried the loss. See docs/findings/pipeline/2026-08-12-conference-split.md.
 #
 # The conference *signal* stayed. Two features carry it, both 0.0 when the two
 # teams share a conference, which is why one model needs no routing.

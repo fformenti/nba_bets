@@ -56,7 +56,7 @@ LEAGUE_SCHEDULE_PATH = RAW_HISTORICAL_DIR / LEAGUE_SCHEDULE_FILE
 # Generated once by an external service rather than derived from anything in
 # this repo, so they are *inputs* and live under raw/ with the other inputs.
 # Nothing in the pipeline can rebuild them offline: losing them stops the ETL at
-# its first step. See docs/PIPELINE_AUDIT.md and the builders in
+# its first step. See docs/findings/pipeline/2026-08-11-pipeline-audit.md and the builders in
 # src/etl/reference/.
 RAW_REFERENCE_DIR = RAW_DIR / "reference"
 # teamId × season → city/state. Built by `make build-teams-locations` (OpenAI).
@@ -191,7 +191,7 @@ GAME_SLUG_LOOKUP_PATH = PROCESSED_DIR / "game_slug_lookup.csv"
 
 # ===== Outputs =====
 # Every path under outputs/ is declared here and nowhere else. Layout, schema and
-# rules: docs/OUTPUTS.md.
+# rules: docs/reference/outputs.md.
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 # One folder per training or evaluation run, ML and LLM alike, so the plotting
 # code reads every run through the same paths.

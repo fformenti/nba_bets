@@ -1,7 +1,8 @@
 """Regressions for the bugs found in the 2026-08-11 pipeline audit.
 
 Each test here pins a behaviour that was wrong, silently, in a way nothing
-downstream could detect. See docs/PIPELINE_AUDIT.md for the findings themselves.
+downstream could detect. See docs/findings/pipeline/2026-08-11-pipeline-audit.md
+for the findings themselves.
 """
 
 import numpy as np

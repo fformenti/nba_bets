@@ -4,7 +4,7 @@ One row per game per (model, calibration) in ``predictions/<split>.csv``. The
 sklearn experiment, the margin regressor and the LLM evaluation all write this
 shape, which is what lets one chart put an xgboost classifier, a regressor and a
 fine-tuned adapter on the same axes. Layout and field meanings:
-docs/OUTPUTS.md.
+docs/reference/outputs.md.
 """
 
 from __future__ import annotations

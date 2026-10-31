@@ -38,7 +38,8 @@ def load_predictions_for_date(game_date_str: str) -> pd.DataFrame:
         return pd.DataFrame(columns=BET_COLUMNS)
 
     # One model predicts every game, so the file is one row per game. The
-    # three-model routing that preceded it (docs/CONFERENCE_SPLIT.md) wrote a
+    # three-model routing that preceded it
+    # (docs/findings/pipeline/2026-08-12-conference-split.md) wrote a
     # game once per model, and this function sized both — two order plans from
     # two disagreeing probabilities, each against a full GAME_BUDGET.
     duplicated = for_date["gameId"].duplicated(keep=False)

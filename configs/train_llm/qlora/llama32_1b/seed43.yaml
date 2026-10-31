@@ -2,7 +2,7 @@ description: "E7 seed repeat: Llama-3.2-1B v2 with training.seed 43"
 
 # The only change from v2.yaml (E4, seed 42). The gap between the two runs'
 # validation log-loss is the noise floor. Measured: 0.0004 (paired SD 0.0008),
-# so a later "win" must beat E4 by >= 0.002; see seed_noise.md.
+# so a later "win" must beat E4 by >= 0.002; see docs/findings/llm/2026-10-21-seed-noise.md.
 
 _include:
   - "v2.yaml"

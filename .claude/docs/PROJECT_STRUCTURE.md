@@ -217,7 +217,7 @@ src/
 │   │   ├── analysis.py                 # Breakdown tables (season phase), predictions ⋈ metadata
 │   │   └── polymarket_baseline.py      # Model vs market, on mutually-covered games
 │   │
-│   ├── results/                        # THE result-file schema every family writes (docs/OUTPUTS.md)
+│   ├── results/                        # THE result-file schema every family writes (docs/reference/outputs.md)
 │   │   ├── schema.py                   # predictions columns, validation, RunInfo (run.json)
 │   │   ├── store.py                    # Read/write outputs/runs/<run_id>/ (upsert per series)
 │   │   ├── scoring.py                  # score_predictions(): one metric definition for ML and LLM
@@ -289,9 +289,10 @@ src/
   deleted. See its README.
 - `outputs/` (gitignored) — `runs/<run_id>/` (per-game predictions, metrics,
   run.json, model introspection, derived `report/`), `comparisons/`, `eda/`,
-  `checkpoints/` (LLM), `archive/` (pre-2026-10-23 outputs). See docs/OUTPUTS.md.
-- `docs/` — `OUTPUTS.md` (outputs layout and result schema), `RUNPOD_TRAINING.md`
-  (GPU box setup for LLM fine-tuning), pipeline and rebuild audits.
+  `checkpoints/` (LLM), `archive/` (pre-2026-10-23 outputs). See docs/reference/outputs.md.
+- `docs/` — all project documentation; `docs/README.md` is the index. `plans/`,
+  `findings/` (experiments, audits, EDA), `reference/` (outputs layout and result
+  schema, GPU box runbook), `explanations/`, `todo.md`.
 - `sandbox/` (gitignored) — exploratory notebooks.
 - `mlruns/`, `mlflow.db` (gitignored) — MLflow tracking.
 - `.claude/` — project settings, hooks, skills, and this doc.

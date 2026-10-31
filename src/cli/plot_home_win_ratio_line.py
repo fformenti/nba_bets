@@ -1,7 +1,7 @@
 """Line-chart the home-team win % per season, scoped to the training population.
 
 Writes the per-season table first, then draws the line chart from it
-(outputs/eda/home_win_ratio/; see docs/OUTPUTS.md).
+(outputs/eda/home_win_ratio/; see docs/reference/outputs.md).
 """
 
 import matplotlib

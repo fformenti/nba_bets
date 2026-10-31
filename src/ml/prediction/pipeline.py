@@ -8,7 +8,7 @@ This used to route each game to a same- or cross-conference model *and* score
 the whole slate with an all-games model, writing two rows per game with no rule
 for which to bet. Measured over eight backtested seasons the split was worse —
 +0.0047 log loss, 95% CI [+0.0011, +0.0080] — so it is gone. See
-docs/CONFERENCE_SPLIT.md.
+docs/findings/pipeline/2026-08-12-conference-split.md.
 """
 
 from __future__ import annotations

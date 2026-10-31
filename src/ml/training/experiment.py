@@ -399,7 +399,7 @@ def train_single_model(
     """Train, select on validation, and write the run's result files.
 
     Writes ``outputs/runs/<run_id>/`` and draws nothing: figures come from
-    ``make plot``, which reads those files (docs/OUTPUTS.md).
+    ``make plot``, which reads those files (docs/reference/outputs.md).
     """
     data_config = config.data
     split_config = config.splitting

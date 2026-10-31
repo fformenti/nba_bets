@@ -15,7 +15,7 @@ training:
   bf16: true
   fp16: false
   tf32: true
-  # E3 (project_knowledge/llm_training/e3_speed_benchmark.md): without gradient
+  # E3 (docs/findings/llm/2026-10-20-e3-speed-benchmark.md): without gradient
   # checkpointing a step drops from 18.4 to 13.8 s. 8 rows per micro-batch then
   # run out of memory; 2 x 16 peaks at 12.3 GB, leaving room for longer prompts.
   # 4 x 8 was 3% faster but peaked at 18.6 of the L4's 22 GB.

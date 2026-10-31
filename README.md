@@ -1,7 +1,7 @@
 # nba-bets
 
 NBA game prediction (sklearn and fine-tuned LLMs) and Polymarket betting. Architecture,
-data flow and layering rules: [CLAUDE.md](CLAUDE.md) and [docs/](docs/).
+data flow and layering rules: [CLAUDE.md](CLAUDE.md). Everything else written about the project: [docs/](docs/README.md).
 
 ## Google Drive sync
 

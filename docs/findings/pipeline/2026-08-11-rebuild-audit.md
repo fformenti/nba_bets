@@ -3,7 +3,7 @@
 > **Every model metric below is superseded.** They were selected on the test set
 > — the calibration method by test Brier and the model family by test accuracy —
 > and they come from the three-model conference split, which has since been
-> collapsed to one model (docs/CONFERENCE_SPLIT.md) and retrained without
+> collapsed to one model (docs/findings/pipeline/2026-08-12-conference-split.md) and retrained without
 > season-decay weighting. Both selections now happen on validation. The findings
 > and the reproducibility results stand; the accuracy figures do not.
 >

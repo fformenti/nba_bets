@@ -49,7 +49,7 @@ falls back to it non-overriding, so the box's own exports still win.
   rebuilt offline — `parse_raw_games` fails at step one without them. Their
   builders are excluded from `full-rebuild` on purpose: a data rebuild must
   never depend on a paid API call that can return a worse table than the one it
-  overwrites. See docs/PIPELINE_AUDIT.md.
+  overwrites. See docs/findings/pipeline/2026-08-11-pipeline-audit.md.
 - **`data/` is ignored except for four tracked inputs.** `.gitignore` un-ignores
   `data/raw/reference/` and `data/raw/historical/handmade/` — the only files no
   command can regenerate, and therefore the only ones a fresh clone cannot do
@@ -62,7 +62,7 @@ falls back to it non-overriding, so the box's own exports still win.
   `outputs/runs/<run_id>/`. EDA writes tables to `outputs/eda/<topic>/tables/`.
   `make plot` / `make plot-compare` and the EDA figures read those files. No
   training, evaluation or EDA code imports plotting, and no output path is
-  written outside `src/config/paths.py`. Layout and schema: docs/OUTPUTS.md.
+  written outside `src/config/paths.py`. Layout and schema: docs/reference/outputs.md.
 
 ### Data Flow
 
@@ -89,6 +89,19 @@ The daily loop (make daily-cycle) — results first, then the new slate:
 Outcome retrieval is pluggable (`src/etl/collectors/results/`). Run the loop
 without a live feed via `make daily-cycle SOURCE=placeholder`, after dropping
 `{gameId}.json` files into `data/raw/incremental/manual_results/`.
+
+## Documentation
+
+Everything written about the project lives under `docs/`; [docs/README.md](docs/README.md) is the
+index. Read it before looking for context or saving a new doc, and add a line there when you do:
+
+- `docs/plans/` — work ahead. Finished plans move to `docs/plans/archive/`.
+- `docs/findings/` — what was measured: experiments, audits, EDA.
+- `docs/reference/` — contracts and runbooks, kept true as the code changes.
+- `docs/explanations/` — written for the human reader.
+- `docs/todo.md` — the backlog.
+
+Filenames are kebab-case. Findings and archived plans start with the event's `YYYY-MM-DD-`.
 
 ## Context Efficiency
 

@@ -14,7 +14,7 @@ data:
 #
 # One model predicts every game. Routing games to same-conference and
 # cross-conference models scored worse over eight backtested seasons — see
-# docs/CONFERENCE_SPLIT.md.
+# docs/findings/pipeline/2026-08-12-conference-split.md.
 model_uri: "runs:/ee34b43e038245b8a3879a86a4bf69b0/nba_xgboost"
 
 mlflow:
