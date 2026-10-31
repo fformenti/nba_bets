@@ -34,7 +34,7 @@ outputs/
 │   ├── llm/                        LLM only: per-game diagnostics no other family has
 │   │   ├── inspection_<split>.csv      raw decoded text, P(+), P(-), expected margin, top tokens
 │   │   └── summary_<split>.json        diagnostics.summarize() of the inspection CSV
-│   ├── tracking/mlflow.db          LLM only: the Colab session's MLflow database, copied by colab_runner
+│   ├── tracking/mlflow.db          LLM only: the Colab session's MLflow database, copied by train_llm.ipynb
 │   └── report/                     DERIVED by `make plot`; safe to delete and redraw
 │       ├── figures/*.png|*.html
 │       └── tables/*.csv

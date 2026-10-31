@@ -54,7 +54,7 @@
   - Injury and availability data are allowed as future inputs.
   - The 2025/26 test-season gap is out of scope until that data exists.
 - **Platform:**
-  - Colab Pro with an L4 (22 GB usable), driven through the repo CLI by `colab_notebooks/colab_runner.ipynb`.
+  - Colab Pro with an L4 (22 GB usable), driven through the repo CLI by `colab_notebooks/train_llm.ipynb`.
   - Budget ≤ $50/month, no local GPU.
   - Tracking is W&B. Adapters push to the Hub as `fformenti/<RUN_NAME>`.
 - **Data:** HF dataset `fformenti/nba-bets`: 23,247 train, 2,949 validation (three seasons) and 1,018 test games.
@@ -203,7 +203,7 @@ The best config, trained on the full train split. **Score test once.** Report it
 ## 5. Running on Colab
 
 1. **Sync the repo to Drive** at `MyDrive/nba_bets`. The setup cell rsyncs it to local disk and skips `outputs/`.
-2. **Open `colab_notebooks/colab_runner.ipynb` on an L4.** In the config cell:
+2. **Open `colab_notebooks/train_llm.ipynb` on an L4.** In the config cell:
    - **Train and inspect:** set `LLM_CONFIG`, a new `RUN_NAME`, `TRAIN=True` and `INSPECT_SPLITS=["validation"]`.
    - **Benchmark, train only:** the same with `INSPECT_SPLITS=[]`.
    - **Untuned baseline:** `TRAIN=False` with `INSPECT_ARGS="--base-only [--few-shot 5 --batch-size 8]"`.
@@ -258,7 +258,7 @@ Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole M
 - **v2 configs:** gradient checkpointing is off in the 8B, 1B and 3B `v2.yaml`, at 2×16, 8×4 and 4×8. The 1B change reaches `compact` and `venue20`.
 - **E7 config:** `llama32_1b/seed43.yaml`, with a test.
 - **Eval sample seed:** `finetune.py::load_eval_dataset` draws the 1,000-row in-training eval sample with `evaluation.seed` instead of `training.seed`. Every run so far used 42 for both, so their samples are unchanged. Tested by `test_eval_sample_ignores_the_training_seed`.
-- **Colab runner:**
+- **Colab notebook (`colab_runner.ipynb` then, `train_llm.ipynb` since 2026-10-30):**
   - Drive stays mounted between runs.
   - The setup cell uninstalls torchao and excludes `.gdoc` files.
   - `runtime.unassign()` replaces a call that didn't exist.
