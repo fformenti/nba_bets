@@ -128,7 +128,7 @@ make evaluate-llm LLM_RUN=...   # score the adapter
   answer even if one reaches the feature frame
   (`tests/test_llm_serialization.py`).
 
-GPU dependencies are an optional extra: `uv sync --extra gpu`. Every torch/peft/
+GPU dependencies are an optional extra: `uv sync --extra pipeline --extra gpu`. Every torch/peft/
 trl import in this package is lazy, so importing it on a laptop is safe.
 
 ## Evaluation vs monitoring

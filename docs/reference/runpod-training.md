@@ -108,10 +108,11 @@ git clone https://github.com/<your-org>/nba_bets.git
 cd nba_bets
 git checkout feature/train_LLM
 
-uv sync --extra gpu
+uv sync --extra pipeline --extra gpu
 ```
 
-`--extra gpu` is what pulls in `peft`, `trl`, `accelerate`, `bitsandbytes`, `wandb` and
+`--extra pipeline` pulls in torch, transformers and the rest of the stack, and `--extra gpu`
+adds `peft`, `trl`, `accelerate`, `bitsandbytes`, `wandb` and
 `sentencepiece`. A plain `uv sync` will install fine and then fail at import time.
 
 ### 2.4 Verify CUDA
@@ -298,7 +299,7 @@ Don't leave a 4090 idling overnight because evaluation finished at 2am.
 | `RuntimeError: WANDB_API_KEY is not set but tracking.wandb.enabled is true` | Add the key, or set `tracking.wandb.enabled: false` |
 | `403` / "gated repo" when loading the model | Llama 3.1 license not accepted for the account owning your token. Preflight won't catch this — it only checks the dataset |
 | `No CUDA device visible` | Wrong template, or `uv sync` pulled a CPU-only torch. Check `uv run python -c "import torch; print(torch.version.cuda)"` |
-| `ModuleNotFoundError: peft` / `trl` / `bitsandbytes` | You ran `uv sync` without `--extra gpu` |
+| `ModuleNotFoundError: torch` / `peft` / `trl` / `bitsandbytes` | You ran `uv sync` without `--extra pipeline --extra gpu` |
 | CUDA OOM | Set `per_device_train_batch_size: 1` and `gradient_accumulation_steps: 8` to hold the effective batch size at 8. Failing that, lower `lora.r` or shorten the prompt (`serialization_format`) |
 | `element 0 of tensors does not require grad` | Gradient checkpointing interacting with the k-bit model. As a fallback set `training.gradient_checkpointing: false` (costs memory) |
 | First step takes forever | 16 GB base-model download. Check `echo $HF_HOME` points at `/workspace` |
@@ -314,7 +315,7 @@ Don't leave a 4090 idling overnight because evaluation finished at 2am.
 export HF_HOME=/workspace/.cache/huggingface
 curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
 cd /workspace && git clone <repo> && cd nba_bets && git checkout feature/train_LLM
-uv sync --extra gpu
+uv sync --extra pipeline --extra gpu
 
 # smoke test
 uv run python -m src.cli.train_llm --config configs/train_llm/qlora/llama31_8b/baseline.yaml \

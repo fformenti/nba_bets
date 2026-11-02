@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Use `uv` for all Python operations. Never use `pip` or `python` directly.
 
+Install with `make sync`. A plain `uv sync` removes the `pipeline` and `gpu`
+extras, and with them almost everything but the stats fetcher's dependencies.
+
 ## Secrets
 
 No API key or token ever lives in the repo. Values sit in `~/.secrets/nba_bets.env`
@@ -27,6 +30,11 @@ falls back to it non-overriding, so the box's own exports still win.
 - **Libraries never have `__main__`; CLI modules never have logic.** Every entry
   point is a thin argparse shell in `src/cli/`, one per Makefile target.
   Enforced by `tests/test_imports_smoke.py`.
+- **The stats fetcher runs on the core dependencies.** It deploys alone, so
+  `[project.dependencies]` holds only what its CLIs import and everything else
+  goes in an extra. `make check-fetch-env`, part of `make test`, imports those
+  CLIs in an environment with nothing else installed. Why this is one project
+  and not a workspace: docs/findings/pipeline/2026-10-31-packaging-decision.md.
 - **One split definition.** `src/ml/datasets/splits.py::build_splits` decides
   train/validation/test. Both the sklearn path and the LLM dataset builder call
   it, so the two model families are always scored on the same gameIds.

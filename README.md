@@ -3,6 +3,17 @@
 NBA game prediction (sklearn and fine-tuned LLMs) and Polymarket betting. Architecture,
 data flow and layering rules: [CLAUDE.md](CLAUDE.md). Everything else written about the project: [docs/](docs/README.md).
 
+## Setup
+
+```bash
+make sync                    # everything: the pipeline and gpu extras, plus dev tools
+uv sync --frozen --no-dev    # the stats fetcher alone, for its deployment
+```
+
+A plain `uv sync` removes the extras, so use `make sync` on a working machine. The fetcher
+runs from the repo root, because `src` is not installed:
+`.venv/bin/python -m src.cli.fetch_upcoming_games`.
+
 ## Google Drive sync
 
 Colab trains from `My Drive/nba_bets/`: the notebooks in `colab_notebooks/` rsync that

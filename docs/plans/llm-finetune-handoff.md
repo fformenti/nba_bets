@@ -30,7 +30,7 @@
   - Don't touch `src/ml/llm/make_dataset.ipynb`; it holds the user's own uncommitted edits.
   - Test is scored **once**, in E15.
 
-**Tools that work locally** (the gpu extra is installed: `uv sync --extra gpu`):
+**Tools that work locally** (the gpu extra is installed: `uv sync --extra pipeline --extra gpu`):
 - **Score a run:**
   `uv run python -m src.cli.inspect_llm --config <any llm config> --run-name <run> --split validation --summarize-only --calibrate-with validation`.
   - It reads `outputs/runs/<run>/llm/inspection_validation.csv` and writes nothing.
@@ -42,7 +42,7 @@
   - For pure s/step, take the median `_timestamp` delta between `train/loss` rows. `train_runtime` includes evals.
 - **HF API:** connect with `HfApi(token=require_env("HF_llm_training_token", ""))`. The Hub user is `fformenti`.
 - **Compare two runs, paired:** `diagnostics.py::paired_log_loss_gap(a, b)` (added 2026-10-28). Pass each run's calibrated rows from `read_predictions(run, ["validation"])`: `platt` for an LLM, `sigmoid` for XGBoost. It joins on `game_id` and bootstraps 5,000 times with `default_rng(0)`. It returns `gap` (a − b; negative means a is better), `ci_low`/`ci_high`, `boot_sd` and `game_sd`. It reproduces the E7 throwaway's interval.
-- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra gpu pytest -q`. 637 pass.
+- **Tests:** `MLFLOW_DISABLE_AGENT_HINT=1 uv run --extra pipeline --extra gpu pytest -q`. 637 pass.
 
 ## 1. Goals and setup
 
@@ -312,7 +312,7 @@ Each run folder's `tracking/mlflow.db` is a copy of that Colab session's whole M
 **Session 2 (2026-10-20):**
 - **Dependencies:** pinned `trl>=1.16,<2` and `peft>=0.21`, and refreshed `uv.lock`.
   - datasets 5.1, pyarrow 25 and mlflow 3.17 came along.
-  - `uv sync --extra gpu` works on macOS.
+  - `uv sync --extra pipeline --extra gpu` works on macOS.
 - **trl 0.x code removed.**
 - **Double forward fixed:** the hook in `FirstTokenAccuracySFTTrainer.compute_loss`. `tests/test_llm_trainer_trl.py` trains a tiny Llama through the real trl and asserts one forward per micro-batch.
 - **Peak memory:** `peak_gpu_memory()` logs it to W&B and MLflow.

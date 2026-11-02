@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix format test \
+.PHONY: sync check-fetch-env lint lint-fix format test \
         build-teams-history build-teams-locations build-distances-table \
         build-polymarket-teams build-game-slug-lookup build-polymarket-odds \
         ingest-raw-games parse-league-schedule process-ingested-games build-features \
@@ -24,7 +24,23 @@ SOURCE            ?= nba_api
 # Game date for bet placement, as YYYY-MM-DD.
 GAME_DATE         ?=
 
+# The stats fetcher deploys alone on the core dependencies; these are its CLIs.
+FETCH_CLIS := fetch_league_schedule parse_league_schedule reconcile_postponed \
+              fetch_game_results fetch_upcoming_games retry_unresolved \
+              append_game_results ingest_raw_games
+
+# ─── Environment ────────────────────────────────────────────────────────────
+
+# A plain `uv sync` removes the pipeline extra; `uv run` leaves it in place.
+sync:
+	uv sync --extra pipeline --extra gpu
+
 # ─── Quality ────────────────────────────────────────────────────────────────
+
+# Imports the fetcher's CLIs in a throwaway environment holding only the core
+# dependencies, so a heavy import creeping into them fails here, not on deploy.
+check-fetch-env:
+	uv run --isolated --frozen --no-dev python -c "import importlib; [importlib.import_module(f'src.cli.{m}') for m in '$(FETCH_CLIS)'.split()]"
 
 lint:
 	uv run ruff check .
@@ -35,7 +51,7 @@ lint-fix:
 format:
 	uv run ruff format .
 
-test:
+test: check-fetch-env
 	uv run pytest
 
 # ─── Reference tables ───────────────────────────────────────────────────────
@@ -147,7 +163,7 @@ migrate-outputs:
 build-llm-dataset:
 	uv run python -m src.cli.build_llm_dataset --config configs/train_llm/$(LLM_CONFIG).yaml $(ARGS)
 
-# LLM fine-tuning (needs `uv sync --extra gpu` on a CUDA box).
+# LLM fine-tuning (needs `uv sync --extra pipeline --extra gpu` on a CUDA box).
 # Pass LLM_RUN=<name> to resume an interrupted run from its Hub checkpoint.
 train-llm:
 	uv run python -m src.cli.train_llm --config configs/train_llm/$(LLM_CONFIG).yaml $(if $(LLM_RUN),--run-name $(LLM_RUN),)

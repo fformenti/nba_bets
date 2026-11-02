@@ -59,6 +59,8 @@ root. Architecture and layering rules live in [CLAUDE.md](../CLAUDE.md), and the
   reproducibility. Its model metrics are superseded.
 - [2026-08-12-conference-split.md](findings/pipeline/2026-08-12-conference-split.md): why three
   conference models became one.
+- [2026-10-31-packaging-decision.md](findings/pipeline/2026-10-31-packaging-decision.md): why this
+  stays one uv project, and what would change that.
 
 ## Reference
 

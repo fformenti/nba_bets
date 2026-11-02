@@ -1,6 +1,6 @@
 """The custom SFTTrainer against the real trl, on a tiny random model on CPU.
 
-Skipped unless the gpu extra is installed (``uv sync --extra gpu``).
+Skipped unless the gpu extra is installed (``uv sync --extra pipeline --extra gpu``).
 """
 
 import pytest
