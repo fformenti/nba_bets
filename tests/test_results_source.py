@@ -105,9 +105,15 @@ class TestParseGameStatus:
     starts, so the scoreline cannot tell the two apart.
     """
 
-    @pytest.mark.parametrize("text", ["PPD", "Postponed", "Cancelled", "Suspended"])
-    def test_the_text_announces_a_game_that_did_not_happen(self, text):
+    @pytest.mark.parametrize("text", ["PPD", "Postponed", "Suspended"])
+    def test_the_text_announces_a_game_that_is_still_owed(self, text):
+        """A suspended game is resumed later, so it is watched like a postponed one."""
         assert _parse_game_status(1, text, 0, 0) is GameStatus.POSTPONED
+
+    @pytest.mark.parametrize("text", ["Cancelled", "Canceled"])
+    def test_a_cancelled_game_is_not_postponed(self, text):
+        """A cancelled game is owed nothing; watching it for a makeup date never ends."""
+        assert _parse_game_status(3, text, 0, 0) is GameStatus.CANCELLED
 
     def test_a_scheduled_game_is_not_postponed(self):
         assert _parse_game_status(1, "7:30 pm ET", 0, 0) is GameStatus.SCHEDULED
@@ -127,7 +133,7 @@ class TestParseGameStatus:
 
     def test_only_settled_statuses_are_terminal(self):
         terminal = {status for status in GameStatus if status.is_terminal}
-        assert terminal == {GameStatus.FINAL, GameStatus.POSTPONED}
+        assert terminal == {GameStatus.FINAL, GameStatus.POSTPONED, GameStatus.CANCELLED}
 
 
 class TestResolveWinnerTeamId:
@@ -298,3 +304,90 @@ class TestStatusRouting:
         assert outcomes["final"] == []
         assert outcomes["postponed"] == []
         assert (upcoming_dir / f"{GAME_ID}.json").exists()
+
+
+class TestReleaseSource:
+    """The sportsdataverse release as a results source, against stubbed downloads."""
+
+    TODAY = pd.Timestamp("2026-11-04").date()
+
+    @staticmethod
+    def _schedule_row(game_id, game_date, home_pts=None, away_pts=None):
+        played = home_pts is not None
+        return {
+            "game_id": game_id,
+            "game_date": game_date,
+            "home_team_id": HOME_TEAM_ID,
+            "away_team_id": AWAY_TEAM_ID,
+            "home_pts": home_pts,
+            "away_pts": away_pts,
+            "home_wl": ("W" if home_pts > away_pts else "L") if played else None,
+            "away_wl": ("L" if home_pts > away_pts else "W") if played else None,
+        }
+
+    @pytest.fixture
+    def source(self, monkeypatch):
+        import pyarrow as pa
+
+        from src.etl.collectors.results import release_source
+
+        schedules = {
+            2025: [self._schedule_row("0022400524", "2025-02-19", 97, 100)],
+            2013: [self._schedule_row("0021201214", "2013-04-16")],
+            2027: [
+                self._schedule_row("0022600100", "2026-11-01"),
+                self._schedule_row("0022600300", "2026-11-28"),
+                self._schedule_row("0022600050", "2026-10-30", 120, 118),
+            ],
+        }
+        minutes = {"0022400524": "240:00", "0022600050": "290:00"}
+
+        def download(_session, release, end_year):
+            if release.name == "schedule":
+                return pa.Table.from_pylist(schedules[end_year])
+            rows = [
+                {"game_id": row["game_id"], "minutes": minutes[row["game_id"]]}
+                for row in schedules[end_year]
+                if row["game_id"] in minutes
+            ]
+            return pa.Table.from_pylist(rows or [{"game_id": "x", "minutes": None}])
+
+        monkeypatch.setattr(release_source, "download_table", download)
+        return release_source.ReleaseResultsSource(session=object(), today=self.TODAY)
+
+    def test_a_makeup_game_is_final_on_the_day_it_was_played(self, source):
+        result = source.fetch("0022400524")
+        assert result.status is GameStatus.FINAL
+        assert (result.home_score, result.away_score) == (97, 100)
+        assert result.winner == AWAY_TEAM_ID
+        assert result.game_date == "2025-02-19"
+
+    def test_overtimes_come_from_team_minutes(self, source):
+        assert source.fetch("0022600050").overtimes == 2
+
+    def test_a_past_season_game_with_no_result_was_cancelled(self, source):
+        assert source.fetch("21201214").status is GameStatus.CANCELLED
+
+    def test_a_future_game_is_scheduled_with_its_date(self, source):
+        result = source.fetch("0022600300")
+        assert result.status is GameStatus.SCHEDULED
+        assert result.game_date == "2026-11-28"
+
+    def test_a_past_game_this_season_with_no_result_is_unknown(self, source):
+        """Postponed without a new date, or not rebuilt yet: neither is a guess to commit."""
+        assert source.fetch("0022600100").status is GameStatus.UNKNOWN
+
+    def test_a_game_the_release_does_not_list_is_unknown(self, source):
+        assert source.fetch("0022600999").status is GameStatus.UNKNOWN
+
+    def test_an_unreachable_release_means_ask_again_later(self, monkeypatch):
+        import requests
+
+        from src.etl.collectors.results import release_source
+
+        def fail(*_args):
+            raise requests.ConnectionError("offline")
+
+        monkeypatch.setattr(release_source, "download_table", fail)
+        source = release_source.ReleaseResultsSource(session=object(), today=self.TODAY)
+        assert source.fetch("0022400524") is None

@@ -95,6 +95,24 @@ def atomic_write_csv(df: pd.DataFrame, output_path: Path) -> None:
             temp_path.unlink(missing_ok=True)
 
 
+def atomic_write_parquet(df: pd.DataFrame, output_path: Path) -> None:
+    """Parquet counterpart of :func:`atomic_write_csv`, for the same reason."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb", dir=output_path.parent, suffix=".tmp", delete=False
+        ) as handle:
+            temp_path = Path(handle.name)
+            df.to_parquet(handle, index=False)
+        temp_path.replace(output_path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def save_feature_table(df: pd.DataFrame, path, **kwargs) -> None:
     """
     Write a feature table to CSV, rounding floats to CSV_FLOAT_FORMAT.

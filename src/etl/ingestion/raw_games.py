@@ -11,7 +11,9 @@ from pathlib import Path
 from pandas import DataFrame
 import pandas as pd
 
+from src.config.constants import NBA_CUP_CHAMPIONSHIP_GAME_TYPE
 from src.config.paths import (
+    GAMES_TIPOFF_CORRECTIONS_PATH,
     RAW_GAMES_PATH,
     INGESTED_GAMES_UPDATED_HISTORY_PATH,
 )
@@ -22,12 +24,52 @@ from src.etl.utils.common import (
     atomic_write_csv,
     coerce_numeric_columns,
     enrich_games_locations,
+    game_type_from_id,
     get_nba_season,
 )
 from src.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
 setup_logging(level="INFO")
+
+
+def load_tipoff_corrections(path: Path = GAMES_TIPOFF_CORRECTIONS_PATH) -> DataFrame:
+    """The archive's known-wrong tip-offs, as ``gameId, archiveGameDate, gameDate``."""
+    return pd.read_csv(path, parse_dates=["archiveGameDate", "gameDate"])
+
+
+def apply_tipoff_corrections(df: DataFrame, corrections: DataFrame) -> DataFrame:
+    """Replace the tip-offs the raw archive records 5 h early.
+
+    A row is corrected only while it still holds the exact wrong value on record,
+    so this is idempotent, and a re-download in which upstream has fixed the
+    times passes through untouched rather than being shifted a second time.
+    """
+    wrong = corrections.set_index("gameId")
+    game_ids = pd.to_numeric(df["gameId"], errors="coerce")
+    expected_wrong = game_ids.map(wrong["archiveGameDate"])
+    matches = expected_wrong.notna() & (df["gameDate"] == expected_wrong)
+
+    df = df.copy()
+    df.loc[matches, "gameDate"] = game_ids[matches].map(wrong["gameDate"])
+    stale = len(corrections) - int(matches.sum())
+    logger.info(
+        "Corrected %d archive tip-off(s); %d correction(s) no longer match the archive",
+        matches.sum(),
+        stale,
+    )
+    return df
+
+
+def label_cup_championships(df: DataFrame) -> DataFrame:
+    """File every NBA Cup final under one gameType, read from its gameId.
+
+    The archive labels the three finals "NBA Cup", "Regular Season" and
+    "in-season-knockout"; the last two share a label with games that do count.
+    """
+    is_final = df["gameId"].map(game_type_from_id).eq(NBA_CUP_CHAMPIONSHIP_GAME_TYPE)
+    df.loc[is_final, "gameType"] = NBA_CUP_CHAMPIONSHIP_GAME_TYPE
+    return df
 
 
 def parse_raw_games(df: DataFrame) -> DataFrame:
@@ -55,6 +97,8 @@ def parse_raw_games(df: DataFrame) -> DataFrame:
 
     # remove rows where gameDate is na
     df = df[df["gameDate"].notna()].copy()
+    df = apply_tipoff_corrections(df, load_tipoff_corrections())
+    df = label_cup_championships(df)
     df["gameDateOnlyStr"] = df["gameDate"].dt.strftime("%Y-%m-%d")
 
     # add season column

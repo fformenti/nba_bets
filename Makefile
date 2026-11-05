@@ -3,6 +3,7 @@
         build-polymarket-teams build-game-slug-lookup build-polymarket-odds \
         ingest-raw-games parse-league-schedule process-ingested-games build-features \
         fetch-league-schedule fetch-upcoming-games fetch-game-results append-game-results \
+        fetch-boxscores requeue-games \
         reconcile-postponed retry-unresolved migrate-incremental \
         predict-upcoming score-predictions bet-polymarket \
         train build-llm-dataset train-llm evaluate-llm inspect-llm \
@@ -18,7 +19,7 @@ LLM_RUN           ?=
 # A run under outputs/runs/ for `make plot`; `latest` is the most recent one.
 RUN               ?= latest
 SPLIT             ?=
-# Where finished-game outcomes come from: nba_api | placeholder.
+# Where finished-game outcomes come from: nba_api | release | placeholder.
 # See src/etl/collectors/results/ — 'placeholder' reads hand-dropped files.
 SOURCE            ?= nba_api
 # Game date for bet placement, as YYYY-MM-DD.
@@ -27,7 +28,7 @@ GAME_DATE         ?=
 # The stats fetcher deploys alone on the core dependencies; these are its CLIs.
 FETCH_CLIS := fetch_league_schedule parse_league_schedule reconcile_postponed \
               fetch_game_results fetch_upcoming_games retry_unresolved \
-              append_game_results ingest_raw_games
+              append_game_results ingest_raw_games fetch_boxscores requeue_games
 
 # ─── Environment ────────────────────────────────────────────────────────────
 
@@ -88,6 +89,15 @@ process-ingested-games:
 build-features:
 	uv run python -m src.cli.build_features --config configs/features.yaml
 
+# ─── Box scores ─────────────────────────────────────────────────────────────
+
+# Team and player box scores from the sportsdataverse GitHub releases. The first
+# run backfills 1996/97 onward; later runs re-download only the current season,
+# and only when its release has moved. REFRESH_ALL=1 re-checks every season.
+# Validation is written to data/processed/boxscores_validation.csv.
+fetch-boxscores:
+	uv run python -m src.cli.fetch_boxscores $(if $(REFRESH_ALL),--refresh-all,) $(if $(SEASONS),--seasons $(SEASONS),)
+
 # ─── Incremental: upcoming games and their results ──────────────────────────
 
 # Re-pull the schedule. This is what makes makeup dates for postponed games
@@ -103,6 +113,12 @@ fetch-game-results:
 
 append-game-results:
 	uv run python -m src.cli.append_game_results
+
+# Put past games back in the pending queue, dated from the release schedule, for
+# games history lacks or holds as postponed although they were played. Follow
+# with `make fetch-game-results SOURCE=release` and `make append-game-results`.
+requeue-games:
+	uv run python -m src.cli.requeue_games $(GAME_IDS)
 
 # Release watched postponed games that now have a new date.
 reconcile-postponed:

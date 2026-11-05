@@ -47,6 +47,14 @@ falls back to it non-overriding, so the box's own exports still win.
   history*, not the directory: `polymarket_game_odds.csv` sits alongside it
   because it is likewise an external observation nothing can regenerate
   offline, but it holds odds rather than games and shares no writer.
+- **The NBA Cup final is never regular season.** It counts towards no record,
+  streak or team/player stat. The archive labels it inconsistently (once as
+  "Regular Season"), so it is identified by its gameId prefix `6`
+  (`NBA Cup Championship`), never by `gameType` or `gameSubLabel`. Raw-archive
+  corrections (this one, and the shifted tip-offs in
+  `data/raw/historical/handmade/games_tipoff_corrections.csv`) live in
+  `parse_raw_games`; `Games.csv` stays as downloaded. See
+  docs/findings/pipeline/2026-11-05-games-archive-corrections.md.
 - **Two configs, two jobs.** `configs/features.yaml` decides which feature
   *tables* get built (ETL); `configs/train/*.yaml` decides which columns a model
   *consumes* (ML). Using one where the other belongs is a bug.
@@ -58,7 +66,7 @@ falls back to it non-overriding, so the box's own exports still win.
   builders are excluded from `full-rebuild` on purpose: a data rebuild must
   never depend on a paid API call that can return a worse table than the one it
   overwrites. See docs/findings/pipeline/2026-08-11-pipeline-audit.md.
-- **`data/` is ignored except for four tracked inputs.** `.gitignore` un-ignores
+- **`data/` is ignored except for five tracked inputs.** `.gitignore` un-ignores
   `data/raw/reference/` and `data/raw/historical/handmade/` — the only files no
   command can regenerate, and therefore the only ones a fresh clone cannot do
   without. Never write build output into those two directories: it would be

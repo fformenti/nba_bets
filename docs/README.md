@@ -61,9 +61,17 @@ root. Architecture and layering rules live in [CLAUDE.md](../CLAUDE.md), and the
   conference models became one.
 - [2026-10-31-packaging-decision.md](findings/pipeline/2026-10-31-packaging-decision.md): why this
   stays one uv project, and what would change that.
+- [2026-11-02-nba-data-sources.md](findings/pipeline/2026-11-02-nba-data-sources.md): box score,
+  injury and preview sources compared, with the brief for the fetcher.
+- [2026-11-05-games-archive-corrections.md](findings/pipeline/2026-11-05-games-archive-corrections.md):
+  NBA Cup finals relabelled by gameId and 450 tip-offs 5 h early, both corrected at ingestion.
 
 ## Reference
 
+- [boxscores.md](reference/boxscores.md): box score source, storage layout, refresh rule and
+  what the validation showed.
+- [game-lifecycle.md](reference/game-lifecycle.md): pending, postponed, cancelled and quarantined
+  games, and which date puts a game in history's order.
 - [outputs.md](reference/outputs.md): the `outputs/` layout, the result schema and plotting.
 - [runpod-training.md](reference/runpod-training.md): runbook for training the LLM on a RunPod GPU box.
 

@@ -9,6 +9,8 @@ requires-python = ">=3.11"
 dependencies = [
     "nba_api>=1.9.0",
     "pandas>=2.3.1",
+    # Box score releases are parquet (src/etl/collectors/boxscores.py).
+    "pyarrow>=25.0.1",
     "requests>=2.32",
 ]
 

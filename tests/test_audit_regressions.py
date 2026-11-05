@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.etl.ingestion.raw_games import parse_raw_games
+from src.etl.ingestion.raw_games import (
+    apply_tipoff_corrections,
+    load_tipoff_corrections,
+    parse_raw_games,
+)
+from src.etl.process_ingested_games import filter_regular_season_games
 from src.ml.prediction.pipeline import _align_features
 
 HOME, AWAY = 1610612741, 1610612748
@@ -121,3 +126,100 @@ def test_empty_slate_does_not_trip_the_guard():
     aligned = _align_features(features, ["a"], allow_missing=False)
 
     assert aligned.empty
+
+
+# ── 2026-11-05: NBA Cup finals and shifted archive tip-offs ──────────────────
+# See docs/findings/pipeline/2026-11-05-games-archive-corrections.md.
+
+CUP_FINALS = [62300001, 62400001, 62500001]
+
+
+@pytest.mark.parametrize("game_id", CUP_FINALS)
+@pytest.mark.parametrize(
+    "archive_game_type", ["Regular Season", "NBA Cup", "in-season-knockout", ""]
+)
+def test_cup_final_is_relabelled_whatever_the_archive_says(
+    game_id, archive_game_type, monkeypatch
+):
+    """The archive filed the 2024/25 final as "Regular Season"."""
+    monkeypatch.setattr(
+        "src.etl.ingestion.raw_games.enrich_games_locations", lambda df: df
+    )
+    raw = _raw_game(game_id, 110, 99)
+    raw["gameType"] = archive_game_type
+
+    parsed = parse_raw_games(pd.DataFrame([raw]))
+
+    assert parsed["gameType"].iloc[0] == "NBA Cup Championship"
+
+
+@pytest.mark.parametrize("game_id", CUP_FINALS)
+@pytest.mark.parametrize("game_type", ["Regular Season", "NBA Cup", ""])
+@pytest.mark.parametrize("sub_label", ["Championship", ""])
+def test_no_cup_final_reaches_the_regular_season_table(game_id, game_type, sub_label):
+    """No final counts towards a record or streak, whatever its labels say."""
+    season = {62300001: "2023/24", 62400001: "2024/25", 62500001: "2025/26"}[game_id]
+    games = pd.DataFrame(
+        [
+            {
+                "gameId": gid,
+                "season": season,
+                "gameType": gtype,
+                "gameLabel": "Emirates NBA Cup",
+                "gameSubLabel": label,
+            }
+            for gid, gtype, label in [
+                (game_id, game_type, sub_label),
+                (22400001, "Regular Season", "West Semifinal"),
+            ]
+        ]
+    )
+
+    kept = filter_regular_season_games(games)
+
+    assert kept["gameId"].tolist() == [22400001]
+
+
+def _corrections():
+    return pd.DataFrame(
+        {
+            "gameId": [22500052],
+            "archiveGameDate": [pd.Timestamp("2025-11-21 15:30")],
+            "gameDate": [pd.Timestamp("2025-11-21 20:30")],
+        }
+    )
+
+
+def test_a_shifted_archive_tipoff_is_corrected():
+    games = pd.DataFrame(
+        {"gameId": [22500052, 22500394], "gameDate": pd.to_datetime(
+            ["2025-11-21 15:30", "2025-12-20 22:00"]
+        )}
+    )
+
+    corrected = apply_tipoff_corrections(games, _corrections())
+
+    assert corrected["gameDate"].tolist() == [
+        pd.Timestamp("2025-11-21 20:30"),
+        pd.Timestamp("2025-12-20 22:00"),
+    ]
+
+
+def test_an_already_correct_tipoff_is_not_shifted_again():
+    """Once upstream fixes the archive, the correction must stop applying."""
+    games = pd.DataFrame(
+        {"gameId": [22500052], "gameDate": [pd.Timestamp("2025-11-21 20:30")]}
+    )
+
+    corrected = apply_tipoff_corrections(games, _corrections())
+
+    assert corrected["gameDate"].tolist() == [pd.Timestamp("2025-11-21 20:30")]
+
+
+def test_the_tracked_corrections_table_is_well_formed():
+    corrections = load_tipoff_corrections()
+
+    assert corrections["gameId"].is_unique
+    shift = corrections["gameDate"] - corrections["archiveGameDate"]
+    assert (shift == pd.Timedelta(hours=5)).all()
+    assert (corrections["gameDate"].dt.date == corrections["archiveGameDate"].dt.date).all()

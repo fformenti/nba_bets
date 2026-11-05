@@ -26,13 +26,6 @@ def filter_regular_season_games(games) -> DataFrame:
         ~games_before_2024_2025["gameType"].isin(gametype_exclude)
     ]
 
-    # Remove NBA Cup Championship game
-    games_before_2024_2025 = games_before_2024_2025[
-        games_before_2024_2025["gameId"] != 62300001
-    ]
-    # Semifinals games Id (for location purposes)
-    # semifinals_games_id = [22301230, 22301229]
-
     # == Before 2024/25 ==
     games_2024_2025 = games[games["season"] == "2024/25"]
 
@@ -42,18 +35,11 @@ def filter_regular_season_games(games) -> DataFrame:
         ~games_2024_2025["gameType"].isin(gametype_exclude)
     ]
 
-    # Remove Emirates NBA Cup Championship game
-    gameSubLabel_exclude = ["Championship"]
-    games_2024_2025 = games_2024_2025[
-        ~games_2024_2025["gameSubLabel"].isin(gameSubLabel_exclude)
-    ]
-
     # == From 2025/26  onwards ==
     games_after_2025 = games[games["season"] >= "2025/26"]
 
     gameType_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
     gameLabel_exclude = ["Preseason", "Playoffs", "Play-in Tournament"]
-    gameSubLabel_exclude = ["Championship"]
 
     games_after_2025 = games_after_2025[
         ~games_after_2025["gameType"].isin(gameType_exclude)
@@ -61,13 +47,12 @@ def filter_regular_season_games(games) -> DataFrame:
     games_after_2025 = games_after_2025[
         ~games_after_2025["gameLabel"].isin(gameLabel_exclude)
     ]
-    games_after_2025 = games_after_2025[
-        ~games_after_2025["gameSubLabel"].isin(gameSubLabel_exclude)
-    ]
 
     regular_season_games = pd.concat(
         [games_before_2024_2025, games_2024_2025, games_after_2025]
     )
+    # Also the one rule that drops every NBA Cup final, whatever the archive
+    # labelled it: its gameId prefix is the only consistent marker.
     regular_season_games = _drop_non_regular_season_ids(regular_season_games)
     return regular_season_games[regular_season_games["season"] >= MIN_SEASON]
 

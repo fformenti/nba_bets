@@ -6,8 +6,8 @@ which finishes a partially-collected day before moving on and — unlike asking
 only for dates after the frontier — can also reach a makeup game rescheduled
 into a date the pipeline has already passed.
 
-Games already parked as postponed or quarantined are excluded, so an unanswered
-game cannot pin the slate to its date forever. Anything left unresolved further
+Games already parked as postponed, cancelled or quarantined are excluded, so an
+unanswered game cannot pin the slate to its date forever. Anything left unresolved further
 than ``UNRESOLVED_GRACE_DAYS`` behind the frontier is quarantined here as a
 second line of defence, for games that never made it into the pending directory
 to have their attempts counted.
@@ -22,6 +22,7 @@ import pandas as pd
 
 from src.config.constants import FETCH_ATTEMPTS_KEY, UNRESOLVED_GRACE_DAYS
 from src.config.paths import (
+    CANCELLED_GAMES_DIR,
     PROCESSED_LEAGUE_SCHEDULE_PATH,
     INGESTED_GAMES_UPDATED_HISTORY_PATH,
     POSTPONED_GAMES_DIR,
@@ -71,11 +72,11 @@ def _load_schedule(schedule_path: Path) -> pd.DataFrame:
 
 
 def _parked_game_ids(*directories: Path) -> set[int]:
-    """gameIds already parked as postponed or quarantined.
+    """gameIds already parked as postponed, cancelled or quarantined.
 
     These are deliberately not collected again: they are waiting on a makeup
-    date or on a human, and re-emitting them would put back the exact deadlock
-    the quarantine exists to break.
+    date or on a human, or will never be played, and re-emitting them would put
+    back the exact deadlock the quarantine exists to break.
     """
     parked: set[int] = set()
     for directory in directories:
@@ -153,11 +154,9 @@ def _get_next_upcoming_games(
     postponed_dir: Path | None = None,
     unresolved_dir: Path | None = None,
     grace_days: int = UNRESOLVED_GRACE_DAYS,
+    cancelled_dir: Path | None = None,
 ) -> pd.DataFrame:
     """The earliest slate of scheduled games that history does not yet know."""
-    frontier = games_played["gameDate"].max()
-    logger.info(f"History frontier: {frontier.date()}")
-
     # A postponed row records a game that did not happen, so it does not settle
     # anything: the fixture is still owed. Counting those rows as played is what
     # would strand a makeup game forever — the schedule moves it to a new date
@@ -171,10 +170,16 @@ def _get_next_upcoming_games(
         if owed:
             logger.info(f"{owed} postponed row(s) in history still owe a fixture")
 
+    # The frontier is the last game *played*. A postponed row can carry a date
+    # past it (the archive dates some 0-0 rows on their makeup day), and letting
+    # that row set the frontier would quarantine every real game behind it.
+    frontier = settled["gameDate"].max()
+    logger.info(f"History frontier: {frontier.date()}")
+
     played_ids = set(
         pd.to_numeric(settled["gameId"], errors="coerce").dropna().astype(int)
     )
-    parked_ids = _parked_game_ids(postponed_dir, unresolved_dir)
+    parked_ids = _parked_game_ids(postponed_dir, unresolved_dir, cancelled_dir)
     if parked_ids:
         logger.info(f"Skipping {len(parked_ids)} parked game(s)")
 
@@ -264,10 +269,62 @@ def _save_upcoming_games(upcoming_games: pd.DataFrame, output_path: Path) -> Non
     )
 
 
+PAYLOAD_COLUMNS = [
+    "gameId",
+    "gameDate",
+    "gameDateOnlyStr",
+    "gameTime",
+    "arenaCity",
+    "arenaName",
+    "hometeamId",
+    "homeTeamCity",
+    "homeTeamName",
+    "hometeamConference",
+    "awayteamId",
+    "awayTeamCity",
+    "awayTeamName",
+    "awayteamConference",
+    "winnerteamConference",
+    "season",
+    "is_neutral_court_game",
+    "gameLabel",
+    "gameSubLabel",
+]
+
+
+def build_pending_payloads(games: pd.DataFrame, teams_history_path: Path | None = None) -> pd.DataFrame:
+    """Schedule-shaped rows → the pending payload columns every collected game carries.
+
+    Shared by the selector and by ``requeue_games``, so a game put back by hand
+    is described exactly like one the selector found.
+    """
+    games = games.copy()
+    games["season"] = games["gameDateTimeEstLocal"].apply(get_nba_season)
+    teams_history = load_teams_history_table(
+        teams_history_path or TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH
+    )
+    games = add_conference(games, teams_history, ignore_winner_column=True)
+
+    # Add neutral court game flag. gameLabel is kept rather than dropped: it and
+    # gameSubLabel are the schedule's own description of what kind of game this
+    # is, and the results payload has no other way to carry that to the append
+    # step — which is what keeps NBA Cup and playoff games out of the
+    # regular-season table.
+    games = add_neutral_court_game_flag(
+        games, game_label_column="gameLabel", drop_label_column=False
+    )
+
+    games = games.drop(columns=["gameDate"], errors="ignore")
+    games = games.rename(columns={"gameDateTimeEstLocal": "gameDate"})
+    games = add_game_time(games)
+    return games[PAYLOAD_COLUMNS].copy()
+
+
 def get_upcoming_games(
     postponed_dir: Path = POSTPONED_GAMES_DIR,
     unresolved_dir: Path = UNRESOLVED_GAMES_DIR,
     output_dir: Path = UPCOMING_GAMES_DIR,
+    cancelled_dir: Path = CANCELLED_GAMES_DIR,
 ) -> None:
     schedule = _load_schedule(PROCESSED_LEAGUE_SCHEDULE_PATH)
     games_played = _load_games_played(INGESTED_GAMES_UPDATED_HISTORY_PATH)
@@ -280,6 +337,7 @@ def get_upcoming_games(
         games_played,
         postponed_dir=postponed_dir,
         unresolved_dir=unresolved_dir,
+        cancelled_dir=cancelled_dir,
     )
 
     if upcoming_games.empty:
@@ -287,51 +345,4 @@ def get_upcoming_games(
         _save_upcoming_games(upcoming_games, output_dir)
         return
 
-    upcoming_games["season"] = upcoming_games["gameDateTimeEstLocal"].apply(
-        get_nba_season
-    )
-    teams_history = load_teams_history_table(
-        TEAMS_CITIES_CONFERENCE_HISTORY_PROCESSED_PATH
-    )
-    upcoming_games = add_conference(
-        upcoming_games, teams_history, ignore_winner_column=True
-    )
-
-    # Add neutral court game flag. gameLabel is kept rather than dropped: it and
-    # gameSubLabel are the schedule's own description of what kind of game this
-    # is, and the results payload has no other way to carry that to the append
-    # step — which is what keeps NBA Cup and playoff games out of the
-    # regular-season table.
-    upcoming_games = add_neutral_court_game_flag(
-        upcoming_games, game_label_column="gameLabel", drop_label_column=False
-    )
-
-    upcoming_games = upcoming_games.drop(columns=["gameDate"], errors="ignore")
-    upcoming_games = upcoming_games.rename(columns={"gameDateTimeEstLocal": "gameDate"})
-    upcoming_games = add_game_time(upcoming_games)
-    upcoming_games = upcoming_games[
-        [
-            "gameId",
-            "gameDate",
-            "gameDateOnlyStr",
-            "gameTime",
-            "arenaCity",
-            "arenaName",
-            "hometeamId",
-            "homeTeamCity",
-            "homeTeamName",
-            "hometeamConference",
-            "awayteamId",
-            "awayTeamCity",
-            "awayTeamName",
-            "awayteamConference",
-            "winnerteamConference",
-            "season",
-            "is_neutral_court_game",
-            "gameLabel",
-            "gameSubLabel",
-        ]
-    ].copy()
-
-    _save_upcoming_games(upcoming_games, output_dir)
-    return
+    _save_upcoming_games(build_pending_payloads(upcoming_games), output_dir)

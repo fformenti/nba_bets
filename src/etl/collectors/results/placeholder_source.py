@@ -23,7 +23,11 @@ To exercise the other outcomes, set ``"status"`` explicitly to any
 .. code-block:: json
 
     {"status": "postponed"}
+    {"status": "cancelled"}
     {"status": "in_progress", "homeTeamFinalScore": 54, "awayTeamFinalScore": 61}
+
+An optional ``"gameDate": "YYYY-MM-DD"`` says when the game was actually played
+(or, for a postponed one, its new date), exactly as a live source would.
 
 **Replacing this:** implement :class:`~src.etl.collectors.results.base.ResultsSource`
 in a new module here and register it in ``__init__.py``. No caller changes —
@@ -70,6 +74,7 @@ class PlaceholderResultsSource:
             return GameResult(
                 postponed=1 if status is GameStatus.POSTPONED else 0,
                 status=status,
+                game_date=payload.get("gameDate"),
             )
 
         try:
@@ -94,6 +99,7 @@ class PlaceholderResultsSource:
             attendance=payload.get("attendance"),
             inactive_players=payload.get("inactivePlayers", []),
             status=GameStatus.FINAL,
+            game_date=payload.get("gameDate"),
         )
 
     @staticmethod

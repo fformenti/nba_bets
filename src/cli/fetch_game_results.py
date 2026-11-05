@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 
 from src.config.paths import (
+    CANCELLED_GAMES_DIR,
     POSTPONED_GAMES_DIR,
     UNRESOLVED_GAMES_DIR,
     UPCOMING_GAMES_DIR,
@@ -38,6 +39,12 @@ def main() -> None:
         help="Where postponed games are parked to be watched for a makeup date.",
     )
     parser.add_argument(
+        "--cancelled-dir",
+        type=Path,
+        default=CANCELLED_GAMES_DIR,
+        help="Where cancelled games are recorded. Nothing watches them.",
+    )
+    parser.add_argument(
         "--unresolved-dir",
         type=Path,
         default=UNRESOLVED_GAMES_DIR,
@@ -60,6 +67,7 @@ def main() -> None:
         args.output_dir,
         source=args.source,
         postponed_dir=args.postponed_dir,
+        cancelled_dir=args.cancelled_dir,
         unresolved_dir=args.unresolved_dir,
         **kwargs,
     )

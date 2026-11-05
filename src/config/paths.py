@@ -74,6 +74,12 @@ LOCATIONS_DISTANCES_PATH = RAW_REFERENCE_DIR / "locations_distances.csv"
 TEAMS_CITIES_CONFERENCE_HISTORY_HANDMADE_PATH = (
     RAW_HISTORICAL_DIR / "handmade" / "TeamsHistoriesConferenceNBA.csv"
 )
+# Tip-offs the raw archive records 5 h early (2025-11-21 to 2026-01-24), each with
+# the archive's wrong value so a corrected upstream copy is left alone.
+# See docs/findings/pipeline/2026-11-05-games-archive-corrections.md.
+GAMES_TIPOFF_CORRECTIONS_PATH = (
+    RAW_HISTORICAL_DIR / "handmade" / "games_tipoff_corrections.csv"
+)
 
 # ===== Collected =====
 # One directory per state a fetched game can be in. A game moves forward through
@@ -90,12 +96,27 @@ ARCHIVE_RESULTS_DIR = RAW_INCREMENTAL_ARCHIVE_DIR / "results"
 # Parked: the source reported the game postponed. Watched against a refreshed
 # schedule for a makeup date; never written to history as a played game.
 POSTPONED_GAMES_DIR = RAW_INCREMENTAL_DIR / "postponed"
+# Closed: the source reported the game cancelled. Unlike a postponed game it is
+# owed nothing, so nothing watches it, and it is never written to history.
+CANCELLED_GAMES_DIR = RAW_INCREMENTAL_DIR / "cancelled"
 # Quarantine: the source never returned a terminal status. Held here so a single
 # unanswerable game cannot block the rest of the pipeline. Needs a human.
 UNRESOLVED_GAMES_DIR = RAW_INCREMENTAL_DIR / "unresolved"
 # Hand-dropped outcomes read by the placeholder results source, until a real
 # provider is chosen. See src/etl/collectors/results/placeholder_source.py.
 MANUAL_RESULTS_DIR = RAW_INCREMENTAL_DIR / "manual_results"
+
+# Box scores, one parquet per season and kind, as published by the
+# sportsdataverse release (src/etl/collectors/boxscores.py). Not game history:
+# nothing here is ever written to INGESTED_GAMES_UPDATED_HISTORY_PATH. The
+# manifest records which release timestamp each stored season came from.
+RAW_BOXSCORES_DIR = RAW_DIR / "boxscores"
+RAW_TEAM_BOXSCORES_DIR = RAW_BOXSCORES_DIR / "team"
+RAW_PLAYER_BOXSCORES_DIR = RAW_BOXSCORES_DIR / "player"
+RAW_BOXSCORES_MANIFEST_PATH = RAW_BOXSCORES_DIR / "manifest.json"
+# Past-dated games the release lists with no result, so no box score is stored:
+# cancelled once their season is over, postponed while it is current.
+RAW_BOXSCORES_UNPLAYED_PATH = RAW_BOXSCORES_DIR / "unplayed_games.csv"
 
 # ===== Ingested =====
 # The authoritative game history — the only ingested table, written by exactly
@@ -118,6 +139,8 @@ POLYMARKET_TEAMS_ABV_PATH = PROCESSED_DIR / "polymarket_teams_abv.csv"
 PROCESSED_LEAGUE_SCHEDULE_PATH = PROCESSED_DIR / "league_schedule.csv"
 REGULAR_SEASON_GAMES_PATH = REGULAR_SEASON_DIR / "games.csv"
 NON_POSITIVE_SCORE_PATH = REGULAR_SEASON_DIR / "non_positive_score.csv"
+# One row per season: the box score checks against themselves and our history.
+BOXSCORES_VALIDATION_PATH = PROCESSED_DIR / "boxscores_validation.csv"
 
 # Feature tables paths
 REGULAR_SEASON_FEATURES_DIR = PROCESSED_DIR / "regular_season" / "features"

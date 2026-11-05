@@ -150,8 +150,24 @@ def test_a_rescheduled_game_replaces_its_old_row(dirs, history_path):
     """The bug that duplicated 22500529: the date moves, the gameId does not."""
     inbox = dirs[0]
 
-    _drop(inbox, _result_payload(22500002, "2026-01-08", 0, 0, postponed=1, winner=0))
-    _append(dirs, history_path)
+    # The archive's 0-0 row for the original fixture, as `ingest-raw-games` writes
+    # it. A results payload saying "postponed" never reaches history (see the next
+    # test), so the row is seeded directly.
+    pd.DataFrame(
+        [
+            {
+                "gameId": 22500002,
+                "gameDate": pd.Timestamp("2026-01-08 20:00"),
+                "gameDateOnlyStr": "2026-01-08",
+                "hometeamId": HOME,
+                "awayteamId": AWAY,
+                "homeScore": 0,
+                "awayScore": 0,
+                "winner": 0,
+                "postponed": 1,
+            }
+        ]
+    ).to_csv(history_path, index=False)
 
     _drop(inbox, _result_payload(22500002, "2026-01-29", 113, 116))
     combined = _append(dirs, history_path)
@@ -182,6 +198,7 @@ def test_postponed_payloads_never_enter_history(dirs, history_path):
         (22500002, "Regular Season"),
         (42500101, "Playoffs"),
         (52500001, "Play-in Tournament"),
+        (62500001, "NBA Cup Championship"),
     ],
 )
 def test_game_type_is_derived_from_the_game_id(dirs, history_path, game_id, expected):

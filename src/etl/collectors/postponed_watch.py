@@ -28,23 +28,43 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def _scheduled_dates(schedule_path: Path) -> dict[int, str]:
-    """gameId → scheduled date, as ``YYYY-MM-DD``."""
+def _scheduled_tipoffs(schedule_path: Path) -> dict[int, pd.Timestamp]:
+    """gameId → scheduled tip-off, as naive Eastern wall time.
+
+    The schedule stamps a "Z" on times that are Eastern, so the label is
+    dropped rather than converted — the same convention as the selector's
+    ``_load_schedule``, which is what wrote the parked payload's ``gameDate``.
+    """
     schedule = pd.read_csv(schedule_path)
-    dates = pd.to_datetime(schedule["gameDateTimeEst"], utc=True, errors="coerce")
+    tipoffs = pd.to_datetime(schedule["gameDateTimeEst"], utc=True, errors="coerce")
+    tipoffs = tipoffs.dt.tz_convert(None)
     ids = pd.to_numeric(schedule["gameId"], errors="coerce")
     return {
-        int(game_id): date.strftime("%Y-%m-%d")
-        for game_id, date in zip(ids, dates, strict=True)
-        if pd.notna(game_id) and pd.notna(date)
+        int(game_id): tipoff
+        for game_id, tipoff in zip(ids, tipoffs, strict=True)
+        if pd.notna(game_id) and pd.notna(tipoff)
     }
+
+
+def _parked_tipoff(payload: dict) -> pd.Timestamp | None:
+    tipoff = pd.to_datetime(payload.get("gameDate"), errors="coerce")
+    if pd.isna(tipoff):
+        tipoff = pd.to_datetime(payload.get("gameDateOnlyStr"), errors="coerce")
+    if pd.isna(tipoff):
+        return None
+    return tipoff.tz_localize(None) if tipoff.tzinfo is not None else tipoff
 
 
 def reconcile_postponed_games(
     postponed_dir: Path | None = None,
     schedule_path: Path | None = None,
 ) -> list[int]:
-    """Release parked games whose schedule date has moved. Returns their ids."""
+    """Release parked games whose scheduled tip-off has moved. Returns their ids.
+
+    The whole tip-off is compared, not just the calendar date: a game suspended
+    and resumed later the same day, or pushed back a few hours, would otherwise
+    never be released and its result never collected.
+    """
     postponed_dir = postponed_dir or POSTPONED_GAMES_DIR
     schedule_path = schedule_path or PROCESSED_LEAGUE_SCHEDULE_PATH
 
@@ -57,7 +77,7 @@ def reconcile_postponed_games(
         logger.info("No postponed games being watched")
         return []
 
-    scheduled = _scheduled_dates(schedule_path)
+    scheduled = _scheduled_tipoffs(schedule_path)
     released: list[int] = []
 
     for path in parked:
@@ -68,18 +88,24 @@ def reconcile_postponed_games(
             logger.warning("Skipping %s: unreadable gameId", path.name)
             continue
 
-        parked_date = payload.get("gameDateOnlyStr")
-        new_date = scheduled.get(game_id)
+        parked_tipoff = _parked_tipoff(payload)
+        new_tipoff = scheduled.get(game_id)
 
-        if new_date is None:
-            logger.info(
-                "Game %s is no longer on the schedule; leaving it parked", game_id
+        if new_tipoff is None:
+            # Either the season's schedule has rolled over or the league dropped
+            # the game. A cancellation is reported by the results source, which
+            # moves the game to cancelled/; until then a human has to look.
+            logger.warning(
+                "Game %s is no longer on the schedule; leaving it parked. "
+                "If it was cancelled, move %s to the cancelled directory.",
+                game_id,
+                path.name,
             )
             continue
 
-        if new_date == parked_date:
+        if new_tipoff == parked_tipoff:
             logger.info(
-                "Game %s still shows %s; no makeup date yet", game_id, parked_date
+                "Game %s still shows %s; no makeup date yet", game_id, parked_tipoff
             )
             continue
 
@@ -88,8 +114,8 @@ def reconcile_postponed_games(
         logger.info(
             "Game %s rescheduled %s → %s; released for collection",
             game_id,
-            parked_date,
-            new_date,
+            parked_tipoff,
+            new_tipoff,
         )
 
     logger.info("Released %d of %d watched game(s)", len(released), len(parked))

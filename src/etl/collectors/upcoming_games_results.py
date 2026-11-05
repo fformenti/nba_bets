@@ -9,10 +9,18 @@ source reports and never by the scoreline:
 
 ``FINAL``
     Enriched with the score and moved to the results inbox, ready for
-    ``append-game-results`` to fold into history.
+    ``append-game-results`` to fold into history. When the source says the game
+    was played on another day than the payload's, the payload takes the played
+    date: history is ordered by it, and every feature reads "the games before
+    this one" off that order.
 ``POSTPONED``
     Moved to the postponed directory, where ``reconcile-postponed`` watches for
-    a makeup date. It is never written to history as a played game.
+    a makeup date. It is never written to history as a played game. A game the
+    source reports on a later date than the payload's, once its original tip-off
+    has passed, is postponed too: that is what a reschedule looks like.
+``CANCELLED``
+    Moved to the cancelled directory and left there. Nothing watches it, and it
+    is never written to history.
 ``SCHEDULED`` / ``IN_PROGRESS`` / ``UNKNOWN``
     Left pending. Once a game has been asked about ``MAX_FETCH_ATTEMPTS`` times
     *after its scheduled tip-off* without a terminal answer it is moved to the
@@ -112,6 +120,34 @@ def resolve_winner_team_id(payload: dict, result) -> int:
     return payload["hometeamId"] if is_home_win else payload["awayteamId"]
 
 
+def _with_played_date(payload: dict, played_date: str, game_id: str) -> dict:
+    """The payload re-dated to the day the game was played, keeping its tip-off time.
+
+    The source knows the date, not the time; the schedule's time of day is the
+    best one available. The date the payload carried is kept for the audit trail.
+    """
+    scheduled = pd.to_datetime(payload.get("gameDate"), errors="coerce")
+    time_of_day = scheduled.strftime("%H:%M:%S") if pd.notna(scheduled) else "00:00:00"
+    logger.warning(
+        f"Game {game_id} was played on {played_date}, not on the payload's "
+        f"{payload.get('gameDateOnlyStr')}; recording the played date"
+    )
+    return {
+        **payload,
+        "scheduledGameDate": payload.get("gameDateOnlyStr"),
+        "gameDate": f"{played_date}T{time_of_day}.000",
+        "gameDateOnlyStr": played_date,
+    }
+
+
+def _park(payload: dict, input_path: Path, directory: Path, game_id: str, what: str) -> Path:
+    destination = directory / input_path.name
+    _write_payload(payload, destination)
+    input_path.unlink()
+    logger.info(f"Game {game_id} {what}; parked at {_display_path(destination)}")
+    return destination
+
+
 def enrich_upcoming_game_result(
     input_path: Path,
     output_dir: Path,
@@ -119,6 +155,7 @@ def enrich_upcoming_game_result(
     postponed_dir: Path | None = None,
     unresolved_dir: Path | None = None,
     max_attempts: int = MAX_FETCH_ATTEMPTS,
+    cancelled_dir: Path | None = None,
 ) -> tuple[GameStatus, Path | None]:
     """Ask the source about one pending game and move it to where it belongs.
 
@@ -149,6 +186,15 @@ def enrich_upcoming_game_result(
         return GameStatus.UNKNOWN, None
 
     status = result.status
+    payload_date = payload.get("gameDateOnlyStr")
+    moved_later = bool(result.game_date and payload_date and result.game_date > payload_date)
+
+    if not status.is_terminal and moved_later and _has_tipped_off(payload):
+        logger.info(
+            f"Game {game_id} did not happen on {payload_date}; the source now has it "
+            f"on {result.game_date}"
+        )
+        status = GameStatus.POSTPONED
 
     if not status.is_terminal:
         if not _has_tipped_off(payload):
@@ -176,19 +222,19 @@ def enrich_upcoming_game_result(
     payload["status"] = status.value
     payload.pop(ATTEMPTS_KEY, None)
 
-    if status is GameStatus.POSTPONED:
-        if postponed_dir is None:
+    if status in (GameStatus.POSTPONED, GameStatus.CANCELLED):
+        directory = postponed_dir if status is GameStatus.POSTPONED else cancelled_dir
+        if directory is None:
             logger.warning(
-                f"Game {game_id} is postponed but no postponed directory was given; "
+                f"Game {game_id} is {status.value} but no directory was given for it; "
                 "leaving it pending"
             )
             return status, None
-        payload["postponed"] = 1
-        destination = postponed_dir / input_path.name
-        _write_payload(payload, destination)
-        input_path.unlink()
-        logger.info(f"Game {game_id} postponed; parked at {_display_path(destination)}")
-        return status, destination
+        payload["postponed"] = 1 if status is GameStatus.POSTPONED else 0
+        return status, _park(payload, input_path, directory, game_id, status.value)
+
+    if result.game_date and result.game_date != payload_date:
+        payload = _with_played_date(payload, result.game_date, game_id)
 
     payload["homeTeamFinalScore"] = result.home_score
     payload["awayTeamFinalScore"] = result.away_score
@@ -230,11 +276,13 @@ def enrich_upcoming_games_results(
     postponed_dir: Path | None = None,
     unresolved_dir: Path | None = None,
     max_attempts: int = MAX_FETCH_ATTEMPTS,
+    cancelled_dir: Path | None = None,
 ) -> dict[str, list[Path]]:
     """Resolve every pending game in ``input_dir``.
 
     Returns the paths written, grouped by what happened: ``final``,
-    ``postponed``, ``quarantined``, and ``pending`` (still in ``input_dir``).
+    ``postponed``, ``cancelled``, ``quarantined``, and ``pending`` (still in
+    ``input_dir``).
     """
     if isinstance(source, str):
         source = get_results_source(source)
@@ -253,6 +301,7 @@ def enrich_upcoming_games_results(
     outcomes: dict[str, list[Path]] = {
         "final": [],
         "postponed": [],
+        "cancelled": [],
         "quarantined": [],
         "pending": [],
     }
@@ -268,6 +317,7 @@ def enrich_upcoming_games_results(
             postponed_dir=postponed_dir,
             unresolved_dir=unresolved_dir,
             max_attempts=max_attempts,
+            cancelled_dir=cancelled_dir,
         )
         if written is None:
             outcomes["pending"].append(input_path)
@@ -275,16 +325,19 @@ def enrich_upcoming_games_results(
             outcomes["final"].append(written)
         elif status is GameStatus.POSTPONED:
             outcomes["postponed"].append(written)
+        elif status is GameStatus.CANCELLED:
+            outcomes["cancelled"].append(written)
         else:
             outcomes["quarantined"].append(written)
 
     logger.info(
         "Resolved %d pending game(s) using '%s': %d final, %d postponed, "
-        "%d still pending, %d quarantined",
+        "%d cancelled, %d still pending, %d quarantined",
         len(pending),
         source.name,
         len(outcomes["final"]),
         len(outcomes["postponed"]),
+        len(outcomes["cancelled"]),
         len(outcomes["pending"]),
         len(outcomes["quarantined"]),
     )

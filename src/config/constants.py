@@ -47,7 +47,14 @@ GAME_ID_TYPE_PREFIX = {
     "3": "All-Star",
     "4": "Playoffs",
     "5": "Play-in Tournament",
+    "6": "NBA Cup Championship",
 }
+
+# The NBA Cup final is the one Cup game outside the regular-season standings, so
+# it never counts towards a record, a streak or any team or player stat. The raw
+# archive files it under three different gameTypes (one per season, one of them
+# "Regular Season"); its gameId prefix is the only consistent marker.
+NBA_CUP_CHAMPIONSHIP_GAME_TYPE = GAME_ID_TYPE_PREFIX["6"]
 
 # Only these game types belong in the regular-season table.
 REGULAR_SEASON_GAME_TYPE = "Regular Season"

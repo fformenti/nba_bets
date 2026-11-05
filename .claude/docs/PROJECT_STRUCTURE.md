@@ -85,6 +85,8 @@ src/
 │   ├── fetch_league_schedule.py        # make fetch-league-schedule
 │   ├── fetch_upcoming_games.py         # make fetch-upcoming-games
 │   ├── fetch_game_results.py           # make fetch-game-results SOURCE=nba_api|placeholder
+│   ├── fetch_boxscores.py              # make fetch-boxscores (backfill + current-season refresh)
+│   ├── requeue_games.py                # make requeue-games GAME_IDS=… (past games back to pending)
 │   ├── append_game_results.py          # make append-game-results
 │   ├── reconcile_postponed.py          # make reconcile-postponed
 │   ├── retry_unresolved.py             # make retry-unresolved
@@ -133,9 +135,14 @@ src/
 │   │   ├── upcoming_games.py           # Next slate: what the schedule has and history lacks
 │   │   ├── upcoming_games_results.py   # Route each game by status; count attempts
 │   │   ├── postponed_watch.py          # Release parked/quarantined games
+│   │   ├── sportsdataverse.py          # Release download: retries, schema guard, season keys
+│   │   ├── boxscores.py                # Team/player box scores, played games only, dated
+│   │   ├── boxscores_validation.py     # Per-season counts vs. themselves and our history
+│   │   ├── requeue_games.py            # Past games back to pending, dated from the release
 │   │   └── results/                    # PLUGGABLE outcome retrieval
 │   │       ├── base.py                 # GameResult + GameStatus + ResultsSource protocol
 │   │       ├── nba_api_source.py       # stats.nba.com (default)
+│   │       ├── release_source.py       # sportsdataverse releases: score + played date
 │   │       └── placeholder_source.py   # TODO: stand-in reading manual_results/
 │   │
 │   ├── reference/                      # Slow-moving lookup tables
@@ -264,9 +271,13 @@ src/
   per state, so "where is this file?" answers "what happened to it?":
   `upcoming_games/` (pending, no terminal result yet), `upcoming_games_results/`
   (final score fetched, not yet in history), `archive/results/` (consumed),
-  `postponed/` (parked, watched for a makeup date), `unresolved/` (quarantined —
+  `postponed/` (parked, watched for a makeup date), `cancelled/` (never played,
+  never watched), `unresolved/` (quarantined —
   the source never settled it), and `manual_results/` (hand-dropped outcomes for
-  the placeholder source). `ingested/` holds exactly one table,
+  the placeholder source). `raw/boxscores/` holds team and player box scores of
+  played games, one parquet per season, a manifest, and `unplayed_games.csv`
+  (cancelled and postponed games) — see docs/reference/boxscores.md. The
+  lifecycle of a collected game: docs/reference/game-lifecycle.md. `ingested/` holds exactly one table,
   `games_updated_history.csv`, the record every downstream step reads:
   `ingest-raw-games` merges the raw archive into it and `append-game-results`
   adds the results inbox to it.

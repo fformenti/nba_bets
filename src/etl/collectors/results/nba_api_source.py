@@ -12,6 +12,7 @@ import re
 import time
 from typing import Any
 
+import pandas as pd
 import requests
 from nba_api.stats.endpoints import boxscoresummaryv2, boxscoresummaryv3
 
@@ -31,8 +32,11 @@ _STATUS_ID_TO_STATUS = {
     3: GameStatus.FINAL,
 }
 
-# A postponed game keeps status id 1 or 3 and announces itself in the text only.
-_NOT_PLAYED_PATTERN = re.compile(r"\b(PPD|Postponed|Cancell?ed|Suspended)\b", re.IGNORECASE)
+# A game that did not happen keeps status id 1 or 3 and announces itself in the
+# text only. A suspended game is resumed later, so it is owed like a postponed
+# one; a cancelled game is owed nothing.
+_CANCELLED_PATTERN = re.compile(r"\bCancell?ed\b", re.IGNORECASE)
+_POSTPONED_PATTERN = re.compile(r"\b(PPD|Postponed|Suspended)\b", re.IGNORECASE)
 
 
 def _result_sets_by_name(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -66,7 +70,9 @@ def _parse_game_status(
     box score has not been published, and treating it as either would write
     something untrue into history.
     """
-    if status_text and _NOT_PLAYED_PATTERN.search(status_text):
+    if status_text and _CANCELLED_PATTERN.search(status_text):
+        return GameStatus.CANCELLED
+    if status_text and _POSTPONED_PATTERN.search(status_text):
         return GameStatus.POSTPONED
 
     status = _STATUS_ID_TO_STATUS.get(_coerce_int(status_id), GameStatus.UNKNOWN)
@@ -105,6 +111,14 @@ def _count_overtimes_from_line_score(line_score: dict[str, Any]) -> int | None:
         if value is not None and str(value) != "":
             overtime_count += 1
     return overtime_count
+
+
+def _game_date(value: Any) -> str | None:
+    """``YYYY-MM-DD`` from the summary's Eastern date (``2026-01-29T00:00:00``)."""
+    if not value:
+        return None
+    parsed = pd.to_datetime(str(value)[:10], errors="coerce")
+    return None if pd.isna(parsed) else parsed.strftime("%Y-%m-%d")
 
 
 def _coerce_int(value: Any) -> int | None:
@@ -210,6 +224,7 @@ def _fetch_game_result_legacy(game_id: str) -> dict[str, Any]:
             attendance=attendance,
             inactive_players=inactive_players,
             status=status,
+            game_date=_game_date(summary.get("GAME_DATE_EST")),
         ),
         "status": "success",
         "status_code": 200,
@@ -287,6 +302,7 @@ def _fetch_game_result_v3(game_id: str) -> dict[str, Any]:
             attendance=attendance,
             inactive_players=inactive_players,
             status=status,
+            game_date=_game_date(summary.get("gameEt")),
         ),
         "status": "success",
         "status_code": 200,

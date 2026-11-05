@@ -23,12 +23,17 @@ class GameStatus(str, Enum):
 
     ``UNKNOWN`` is the safe bucket. An ambiguous or unparseable status must
     leave the game pending rather than commit a guess to the history table.
+
+    ``POSTPONED`` and ``CANCELLED`` are different promises. A postponed game is
+    still owed: it is watched until the schedule gives it a new date. A
+    cancelled game never will be played, so nothing watches it.
     """
 
     FINAL = "final"
     SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
     POSTPONED = "postponed"
+    CANCELLED = "cancelled"
     UNKNOWN = "unknown"
 
     @property
@@ -38,7 +43,7 @@ class GameStatus(str, Enum):
         Terminal statuses move the payload out of the pending directory. The
         rest leave it there to be asked about again.
         """
-        return self in (GameStatus.FINAL, GameStatus.POSTPONED)
+        return self in (GameStatus.FINAL, GameStatus.POSTPONED, GameStatus.CANCELLED)
 
 
 @dataclass
@@ -48,6 +53,12 @@ class GameResult:
     ``status`` drives every routing decision downstream. ``postponed`` is kept
     because the historical backfill uses it as a column, and is derived from
     ``status`` rather than the other way round.
+
+    ``game_date`` (``YYYY-MM-DD``, Eastern) is the date the source says the game
+    was played, or is now scheduled for. It is what puts a makeup game in its
+    true place in history: the pending payload only knows the schedule's date
+    as of the last time the collector looked. ``None`` when the source does not
+    say, and then the payload's date stands.
     """
 
     home_score: int = 0
@@ -58,6 +69,7 @@ class GameResult:
     attendance: int | None = None
     inactive_players: list[dict[str, Any]] = field(default_factory=list)
     status: GameStatus = GameStatus.UNKNOWN
+    game_date: str | None = None
 
 
 @runtime_checkable
