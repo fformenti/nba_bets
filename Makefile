@@ -21,7 +21,8 @@ RUN               ?= latest
 SPLIT             ?=
 # Where finished-game outcomes come from: nba_api | release | placeholder.
 # See src/etl/collectors/results/ — 'placeholder' reads hand-dropped files.
-SOURCE            ?= nba_api
+# 'release' is the default: stats.nba.com times out from the laptop.
+SOURCE            ?= release
 # Game date for bet placement, as YYYY-MM-DD.
 GAME_DATE         ?=
 
@@ -103,7 +104,7 @@ fetch-boxscores:
 # Re-pull the schedule. This is what makes makeup dates for postponed games
 # visible; without it the schedule freezes on the day it was downloaded.
 fetch-league-schedule:
-	uv run python -m src.cli.fetch_league_schedule
+	uv run python -m src.cli.fetch_league_schedule $(if $(KEEP_CACHED_SCHEDULE),--keep-cached-on-failure,)
 
 fetch-upcoming-games:
 	uv run python -m src.cli.fetch_upcoming_games
@@ -272,7 +273,7 @@ process-results-pipeline:
 # Pending payloads persist between runs, so the results step still finds them.
 # Run with SOURCE=placeholder to exercise it without a live results feed.
 daily-cycle:
-	$(MAKE) fetch-league-schedule
+	$(MAKE) fetch-league-schedule KEEP_CACHED_SCHEDULE=1
 	$(MAKE) parse-league-schedule
 	$(MAKE) reconcile-postponed
 	$(MAKE) fetch-game-results

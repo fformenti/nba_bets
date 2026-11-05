@@ -50,10 +50,14 @@ so the tie-break never orders two games of the same team.
 
 ## Results sources
 
-`SOURCE=` in the Makefile picks one: `nba_api` (stats.nba.com, the default), `release` (the
-sportsdataverse GitHub releases; see [boxscores.md](boxscores.md)) or `placeholder` (hand-dropped
-files). The `release` source answers `final` with the played date, `scheduled` for a future date,
-`cancelled` for a past game in a season that is over, and `unknown` otherwise. Its data lags the
-games by up to a day.
+`SOURCE=` in the Makefile picks one: `release` (the sportsdataverse GitHub releases, the default;
+see [boxscores.md](boxscores.md)), `nba_api` (stats.nba.com, which times out from the laptop) or
+`placeholder` (hand-dropped files). The `release` source answers `final` with the played date,
+`scheduled` for a future date, `cancelled` for a past game in a season that is over, and `unknown`
+otherwise. Its data lags the games by up to a day.
+
+`daily-cycle` re-pulls the schedule from stats.nba.com first. If that is unreachable it keeps the
+schedule on disk and carries on; makeup dates published since then arrive on the next pull that
+succeeds. A standalone `make fetch-league-schedule` still fails loudly.
 
 Tests: `tests/test_postponed_lifecycle.py` runs games through the whole loop on tmp directories.

@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import requests
 from nba_api.stats.endpoints import scheduleleaguev2
 
 from src.config.constants import CURRENT_SEASON_START_YEAR
@@ -91,20 +92,38 @@ def _flatten_games(league_schedule: dict) -> list[dict]:
 def fetch_league_schedule(
     season: str | None = None,
     output_path: Path | None = None,
+    keep_cached_on_network_error: bool = False,
 ) -> pd.DataFrame:
     """Download the league schedule and write it to ``output_path``.
 
     The write is atomic and refuses to shrink the file materially: a bad pull
     must not take the schedule with it, because the schedule is what tells the
     collector which games exist at all.
+
+    With ``keep_cached_on_network_error``, an unreachable stats.nba.com leaves
+    the file on disk in place and returns it instead of raising. ``daily-cycle``
+    asks for this: a stale schedule only delays a postponed game's makeup date,
+    whereas failing here stopped the whole cycle, results included, every day
+    stats.nba.com was down. Only network errors are forgiven — an empty or
+    shrunken pull still raises, because that is a response worth looking at.
     """
     season = season or season_string()
     output_path = output_path or LEAGUE_SCHEDULE_PATH
 
     logger.info(f"Fetching the {season} league schedule")
-    response = scheduleleaguev2.ScheduleLeagueV2(
-        season=season, league_id=LEAGUE_ID, timeout=NBA_API_TIMEOUT
-    )
+    try:
+        response = scheduleleaguev2.ScheduleLeagueV2(
+            season=season, league_id=LEAGUE_ID, timeout=NBA_API_TIMEOUT
+        )
+    except requests.RequestException as error:
+        if not (keep_cached_on_network_error and output_path.exists()):
+            raise
+        logger.warning(
+            f"stats.nba.com unreachable ({type(error).__name__}); keeping the cached "
+            f"{output_path.name}. Makeup dates published since it was written will "
+            "not be seen until a pull succeeds."
+        )
+        return pd.read_csv(output_path)
     league_schedule = response.get_dict().get("leagueSchedule", {})
 
     rows = _flatten_games(league_schedule)

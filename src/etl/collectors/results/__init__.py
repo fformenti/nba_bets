@@ -17,7 +17,12 @@ SOURCES = {
     ReleaseResultsSource.name: ReleaseResultsSource,
 }
 
-DEFAULT_SOURCE = NBAApiResultsSource.name
+# The release is the default because stats.nba.com does not answer from the
+# machine the daily cycle runs on: every request hangs until it times out, so
+# nba_api leaves each game pending without ever spending an attempt, and the
+# cycle stalls without failing. The release lags games by up to a day and has no
+# attendance or inactive list; neither is a model input.
+DEFAULT_SOURCE = ReleaseResultsSource.name
 
 
 def get_results_source(name: str = DEFAULT_SOURCE, **kwargs) -> ResultsSource:
