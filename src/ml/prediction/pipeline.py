@@ -145,20 +145,22 @@ def _align_features(
     if feature_names is None:
         return features
 
+    # A column the model was trained on that the feature code does not produce
+    # at all is fatal whatever ``allow_missing`` says. That flag is for values
+    # that are legitimately empty (opening night has no rolling averages); a
+    # column that does not exist means the model predates a feature-code change
+    # and can never be served. Downgrading this to a log line is how a model
+    # trained on 14 features served for weeks with 7 of them gone, after commit
+    # 64fe7d8 removed them — retrain and promote instead.
     missing = [col for col in feature_names if col not in features.columns]
-    if missing and not allow_missing:
-        raise ValueError(f"Missing required features: {missing}")
-
-    # Log missing features
     if missing:
-        logger.info(f"Missing features that will be filled with NaN: {missing}")
-
-    aligned = features.copy()
-    for col in missing:
-        aligned[col] = np.nan  # Use numpy NaN instead of pd.NA for sklearn compatibility
+        raise ValueError(
+            f"The model needs {len(missing)} feature(s) the feature code no longer "
+            f"builds: {missing}. Retrain and promote (`make train PROMOTE=1`)."
+        )
 
     # Reorder columns to match feature_names
-    aligned = aligned[feature_names]
+    aligned = features[feature_names].copy()
 
     # A feature that is NaN for *every* row of the slate is a different animal
     # from one that is NaN for some of them. Per-row gaps are ordinary — a team

@@ -119,6 +119,19 @@ def test_allow_missing_downgrades_the_skew_to_a_warning(caplog):
     assert "NaN for every game" in caplog.text
 
 
+@pytest.mark.parametrize("allow_missing", [False, True])
+def test_feature_the_code_no_longer_builds_is_fatal(allow_missing):
+    """A column absent from the built features is a stale model, not a data gap.
+
+    allow_missing_features once downgraded this to a log line, and the deployed
+    model served with 7 of its 14 features imputed for weeks.
+    """
+    features = pd.DataFrame({"still_built": [1.0, 2.0]})
+
+    with pytest.raises(ValueError, match="no longer builds"):
+        _align_features(features, ["still_built", "removed"], allow_missing=allow_missing)
+
+
 def test_empty_slate_does_not_trip_the_guard():
     """No rows means no evidence either way — every column is trivially all-NaN."""
     features = pd.DataFrame({"a": pd.Series(dtype=float)})
