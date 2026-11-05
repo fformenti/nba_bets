@@ -140,13 +140,21 @@ def test_scoring_is_idempotent(predictions_path, history_path, empty_results_dir
     pd.testing.assert_frame_equal(first, second)
 
 
-def test_no_predictions_file_is_a_clear_error(tmp_path, history_path, empty_results_dir):
-    with pytest.raises(FileNotFoundError, match="predict-upcoming"):
-        score_predictions(
+def test_no_predictions_file_scores_nothing(tmp_path, history_path, empty_results_dir, caplog):
+    """A fresh pipeline has no predictions yet, and daily-cycle scores before it
+    predicts — raising here stopped the cycle before the file could be written."""
+    with caplog.at_level("WARNING"):
+        scorecard = score_predictions(
             predictions_path=tmp_path / "missing.csv",
             historical_path=history_path,
             results_dir=empty_results_dir,
+            scorecard_path=tmp_path / "scorecard.csv",
+            scored_games_path=tmp_path / "scored.csv",
         )
+
+    assert scorecard.empty
+    assert "predict-upcoming" in caplog.text
+    assert not (tmp_path / "scorecard.csv").exists()
 
 
 def test_the_scorer_and_the_writer_share_one_prediction_key():

@@ -198,11 +198,18 @@ def score_predictions(
     Writes a per-game detail CSV and a metrics scorecard, and returns the
     scorecard. Re-running is safe and idempotent — both files are rewritten from
     scratch off the durable inputs.
+
+    No predictions file is an empty scorecard, not an error: it is the state of
+    a fresh pipeline, and ``daily-cycle`` scores before it predicts. Raising
+    here stopped the cycle short of the step that writes the file, so it could
+    never start itself.
     """
     if not predictions_path.exists():
-        raise FileNotFoundError(
-            f"No predictions at {predictions_path}. Run `make predict-upcoming` first."
+        logger.warning(
+            f"No predictions at {predictions_path} yet; nothing to score. "
+            "`make predict-upcoming` writes it."
         )
+        return pd.DataFrame()
 
     predictions = pd.read_csv(predictions_path)
     logger.info(f"Loaded {len(predictions)} prediction(s) from {predictions_path.name}")
