@@ -262,31 +262,39 @@ class MLflowTracker:
             except Exception as e:
                 logger.warning(f"Could not infer MLflow signature: {e}")
 
-        try:
-            model_info = mlflow.sklearn.log_model(
-                sk_model=model,
-                name=artifact_path,
-                registered_model_name=registered_model_name,
-                extra_pip_requirements=extra_pip_requirements,
-                signature=signature,
-                input_example=input_example,
-            )
-            logger.info(f"Logged model to MLflow at {artifact_path}")
+        # cloudpickle, set explicitly. MLflow 3.17 switched the default to skops,
+        # which refuses the types in our pipelines (xgboost, the calibration
+        # wrapper) — and while the failure below was a warning, every run from
+        # 2026-10-21 to 2026-11-05 logged a model URI with no model behind it.
+        # cloudpickle is what the 3.8.1 runs wrote, so old and new runs load
+        # the same way. These artifacts are our own; skops' untrusted-input
+        # protection buys nothing here.
+        #
+        # A failure is not caught: a run whose model did not save must not go on
+        # to report a URI that `--promote` would deploy.
+        model_info = mlflow.sklearn.log_model(
+            sk_model=model,
+            name=artifact_path,
+            registered_model_name=registered_model_name,
+            extra_pip_requirements=extra_pip_requirements,
+            signature=signature,
+            input_example=input_example,
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+        )
+        logger.info(f"Logged model to MLflow at {artifact_path}")
 
-            if dataset_name and registered_model_name and model_info.registered_model_version:
-                try:
-                    client = MlflowClient()
-                    client.set_model_version_tag(
-                        name=registered_model_name,
-                        version=model_info.registered_model_version,
-                        key="dataset",
-                        value=dataset_name,
-                    )
-                    logger.debug(f"Set dataset tag '{dataset_name}' on model version {model_info.registered_model_version}")
-                except Exception as e:
-                    logger.warning(f"Could not set dataset tag on model version: {e}")
-        except Exception as e:
-            logger.warning(f"Error logging model to MLflow: {e}")
+        if dataset_name and registered_model_name and model_info.registered_model_version:
+            try:
+                client = MlflowClient()
+                client.set_model_version_tag(
+                    name=registered_model_name,
+                    version=model_info.registered_model_version,
+                    key="dataset",
+                    value=dataset_name,
+                )
+                logger.debug(f"Set dataset tag '{dataset_name}' on model version {model_info.registered_model_version}")
+            except Exception as e:
+                logger.warning(f"Could not set dataset tag on model version: {e}")
 
     def log_artifact(self, local_path: str, artifact_path: Optional[str] = None):
         """
