@@ -79,6 +79,8 @@ root. Architecture and layering rules live in [CLAUDE.md](../CLAUDE.md), and the
 
 - [llm-hub-revisions-vs-wandb-versions.md](explanations/llm-hub-revisions-vs-wandb-versions.md):
   finding and loading a specific LLM checkpoint after a training disconnect.
+- [llm-finetune-recipe-knobs.md](explanations/llm-finetune-recipe-knobs.md): what the LLM
+  fine-tune does, the three jobs a config knob can do, and which can move AUC.
 
 ## To do
 
